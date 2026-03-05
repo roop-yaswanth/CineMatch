@@ -7,6 +7,8 @@ from huggingface_hub import snapshot_download
 snapshot_download(repo_id="ml8r/cinematch-data", repo_type="dataset", local_dir="Data")
 ```
 
+[ml8r/cinematch-data at main](https://huggingface.co/datasets/ml8r/cinematch-data/tree/main) -> Link to Hugging Face data. 
+
 ---
 
 ## MovieLens 32M
