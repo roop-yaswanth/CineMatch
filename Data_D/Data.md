@@ -1,5 +1,14 @@
 # Data Sources
 
+All output data like faiss and other files is hosted on HuggingFace at `ml8r/cinematch-data`. To download:
+
+```bash
+from huggingface_hub import snapshot_download
+snapshot_download(repo_id="ml8r/cinematch-data", repo_type="dataset", local_dir="Data")
+```
+
+---
+
 ## MovieLens 32M
 
 - **Source:** https://grouplens.org/datasets/movielens/32m/
