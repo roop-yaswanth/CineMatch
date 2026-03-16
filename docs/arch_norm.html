@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CineMatch: System Architecture</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a;
+            color: #e2e8f0;
+        }
+
+        code,
+        pre {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .glass-card {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 0.75rem;
+        }
+
+        .math-block {
+            background: #020617;
+            border-left: 3px solid #6366f1;
+            padding: 1rem;
+            margin: 1rem 0;
+            overflow-x: auto;
+            border-radius: 0 0.5rem 0.5rem 0;
+        }
+
+        .correction-badge {
+            background: #9f1239;
+            color: #ffe4e6;
+            font-size: 0.7rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            display: inline-block;
+            margin-bottom: 0.5rem;
+        }
+
+        .update-badge {
+            background: #065f46;
+            color: #d1fae5;
+            font-size: 0.7rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            display: inline-block;
+            margin-bottom: 0.5rem;
+        }
+    </style>
+</head>
+
+<body class="flex h-screen overflow-hidden selection:bg-indigo-500/30">
+
+    <!-- Sidebar Navigation -->
+    <nav class="w-72 bg-slate-900 border-r border-slate-800 flex flex-col h-full flex-shrink-0 z-20 shadow-2xl">
+        <div class="p-6 border-b border-slate-800">
+            <h1 class="text-2xl font-bold text-white tracking-tight flex items-center">
+                <i class="fas fa-layer-group text-indigo-500 mr-3"></i>CineMatch
+            </h1>
+        </div>
+        <div class="flex-1 overflow-y-auto py-4 px-4 space-y-1">
+            <div class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 mt-4 px-2">1. Offline Stack</div>
+            <a href="#semantic" class="block px-2 py-2 text-sm text-slate-300 rounded hover:bg-slate-800"><i
+                    class="fas fa-language w-5 text-center text-blue-400 mr-2"></i>Semantic (Qwen3)</a>
+            <a href="#collaborative" class="block px-2 py-2 text-sm text-slate-300 rounded hover:bg-slate-800"><i
+                    class="fas fa-project-diagram w-5 text-center text-emerald-400 mr-2"></i>Graph (XSimGCL)</a>
+
+            <div class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 mt-6 px-2">2. Online Engine</div>
+            <a href="#retrieval" class="block px-2 py-2 text-sm text-slate-300 rounded hover:bg-slate-800"><i
+                    class="fas fa-bolt w-5 text-center text-amber-400 mr-2"></i>Dual Retrieval</a>
+            <a href="#reranker" class="block px-2 py-2 text-sm text-slate-300 rounded hover:bg-slate-800"><i
+                    class="fas fa-balance-scale w-5 text-center text-teal-400 mr-2"></i>Reranking & Fusion</a>
+            <a href="#diversity" class="block px-2 py-2 text-sm text-slate-300 rounded hover:bg-slate-800"><i
+                    class="fas fa-dice-d20 w-5 text-center text-purple-400 mr-2"></i>Set Diversity (DPP)</a>
+
+            <div class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 mt-6 px-2">3. Evaluation</div>
+            <a href="#metrics" class="block px-2 py-2 text-sm text-slate-300 rounded hover:bg-slate-800"><i
+                    class="fas fa-chart-pie w-5 text-center text-rose-400 mr-2"></i>Comprehensive Metrics</a>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="flex-1 overflow-y-auto bg-[#0b1120] relative scroll-smooth">
+        <div class="max-w-5xl mx-auto p-8 md:p-12 pb-32">
+
+            <!-- Title Header -->
+            <header class="mb-16 border-b border-slate-800 pb-8">
+
+                <h1 class="text-4xl md:text-5xl font-bold text-white mb-4 tracking-tight">CineMatch Implementation Guide
+                </h1>
+                <p class="text-slate-400 text-lg leading-relaxed">
+                    A cross-cultural recommendation pipeline optimized for long-tail international discovery. This
+                    architecture utilizes contrastive graph learning (XSimGCL) paired with instruction-aware LLM
+                    embeddings (Qwen3), finalized by Determinantal Point Processes (DPP) for rigorous set-level
+                    diversity.
+                </p>
+            </header>
+
+            <!-- SECTION: SEMANTIC -->
+            <section id="semantic" class="mb-20 scroll-mt-10">
+                <h2 class="text-3xl font-bold text-white mb-6"><i class="fas fa-language text-blue-500 mr-4"></i>1.
+                    Semantic Pipeline</h2>
+                <div class="glass-card p-6 md:p-8">
+
+                    <div class="mb-6">
+                        <span class="correction-badge"><i class="fas fa-arrow-up mr-1"></i> QWEN3-4B EMBEDDING</span>
+                        <p class="text-sm text-slate-300">
+                            Based on empirical MTEB Multilingual benchmarks, Qwen3-4B outperforms BGE-M3 (69.5 vs
+                            59.56). Both are contrastively trained for retrieval, but Qwen3's larger parameter space
+                            yields superior zero-shot cross-lingual alignment.
+                        </p>
+                    </div>
+
+                    <div class="grid md:grid-cols-2 gap-8 mb-6">
+                        <div>
+                            <h3 class="text-lg font-semibold text-white mb-2">Instruction & Query Assembly</h3>
+                            <p class="text-xs text-slate-400 mb-3">To unlock maximum zero-shot retrieval performance,
+                                the query vector must be explicitly constructed using a chronologically decayed
+                                concatenation of recent interactions, prepended with a task instruction.</p>
+                            <pre
+                                class="bg-slate-900 p-3 rounded text-[10px] text-emerald-400 font-mono border border-slate-700 overflow-x-auto"><code><span class="text-slate-500"># 1. Assemble top 5 recent likes with metadata</span>
+recent_items = [f"'{m.title}' ({m.genres})" for m in top_5_likes]
+user_history_text = ", ".join(recent_items)
+
+<span class="text-slate-500"># 2. Online Query Generation</span>
+prompt = "Instruct: Given a movie description, retrieve semantically similar movies.\nQuery: " + user_history_text
+u_qvec = qwen3.encode(prompt)</code></pre>
+                            <p class="text-[10px] text-slate-500 mt-2"><em>Why this matters:</em> Concatenating titles
+                                and core genres captures temporal drift and localizes the LLM's attention, avoiding the
+                                noisy dilution of averaging 50 separate movie embeddings.</p>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-semibold text-white mb-2">FAISS Index Selection</h3>
+                            <p class="text-xs text-slate-400 mb-3">While `IndexIDMap2(HNSW32)` supports incremental IDs
+                                and operates faster, we deliberately deploy `IndexIDMap2(FlatIP)` for the MVP phase.</p>
+                            <p class="text-xs text-slate-400"><strong>Justification:</strong> FlatIP provides a
+                                mathematically exact baseline (Recall@K = 1.0) without ANN quantization or
+                                graph-building overhead.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SECTION: COLLABORATIVE -->
+            <section id="collaborative" class="mb-20 scroll-mt-10">
+                <h2 class="text-3xl font-bold text-white mb-6"><i
+                        class="fas fa-project-diagram text-emerald-500 mr-4"></i>2. Collaborative Graph</h2>
+                <div class="glass-card p-6 md:p-8">
+
+                    <div class="mb-6">
+                        <span class="update-badge"><i class="fas fa-check-circle mr-1"></i> XSimGCL (2023)</span>
+                        <p class="text-sm text-slate-300">
+                            For a cross-cultural system where foreign films live in the <em>long-tail</em> of the
+                            dataset, <strong>XSimGCL</strong> is the SOTA choice over UltraGCN/LightGCN.
+                        </p>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-white mb-3">Cross-batch Simulated Graph Contrastive Learning
+                    </h3>
+                    <p class="text-sm text-slate-400 mb-4">Standard models push popular English blockbusters to all
+                        users due to inherent popularity bias. XSimGCL utilizes noise-based contrastive learning in a
+                        single pass to produce much more uniform embedding distributions. This mathematically protects
+                        and surfaces long-tail items (Telugu, Tamil, Korean films) that would otherwise be buried by the
+                        algorithm.</p>
+
+                    <div class="bg-slate-900/50 border border-slate-700 p-4 rounded-lg">
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">RecBole
+                            Integration</span>
+                        <p class="text-xs text-slate-300 font-mono">XSimGCL is natively supported in RecBole. Requires a
+                            single config change: `model = 'XSimGCL'`, yielding statistically significant NDCG
+                            improvements on highly sparse interaction graphs.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SECTION: RERANKER & FUSION -->
+            <section id="reranker" class="mb-20 scroll-mt-10">
+                <h2 class="text-3xl font-bold text-white mb-6"><i class="fas fa-balance-scale text-teal-500 mr-4"></i>3.
+                    Reranking & Dynamic Fusion</h2>
+                <div class="glass-card p-6 md:p-8">
+
+                    <div class="mb-6 border-b border-slate-700 pb-6">
+                        <h3 class="text-lg font-semibold text-white mb-2">Qwen3-Reranker-4B</h3>
+                        <p class="text-sm text-slate-400 mb-3">Applying an external reranker introduces semantic drift.
+                            We explicitly pair the Qwen3-Embedding with the Qwen3-Reranker for coherent score
+                            distributions across the pipeline. Ranked 1st on MTEB multilingual reranking benchmarks
+                            (June 2025).</p>
+                    </div>
+
+                    <div class="mb-6">
+                        <span class="correction-badge"><i class="fas fa-wrench mr-1"></i> 3-DIMENSIONAL MLP GATING
+                            (SOFTMAX)</span>
+                        <p class="text-sm text-slate-300 mb-4">
+                            A fixed $\gamma$ and an artificially constrained $\alpha = 1 - \beta$ setup severely
+                            underfits user complexity. A power user with 500 ratings derives vastly different utility
+                            from the Cross-Encoder compared to a new user. The gating mechanism must dynamically
+                            allocate weights across all three components.
+                        </p>
+                    </div>
+
+                    <div class="grid md:grid-cols-2 gap-8 mb-6">
+                        <div class="bg-slate-900/80 p-5 rounded-lg border border-slate-700">
+                            <h4 class="font-bold text-teal-400 text-sm mb-2">The Multi-Layer Perceptron</h4>
+                            <p class="text-xs text-slate-400 mb-3">A small network processes user state features and
+                                outputs an unnormalized logits vector, which is passed through Softmax to guarantee
+                                $\alpha + \beta + \gamma = 1$.</p>
+                            <ul class="text-xs text-slate-300 space-y-1 font-mono">
+                                <li><strong>Input:</strong> [log(Degree), RatingVar, RecencyScore, LangEntropy,
+                                    CrossLingualRatio]</li>
+                                <li><strong>Network:</strong> Linear &rarr; ReLU &rarr; Linear &rarr; Softmax</li>
+                                <li><strong>Output:</strong> $[\alpha(u), \beta(u), \gamma(u)]$</li>
+                            </ul>
+                            <p class="text-xs text-slate-400 mt-3"><em>Cross-cultural gating logic:</em> A user with
+                                high LangEntropy already watches across cultures — the MLP learns to trust CF more (β↑).
+                                A monolingual user gets higher semantic weight (α↑) to discover cross-cultural content
+                                via Qwen3 embeddings. This directly drives CCDR@K improvement.</p>
+                        </div>
+                        <div class="bg-slate-900/80 p-5 rounded-lg border border-slate-700">
+                            <h4 class="font-bold text-emerald-400 text-sm mb-2">Min-Max Normalization</h4>
+                            <p class="text-xs text-slate-400 mb-3">CRITICAL: XSimGCL dot products and Qwen Cosine
+                                distances occupy disparate mathematical spaces. Per-batch min-max normalization
+                                ($\tilde{x}$) is strictly enforced before fusion.</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-amber-900/20 border border-amber-500/30 p-4 rounded-lg mt-6">
+                        <span class="text-xs font-bold text-amber-400 uppercase tracking-wider block mb-2">Cold-Start
+                            Fallback</span>
+                        <p class="text-xs text-slate-300">For users with &lt;5 interactions, the gating bypasses CF
+                            entirely (β=0), relying on semantic retrieval as the cold-start fallback. When log(Degree) →
+                            −∞, the softmax collapses to α≈1, β≈0, γ≈0 — pure semantic. This behavior is enforced as a
+                            hard rule rather than depending on learned weights.</p>
+                    </div>
+
+                    <div class="math-block">
+                        <span class="text-xs text-slate-500 block mb-2">// Fully Dynamic Min-Max Normalized Late
+                            Fusion</span>
+                        $$ FinalScore(i) = \alpha(u)\widetilde{FAISS}(i) + \beta(u)\widetilde{CF}(i) +
+                        \gamma(u)\widetilde{Rerank}(i) $$
+                    </div>
+                </div>
+            </section>
+
+            <!-- SECTION: DIVERSITY DPP -->
+            <section id="diversity" class="mb-20 scroll-mt-10">
+                <h2 class="text-3xl font-bold text-white mb-6"><i class="fas fa-dice-d20 text-purple-500 mr-4"></i>4.
+                    Set-Level Diversity (DPP)</h2>
+                <div class="glass-card p-6 md:p-8">
+
+                    <h3 class="text-lg font-semibold text-white mb-3">Determinantal Point Processes (DPP)</h3>
+                    <p class="text-sm text-slate-400 mb-4">Replaces the myopic MMR approach. DPPs evaluate diversity
+                        globally in one shot. The probability of selecting a set $S$ is proportional to the determinant
+                        of the kernel matrix $L_S$, representing the total "volume spanned" by the embeddings in the
+                        semantic space.</p>
+
+                    <div class="math-block">
+                        <span class="text-xs text-slate-500 block mb-2">// The Quality-Diversity Kernel Matrix L</span>
+                        $$ L_{i,j} = q_i \cdot q_j \cdot \text{sim}(\text{Qwen}_i, \text{Qwen}_j) $$
+                        <br>
+                        <span class="text-xs text-slate-500 block mb-2">// Where q_i integrates the language boost
+                            directly into quality</span>
+                        $$ q_i = FinalScore(i)^{1/2} \cdot (1 + \delta_{lang}(i)) $$
+                        <br>
+                        <span class="text-xs text-slate-500 block mb-2">// Probability of selecting set S</span>
+                        $$ \mathcal{P}(S) \propto \det(L_S) $$
+                    </div>
+
+                    <p class="text-xs text-slate-400 mt-4"><em>Inference:</em> Greedy MAP inference runs in $O(N \cdot
+                        K^2)$ time, requiring $<2\text{ms}$ for $K=30$. Completely separates the language boost signal
+                            into the intrinsic item quality parameter $q_i$.</p>
+                </div>
+            </section>
+
+            <!-- SECTION: METRICS -->
+            <section id="metrics" class="mb-20 scroll-mt-10">
+                <h2 class="text-3xl font-bold text-white mb-6"><i class="fas fa-chart-pie text-rose-500 mr-4"></i>5.
+                    Comprehensive Metrics</h2>
+                <div class="glass-card p-6 md:p-8">
+
+                    <div class="grid md:grid-cols-2 gap-6 mb-6">
+                        <div class="bg-slate-900 p-4 rounded border border-slate-700 border-l-4 border-l-blue-500">
+                            <h4 class="font-bold text-white mb-1">NDCG@K & MRR</h4>
+                            <p class="text-xs text-slate-400">Position-sensitive accuracy and latency to the first
+                                relevant item.</p>
+                        </div>
+                        <div class="bg-slate-900 p-4 rounded border border-slate-700 border-l-4 border-l-indigo-500">
+                            <h4 class="font-bold text-white mb-1">CCDR@K</h4>
+                            <p class="text-xs text-slate-400">Cross-Cultural Discovery Rate. Percentage of relevant
+                                recommendations outside the user's primary history language.</p>
+                        </div>
+                    </div>
+
+                    <div class="grid md:grid-cols-2 gap-6">
+                        <div class="bg-rose-900/20 p-4 rounded border border-rose-500/30 border-l-4 border-l-rose-500">
+                            <h4 class="font-bold text-rose-300 mb-1">ILD@K (Intra-List Diversity)</h4>
+                            <p class="text-xs text-rose-100/70">Calculates the average pairwise cosine distance within
+                                the top-K list. <strong>Without ILD, we cannot mathematically prove our DPP
+                                    implementation actually improves set variance over a relevance-only
+                                    baseline.</strong></p>
+                        </div>
+                        <div
+                            class="bg-amber-900/20 p-4 rounded border border-amber-500/30 border-l-4 border-l-amber-500">
+                            <h4 class="font-bold text-amber-300 mb-1">Catalog Coverage@K</h4>
+                            <p class="text-xs text-amber-100/70">Percentage of the 1.3M item catalog that appears in
+                                *any* user's Top-K. Validates that the XSimGCL long-tail enhancement actually surfaces
+                                niche items globally.</p>
+                        </div>
+                    </div>
+
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+</body>
+
+</html>
