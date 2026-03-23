@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CineMatch: Master Architecture Reference</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        slate: { 850: '#151e2e', 900: '#0f172a' },
+                        primary: '#3b82f6',
+                        semantic: '#10b981',
+                        collab: '#8b5cf6',
+                        fusion: '#f59e0b',
+                        ui: '#ec4899'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background-color: #0f172a; color: #f8fafc; overflow: hidden; }
+        .node {
+            transition: all 0.2s ease-in-out;
+            cursor: pointer;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+        }
+        .node:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5); filter: brightness(1.1); }
+        .node.active { ring: 2px; ring-offset: 2px; ring-offset-slate-900; }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+    </style>
+</head>
+<body class="h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="bg-slate-800 border-b border-slate-700 p-4 flex justify-between items-center z-10 shadow-md">
+        <div>
+            <h1 class="text-2xl font-bold text-white tracking-tight">CineMatch: Architecture</h1>
+        </div>
+        <div class="text-sm bg-slate-700 px-3 py-1 rounded-full text-slate-300 font-mono">
+            Final Score = α·Norm(Content) + β·Norm(CF) + γ·Rerank
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 flex overflow-hidden">
+        
+        <!-- Left Pane: Interactive Diagram -->
+        <div id="left-pane" class="w-full p-6 overflow-y-auto relative bg-slate-900 diagram-container transition-[width] duration-500">
+            
+            <!-- System Context / Paradigm -->
+            <div class="flex justify-center mb-6">
+                <div class="node bg-gradient-to-br from-slate-800 to-slate-700 border-l-4 border-slate-400 p-3 rounded-lg w-full max-w-2xl text-center" onclick="showDetails('two-tower')">
+                    <div class="font-bold text-md text-white">Two-Tower Approach</div>
+                </div>
+            </div>
+
+            <!-- Data Layer -->
+            <div class="flex justify-center gap-8 mb-8 relative z-10">
+                <div class="node bg-gradient-to-br from-slate-800 to-slate-700 border-l-4 border-slate-500 p-4 rounded-lg w-64" onclick="showDetails('data-tmdb')">
+                    <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Rich Metadata</div>
+                    <div class="font-bold text-lg">TMDB + IMDb Merged</div>
+                    <div class="text-xs text-slate-300 mt-2">1.37M movies. Filtered via ~738K IMDb ratings.</div>
+                </div>
+                <div class="node bg-gradient-to-br from-slate-800 to-slate-700 border-l-4 border-slate-500 p-4 rounded-lg w-64" onclick="showDetails('data-ml32m')">
+                    <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Interactions</div>
+                    <div class="font-bold text-lg">MovieLens-32M</div>
+                    <div class="text-xs text-slate-300 mt-2">32M ratings. Real-world ground truth.</div>
+                </div>
+            </div>
+
+            <!-- Pipeline Layer -->
+            <div class="flex justify-between items-start mb-8 relative z-10">
+                
+                <!-- Path A: Semantic -->
+                <div class="w-[30%] flex flex-col items-center gap-4">
+                    <div class="bg-emerald-900/30 text-emerald-400 text-xs px-2 py-1 rounded font-bold uppercase tracking-widest border border-emerald-700/50 text-center w-full">Path A:<br>Semantic Engine (Inductive)</div>
+                    
+                    <div class="node bg-gradient-to-br from-emerald-900 to-teal-900 border-l-4 border-emerald-500 p-3 rounded-lg w-full" onclick="showDetails('patha-bge')">
+                        <div class="font-bold">Semantic Encoder - BGE/Qwen</div>
+                        <div class="text-xs text-emerald-100/70 mt-1">1024-dim dense vectors from text.</div>
+                    </div>
+                    
+                    <div class="h-4 border-l-2 border-dashed border-emerald-600/50"></div>
+                    
+                    <div class="node bg-gradient-to-br from-emerald-900 to-teal-900 border-l-4 border-emerald-500 p-3 rounded-lg w-full" onclick="showDetails('patha-faiss')">
+                        <div class="font-bold">FAISS IndexIDMap2</div>
+                        <div class="text-xs text-emerald-100/70 mt-1">Exact search. FlatIP Cosine retrieval.</div>
+                    </div>
+                </div>
+
+                <!-- Central: User Input & Gate -->
+                <div class="w-[30%] flex flex-col items-center gap-4 mt-8 relative z-20">
+                    <div class="node bg-slate-800 border-2 border-slate-600 p-3 rounded-full w-20 h-20 flex items-center justify-center text-center shadow-lg" onclick="showDetails('user-state')">
+                        <div>
+                            <div class="text-xl">👤</div>
+                            <div class="text-[10px] font-bold mt-1">User State</div>
+                        </div>
+                    </div>
+
+                    <div class="h-4 border-l-2 border-dashed border-slate-500"></div>
+
+                    <div class="node bg-gradient-to-br from-amber-900 to-orange-900 border-l-4 border-amber-500 p-3 rounded-lg w-full text-center" onclick="showDetails('mlp-gate')">
+                        <div class="font-bold text-sm">MLP Routing Gate</div>
+                        <div class="text-xs text-amber-100/70 mt-1">Predicts scalar weights (α, β)</div>
+                    </div>
+                </div>
+
+                <!-- Path B: Collaborative -->
+                <div class="w-[30%] flex flex-col items-center gap-4">
+                    <div class="bg-indigo-900/30 text-indigo-400 text-xs px-2 py-1 rounded font-bold uppercase tracking-widest border border-indigo-700/50 text-center w-full">Path B:<br>CF Engine (Transductive)</div>
+                    
+                    <div class="w-full flex gap-2">
+                        <div class="node flex-1 bg-gradient-to-br from-indigo-900 to-purple-900 border-l-4 border-indigo-500 p-3 rounded-lg" onclick="showDetails('pathb-xsimgcl')">
+                            <div class="font-bold">XSimGCL Engine</div>
+                            <div class="text-[11px] text-indigo-100/70 mt-1">Graph CL. 512-dim.</div>
+                        </div>
+                        <div class="node flex-1 bg-gradient-to-br from-purple-900 to-fuchsia-900 border-l-4 border-fuchsia-500 p-3 rounded-lg" onclick="showDetails('xsimgcl-flow')">
+                            <div class="font-bold">Execution Flow</div>
+                            <div class="text-[11px] text-fuchsia-100/70 mt-1">Step-by-step logic.</div>
+                        </div>
+                    </div>
+                    
+                    <div class="h-4 border-l-2 border-dashed border-indigo-600/50"></div>
+                    
+                    <div class="node bg-gradient-to-br from-indigo-900 to-purple-900 border-l-4 border-indigo-500 p-3 rounded-lg w-full" onclick="showDetails('pathb-retrieval')">
+                        <div class="font-bold">Dot-Product Retrieval</div>
+                        <div class="text-xs text-indigo-100/70 mt-1">Prediction & InfoNCE Loss.</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Fusion & Post-Processing Layer -->
+            <div class="flex flex-col items-center gap-4 relative z-10">
+                <div class="w-full border-t-2 border-dashed border-slate-600 relative flex justify-center pt-4">
+                    <div class="node bg-gradient-to-br from-amber-900 to-orange-900 border-l-4 border-amber-500 p-3 rounded-lg w-[32rem] text-center" onclick="showDetails('late-fusion')">
+                        <div class="font-bold text-md">Late-Fusion Score Ensemble (Linear Aggregation)</div>
+                        <div class="text-xs font-mono mt-1 bg-black/30 p-1.5 rounded">
+                            <span class="text-emerald-400">α * Norm(FAISS)</span> + <span class="text-indigo-400">β * Norm(CF)</span> + <span class="text-rose-400">γ * Rerank</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex gap-4">
+                    <div class="node bg-gradient-to-br from-blue-900 to-blue-800 border-l-4 border-blue-500 p-3 rounded-lg w-56 text-center" onclick="showDetails('reranker')">
+                        <div class="font-bold text-sm">Qwen3 / BGE Reranker</div>
+                        <div class="text-[11px] text-blue-200/70 mt-1">Unsupervised / Cross-Encoder</div>
+                    </div>
+                    <div class="node bg-gradient-to-br from-blue-900 to-blue-800 border-l-4 border-blue-500 p-3 rounded-lg w-56 text-center" onclick="showDetails('dpp-diversity')">
+                        <div class="font-bold text-sm">DPP Diversity Rerank</div>
+                        <div class="text-[11px] text-blue-200/70 mt-1">Determinantal Point Process</div>
+                    </div>
+                </div>
+
+                <!-- Frontend UI -->
+                <div class="w-full border-t-2 border-dashed border-slate-600 mt-2 pt-4 flex justify-center">
+                    <div class="node bg-gradient-to-br from-pink-900 to-rose-900 border-l-4 border-pink-500 p-3 rounded-lg w-[32rem] text-center" onclick="showDetails('ui-frontend')">
+                        <div class="font-bold text-md text-pink-200">Interactive UI & Inference Engine</div>
+                        <div class="text-xs text-pink-100/70 mt-1">Gradio Widget • Onboarding DB • Dynamic Filtering</div>
+                    </div>
+                </div>
+
+                <!-- Metrics & Limits -->
+                <div class="flex gap-4 mt-6 w-full border-t border-slate-800 pt-6">
+                    <div class="node bg-slate-800 p-3 rounded-lg flex-1 border-l-4 border-slate-500" onclick="showDetails('metrics')">
+                        <div class="text-[11px] font-bold text-slate-400 uppercase">Evaluation Goals</div>
+                        <div class="text-xs mt-1">NDCG, Hit, MRR, ILD, CCDR, Coverage</div>
+                    </div>
+                    <div class="node bg-slate-800 p-3 rounded-lg flex-1 border-l-4 border-slate-500" onclick="showDetails('baselines')">
+                        <div class="text-[11px] font-bold text-slate-400 uppercase">Baselines</div>
+                        <div class="text-xs mt-1">LightGCN, Popular, CF-only</div>
+                    </div>
+                    <div class="node bg-gradient-to-br from-rose-900 to-pink-900 border-l-4 border-rose-500 p-3 rounded-lg flex-1" onclick="showDetails('future-work')">
+                        <div class="text-[11px] font-bold text-rose-300 uppercase">Future Work</div>
+                        <div class="text-xs mt-1">Feature-Init GNN, RAG+LLM, Mongo</div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Right Pane: Details -->
+        <div id="right-pane" class="hidden w-[40%] bg-slate-850 border-l border-slate-700 p-6 shadow-2xl overflow-y-auto flex flex-col transition-all duration-500">
+            
+            <button id="close-panel" class="ml-auto mb-4 text-slate-400 hover:text-slate-200 transition-colors" onclick="hideDetails()">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+            
+            <div id="detail-panel" class="flex-1 flex flex-col">
+                <div class="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1" id="detail-category">Category</div>
+                <h2 class="text-2xl font-bold text-white mb-4 border-b border-slate-700 pb-2" id="detail-title">Title</h2>
+                
+                <div class="prose prose-invert prose-sm max-w-none text-slate-300 space-y-5" id="detail-content">
+                    <!-- Content injected via JS -->
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const defenseData = {
+            'two-tower': {
+                category: 'System Paradigm',
+                title: 'Two Tower Approach',
+                content: `
+                    <div class="bg-slate-800 p-4 rounded-md border-l-2 border-slate-400">
+                        <p class="mb-2">A classic "Two-Tower" architecture (like YouTube's original DNN) has Tower 1 (encodes User age/location into Vector U), Tower 2 (encodes Item title/tags into Vector I), and scores via dot product.</p>
+                        <p>Our architecture is a <strong>Late-Fusion Dual-Retrieval Pipeline</strong>. It is more complex:</p>
+                        <ul class="list-disc pl-5 mt-2 space-y-1">
+                            <li><strong>Path A: The Content Tower (Inductive):</strong> Uses BGE-M3/Qwen to embed movie content. The "user tower" here is just a synthetic query built from their history. <em>Strength: Perfect for cold-start and niche phrasing.</em></li>
+                            <li><strong>Path B: The Graph Tower (Transductive):</strong> Uses XSimGCL to learn high-order behavioral patterns. <em>Strength: Perfect for warm-start power users.</em></li>
+                        </ul>
+                    </div>
+                    <div class="bg-slate-800 p-4 rounded-md border-l-2 border-slate-400 mt-4">
+                        <strong class="text-white block mb-2 text-md">Why Industries Use It & How It Works:</strong>
+                        <p class="mb-2"><strong>How it works:</strong> The Two-Tower model independently maps user features (history, context, demographics) and item features (metadata, content) through separate neural networks into a shared latent embedding space. The final prediction score is simply the inner product or cosine similarity between these two dense vectors.</p>
+                        <p class="mb-2"><strong>Why industries use it:</strong> The primary reason is <strong>extreme scalability and low latency retrieval</strong>. Because the towers are decoupled, item embeddings for millions of products can be pre-computed and indexed offline. At runtime, the system only computes the user embedding once and executes a blazing-fast Approximate Nearest Neighbor (ANN) search (e.g., using FAISS) without needing to evaluate the neural network for every candidate.</p>
+                        <p class="mb-2"><strong>Comparison with others:</strong> Compared to <em>Cross-Encoders</em> (which process user and item features together across deep layers for high accuracy), Two-Towers are much faster but sacrifice early feature interactions. Compared to classic <em>Matrix Factorization</em> natively limited to user-item ID interactions, Two-Towers seamlessly ingest rich contextual side-features (text, categories, images), significantly alleviating the cold-start problem.</p>
+                    </div>
+                    <div class="bg-slate-800 p-4 rounded-md border-l-2 border-slate-400 mt-4">
+                        <strong class="text-white block mb-2 text-md">How to Solve the "New User" (Transductive) Problem:</strong>
+                        <p class="mb-2">Because XSimGCL learns a fixed lookup table of embeddings, New User literally does not exist in the math. You cannot compute a dot product for them. We solve this via <strong>Dynamic Dual Routing</strong> (not modifying the GCN):</p>
+                        <ol class="list-decimal pl-5 space-y-1">
+                            <li>Look at the movies the new user liked (rating ≥ 3.5).</li>
+                            <li>Extract the <strong>titles and genres</strong> of those movies.</li>
+                            <li>Concatenate into a text query: <em>"Instruct: Given... Query: 'The Matrix' (Action), 'Inception' (Action)"</em>.</li>
+                            <li>Pass this text into <strong>BGE-M3</strong> to generate a dense vector.</li>
+                            <li>Search the <strong>FAISS index</strong> using this vector.</li>
+                        </ol>
+                        <p class="mt-2 text-sm text-emerald-400">For a brand new user, the MLP routing outputs α=1.0 and β=0.0. We completely bypass the XSimGCL limitation by relying on the content-based path until the next offline graph retrain.</p>
+                    </div>`
+            },
+            'data-tmdb': {
+                category: 'Data Foundation',
+                title: 'TMDB + IMDb Merged Catalog',
+                content: `
+                    <div class="bg-slate-800 p-4 rounded-md border-l-2 border-primary">
+                        <strong class="text-primary block mb-2 text-lg">The Challenge</strong>
+                        <p class="mb-2">TMDB suffers from extreme sparsity in <code>vote_count</code> for international and niche films, making semantic retrieval dangerous.</p>
+                        <p>The catalog ingestion pipeline includes a <strong>TMDB API sync</strong> for up-to-date metadata. We then executed <code>merge_imdb_ratings.py</code> to join IMDb <code>numVotes</code> and <code>averageRating</code>. This creates a robust quality filter mapping <strong>~738K IMDb ratings</strong> onto the 1.37M TMDB catalog.</p>
+                    </div>`
+            },
+            'data-ml32m': {
+                category: 'Data Foundation',
+                title: 'MovieLens-32M',
+                content: `
+                    <div class="bg-slate-800 p-4 rounded-md border-l-2 border-primary">
+                        <p class="mb-2">MovieLens-32M is the largest <em>stable, real-world</em> dataset available. MovieLens-1B is a <strong>synthetic</strong> dataset generated via fractal expansion.</p>
+                        <p>Because CineMatch uses semantic embeddings that read <em>actual</em> movie plots, using a synthetic dataset where user interactions are mathematically hallucinated would fundamentally destroy the ground-truth correlation between semantic intent and collaborative behavior.</p>
+                    </div>`
+            },
+            'patha-bge': {
+                category: 'Semantic Engine (Inductive Content)',
+                title: 'Multi-Encoder Evaluation',
+                content: `
+                    <p class="text-lg font-bold text-white">Purpose: Solves the Item Cold-Start problem and enables Zero-Shot exploration.</p>
+                    <div class="bg-slate-800 p-4 rounded-md border-l-2 border-semantic">
+                        <strong class="text-semantic block mb-2">Lossless Index Details:</strong>
+                        <ul class="list-disc pl-5 space-y-2 text-slate-300">
+                            <li><strong>BGE-M3 Index:</strong> 1024-dimensional vectors for the full 1.37M TMDB catalog.</li>
+                            <li><strong>IMDB BGE Index:</strong> Encoded the high-quality ~738K IMDb subset.</li>
+                            <li><strong>Qwen3 Index:</strong> Encoded TMDB resulting in a massive 14GB precision index.</li>
+                        </ul>
+                    </div>
+                    <div class="bg-slate-800 p-4 rounded-md border-l-2 border-semantic">
+                        <strong class="text-semantic block mb-2">Batch Update Pipeline:</strong>
+                        <p>We perform script-based batch updates (via <code>update_faiss.py</code>) on a <strong>weekly/biweekly basis</strong>. This bypasses the need for full-graph retraining daily.</p>
+                    </div>`
+            },
+            'patha-faiss': {
+                category: 'Semantic Engine (Inductive Content)',
+                title: 'FAISS: Architecture, Indexing, and Search Deep Dive',
+                content: `
+                    <div class="bg-slate-800 p-4 rounded-md border-l-2 border-semantic text-slate-300">
+                        <p class="mb-3"><strong>Why FAISS?</strong> We selected FAISS (Facebook AI Similarity Search) over alternatives like Annoy or Milvus because of its deeply optimized C++ core and robust capability to handle dense vector representations. While Milvus is excellent for large-scale distributed deployments, our current architecture required low-latency, localized memory-bound operations, and Annoy lacks the sheer throughput for our specific vector dimensions.</p>
+                        <p class="mb-3"><strong>FlatIP (Exact Search):</strong> We utilize the IndexFlatIP (Inner Product) index. Unlike HNSW (Hierarchical Navigable Small World) or IVF (Inverted File) indexes which rely on approximate nearest neighbor (ANN) techniques and involve a trade-off between search speed and accuracy, FlatIP performs an exhaustive, exact search. This guarantees that we calculate the absolute highest similarity scores across the dataset without losing items to quantization or clustering boundaries.</p>
+                        <p><strong>IDMap2 Mapping:</strong> FAISS intrinsically tracks records using sequential integer IDs. To bridge our specific dataset identifiers with the index without maintaining a secondary lookup database in memory, we wrap the index in an IDMap2. This allows us to inject and retrieve the exact TMDB mapping IDs directly from the FAISS results, eliminating discrepancy risks during retrieval.</p>
+                    </div>`
+            },
+            'user-state': {
+                category: 'Dynamic Routing',
+                title: 'User State (The Input)',
+                content: `
+                    <div class="bg-slate-800 p-4 rounded-md border-l-2 border-fusion">
+                        <strong class="text-fusion block mb-2 text-lg">Asymmetrical Routing Principle</strong>
+                        <p class="mb-2">Our architecture relies on the principle that the state of the <em>User</em> (degree/sparsity) determines gating weights, entirely independent of the state of the <em>Items</em>.</p>
+                        <ul class="list-disc pl-5 space-y-2 text-slate-300">
+                            <li><strong>Cold User (Degree < 5):</strong> Routes almost 100% to Path A (Semantic Fallback).</li>
+                            <li><strong>Power User:</strong> Routes heavily to Path B (Graph) for serendipity.</li>
+                        </ul>
+                    </div>`
+            },
+            'mlp-gate': {
+                category: 'Dynamic Routing',
+                title: 'Multi Layer Perceptron (MLP) Gate: Why & How',
+                content: `
+                    <div class="bg-slate-900 p-3 rounded border border-fusion/50 mb-3">
+                        <p class="text-sm"><strong>What it does:</strong> It takes User Features (number of ratings, variance) and outputs routing weights (α, β) dictating how much to trust the Content vs. Graph tower. <br><strong>Alternatives:</strong> A static weight (e.g., α=0.5, β=0.5) fails cold-start users. Logistic Regression is too strictly linear. We selected an MLP because it captures the complex, non-linear relationship between a user's graph density and their reliability in the transductive latent space.</p>
+                    </div>
+                    <p class="text-white italic mb-4">"It is a Late-Fusion Ensembled Architecture not a Early-Fusion Joint-Training model."</p>
+                    
+                    <div class="space-y-4">
+                        <div class="bg-slate-800 p-4 rounded-md border-l-2 border-fusion">
+                            <strong class="text-fusion block mb-1">Preventing Modality Collapse</strong>
+                            <p>Our system <em>never mixes the vectors</em>. The semantic and collaborative spaces stay completely isolated. Path A returns Cosine scores; Path B returns Dot Product scores. Because they are on different scales, we explicitly apply a <strong>MinMax Scaler</strong> to normalize both to [0.0, 1.0]. The MLP only outputs scalar weights (α, β), acting as a dynamic weighted-average ensemble on top of normalized logits, avoiding modality collapse entirely.</p>
+                        </div>
+
+                        <div class="bg-slate-800 p-4 rounded-md border-l-2 border-fusion">
+                            <strong class="text-fusion block mb-1">Handling Missing Graph Edges Gracefully</strong>
+                            <p>The MLP routes based on the <em>User's</em> state. If User 42 gets α=0.6, β=0.3, and retrieves "The Matrix 4" (a brand new movie missing from the graph), the code automatically assigns it a CF score of 0.0. Final Score: <code>(0.6 * 0.8) + (0.3 * 0.0) = 0.48</code>. Instead of breaking, the pipeline naturally decays to a pure semantic score for that item.</p>
+                        </div>
+
+                        <div class="bg-slate-800 p-4 rounded-md border-l-2 border-fusion">
+                            <strong class="text-fusion block mb-1">Decoupled Offline Training</strong>
+                            <p>We do not train end-to-end. Our architecture enforces strict decoupling. BGE-M3 is pre-trained independently. XSimGCL is trained independently via contrastive learning. The MLP Gate is trained offline to predict optimal weights maximizing NDCG. The concept of a dead gradient starving lower layers simply doesn't apply.</p>
+                        </div>
+                    </div>`
+            },
+            'xsimgcl-flow': {
+                category: 'Collaborative Engine (Transductive Graph)',
+                title: 'XSimGCL Workflow Breakdown',
+                content: `
+                    <div class="bg-slate-800 p-4 rounded-md border-l-2 border-collab space-y-3 text-slate-300">
+                        <p>Step 1: <strong>Graph Input</strong> - The bipartite user-item interaction graph is ingested.</p>
+                        <p>Step 2: <strong>LightGCN Message Passing</strong> - Information propagates through the graph layers to capture collaborative signals.</p>
+                        <p>Step 3: <strong>Uniform Noise Augmentation</strong> - Random uniform noise is added to the embeddings to create contrastive views instead of computationally heavy graph augmentations.</p>
+                        <p>Step 4: <strong>Loss Computation</strong> - The system calculates the BPR (Bayesian Personalized Ranking) main loss alongside the InfoNCE contrastive loss.</p>
+                        <p>Step 5: <strong>Weighted Final Sum</strong> - The main recommendation loss and the self-supervised contrastive loss are combined into a final sum to update the model weights.</p>
+                    </div>`
+            },
+            'pathb-xsimgcl': {
+                category: 'Collaborative Engine (Transductive Graph)',
+                title: 'XSimGCL vs. Alternatives & Benchmarks',
+                content: `
+                    <div class="bg-slate-800 p-3 rounded-md border-l-2 border-collab mb-4">
+                        <strong class="text-collab block mb-1">RecBole Framework & Why SVD Fails:</strong>
+                        <p class="text-sm mb-2">XSimGCL is trained using RecBole, an industry-standard PyTorch framework, and exports <strong>512-dimensional embeddings</strong>. Traditional SVD/ALS fails because it only models <em>First-Order Connectivity</em>. It completely fails on cold-start items (a zero-interaction item has a zero-vector), trapping users in filter bubbles. GCNs fix this by explicitly propagating high-order message passing.</p>
+                    </div>
+
+                    <strong class="text-white block mb-2 text-md">1. Architectural Alternatives: Why Graph?</strong>
+                    <div class="overflow-x-auto rounded-md border border-slate-700 mb-6">
+                        <table class="min-w-full text-[10px] text-left text-slate-300">
+                            <thead class="bg-slate-800 text-slate-400">
+                                <tr><th class="p-2 border-b border-slate-700">Model Architecture</th><th class="p-2 border-b border-slate-700">Core Mechanism</th><th class="p-2 border-b border-slate-700">Best Used For</th><th class="p-2 border-b border-slate-700">Typical Performance</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr class="bg-indigo-900/20 border-b border-slate-700/50">
+                                    <td class="p-2 font-bold text-indigo-300">LightGCN</td>
+                                    <td class="p-2">Simplifies Graph Convolutions to efficiently propagate embeddings across a bipartite graph.</td>
+                                    <td class="p-2">Massive datasets with complex, hidden user-item relationships.</td>
+                                    <td class="p-2 font-bold text-emerald-400">SELECTED: SOTA pure CF. Exceptional Recall@20.</td>
+                                </tr>
+                                <tr class="border-b border-slate-700/50">
+                                    <td class="p-2 font-bold text-slate-300">SASRec / BERT4Rec</td>
+                                    <td class="p-2">Uses bidirectional self-attention to weigh past interactions over time.</td>
+                                    <td class="p-2">Session-based recommendations (predicting what to watch right now).</td>
+                                    <td class="p-2 text-rose-300">Rejected: CineMatch is general exploration, not session prediction.</td>
+                                </tr>
+                                <tr class="border-b border-slate-700/50">
+                                    <td class="p-2 font-bold text-slate-300">LLM + RAG Hybrid</td>
+                                    <td class="p-2">Combines traditional MF with vector embeddings from language models.</td>
+                                    <td class="p-2">Cold-start scenarios and providing human-readable explanations.</td>
+                                    <td class="p-2">Used specifically as the Path A safety net.</td>
+                                </tr>
+                                <tr class="border-b border-slate-700/50">
+                                    <td class="p-2 font-bold text-slate-300">DeepFM</td>
+                                    <td class="p-2">Combines deep neural networks with factorization machines to map interactions.</td>
+                                    <td class="p-2">Feature-rich datasets (genres, user ages, tags, genome scores).</td>
+                                    <td class="p-2 text-rose-300">Rejected: Requires heavy tabular metadata which ML-32M lacks.</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-2 font-bold text-slate-300">SVD / ALS</td>
+                                    <td class="p-2">Decomposes the user-item matrix into latent factors.</td>
+                                    <td class="p-2">Baseline testing and computationally restricted environments.</td>
+                                    <td class="p-2 text-rose-300">Rejected: Traps users in filter bubbles.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <strong class="text-white block mb-2 text-md">2. Benchmark Validation (Tested on ML-1M):</strong>
+                    <div class="overflow-x-auto rounded-md border border-slate-700 mb-4">
+                        <table class="min-w-full text-[10px] text-center text-slate-300">
+                            <thead class="bg-slate-800 text-slate-400">
+                                <tr><th class="p-1 border-b border-r border-slate-700 text-left">Dataset</th><th class="p-1 border-b border-slate-700">#Users</th><th class="p-1 border-b border-slate-700">#Items</th><th class="p-1 border-b border-slate-700">#Interactions</th><th class="p-1 border-b border-slate-700">Sparsity</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr><td class="p-1 border-r border-slate-700 text-left">ml-1m</td><td class="p-1">6,040</td><td class="p-1">3,629</td><td class="p-1">836,478</td><td class="p-1">96.18%</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="overflow-x-auto rounded-md border border-slate-700">
+                        <table class="min-w-full text-[10px] text-center text-slate-300">
+                            <thead class="bg-slate-800 text-slate-400">
+                                <tr><th class="p-1 border-b border-r border-slate-700 text-left">Method</th><th class="p-1 border-b border-slate-700">Recall@10</th><th class="p-1 border-b border-slate-700">MRR@10</th><th class="p-1 border-b border-slate-700">NDCG@10</th><th class="p-1 border-b border-slate-700">Hit@10</th><th class="p-1 border-b border-slate-700">Precision@10</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr class="border-b border-slate-700/50"><td class="p-1 border-r border-slate-700 text-left">BPR</td><td class="p-1">0.1776</td><td class="p-1">0.4187</td><td class="p-1">0.2401</td><td class="p-1">0.7199</td><td class="p-1">0.1779</td></tr>
+                                <tr class="border-b border-slate-700/50"><td class="p-1 border-r border-slate-700 text-left">NeuMF</td><td class="p-1">0.1651</td><td class="p-1">0.4020</td><td class="p-1">0.2271</td><td class="p-1">0.7029</td><td class="p-1">0.1700</td></tr>
+                                <tr class="border-b border-slate-700/50"><td class="p-1 border-r border-slate-700 text-left">NGCF</td><td class="p-1">0.1814</td><td class="p-1">0.4354</td><td class="p-1">0.2508</td><td class="p-1">0.7239</td><td class="p-1">0.1850</td></tr>
+                                <tr class="border-b border-slate-700/50"><td class="p-1 border-r border-slate-700 text-left">LightGCN</td><td class="p-1">0.1861</td><td class="p-1">0.4388</td><td class="p-1">0.2538</td><td class="p-1">0.7330</td><td class="p-1">0.1863</td></tr>
+                                <tr class="border-b border-slate-700/50"><td class="p-1 border-r border-slate-700 text-left">LightGCL</td><td class="p-1">0.1867</td><td class="p-1">0.4283</td><td class="p-1">0.2479</td><td class="p-1">0.7370</td><td class="p-1">0.1815</td></tr>
+                                <tr class="border-b border-slate-700/50"><td class="p-1 border-r border-slate-700 text-left">SGL</td><td class="p-1">0.1889</td><td class="p-1">0.4315</td><td class="p-1">0.2505</td><td class="p-1">0.7392</td><td class="p-1">0.1843</td></tr>
+                                <tr class="border-b border-slate-700/50"><td class="p-1 border-r border-slate-700 text-left">HMLET</td><td class="p-1">0.1847</td><td class="p-1">0.4297</td><td class="p-1">0.2490</td><td class="p-1">0.7305</td><td class="p-1">0.1836</td></tr>
+                                <tr class="border-b border-slate-700/50"><td class="p-1 border-r border-slate-700 text-left">NCL</td><td class="p-1">0.2021</td><td class="p-1">0.4599</td><td class="p-1">0.2702</td><td class="p-1">0.7565</td><td class="p-1">0.1962</td></tr>
+                                <tr class="border-b border-slate-700/50"><td class="p-1 border-r border-slate-700 text-left">SimGCL</td><td class="p-1">0.2029</td><td class="p-1">0.4550</td><td class="p-1">0.2667</td><td class="p-1">0.7640</td><td class="p-1">0.1933</td></tr>
+                                <tr class="bg-indigo-900/40 font-bold"><td class="p-1 border-r border-slate-700 text-left text-emerald-400">XSimGCL</td><td class="p-1">0.2116</td><td class="p-1">0.4638</td><td class="p-1">0.2750</td><td class="p-1">0.7743</td><td class="p-1">0.1987</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="text-xs text-slate-400 mt-2"><strong>Conclusion:</strong> XSimGCL significantly outperforms all Matrix Factorization and Graph variants (like LightGCN and SGL-ED) by injecting uniform noise instead of complex edge-dropping, optimizing the InfoNCE loss to rescue long-tail items.</p>`
+            },
+            'pathb-retrieval': {
+                category: 'Collaborative Engine (Transductive Graph)',
+                title: 'Dot Product Retrieval & Contrastive Learning',
+                content: `
+                    <div class="bg-slate-800 p-4 rounded-md border-l-2 border-collab">
+                        <strong class="text-collab block mb-2 text-lg">XSimGCL Dot Product Mechanics</strong>
+                        <p class="mb-3 text-sm">The dot product takes two inputs (a dense User embedding vector and a dense Item embedding vector). It multiplies their matching coordinates and sums them up. The output is a single scalar number—the higher the number, the stronger the affinity. In XSimGCL, it is foundational in two ways <em>(Ref: MDPI)</em>:</p>
+                        
+                        <ol class="list-decimal pl-5 space-y-3 text-slate-300">
+                            <li><strong>Prediction Task:</strong> It acts as the final scoring mechanism. The algorithm calculates the dot product of the final learned user and item embeddings to rank recommendations.</li>
+                            <li><strong>Contrastive Learning (CL) Task:</strong> The model uses an auxiliary <strong>InfoNCE loss</strong> to cluster the graph. It creates two "views" of the same node by injecting noise. The dot product calculates similarity to pull these positive pairs together, while pushing apart the negative pairs (different nodes).</li>
+                        </ol>
+                    </div>`
+            },
+            'late-fusion': {
+                category: 'Ensemble Engine',
+                title: 'Late-Fusion Linear Aggregation',
+                content: `
+                    <p class="text-lg font-bold text-white mb-2"> Formula:</p>
+                    <pre class="bg-black/50 p-3 rounded-md text-emerald-400 font-mono text-sm mb-4 border border-slate-700">Final = α·MinMax(FAISS) + β·MinMax(XSimGCL) + γ·Rerank</pre>
+                    
+                    <div class="bg-slate-800 p-4 rounded-md border-l-2 border-fusion">
+                        <strong class="text-fusion block mb-2 text-lg">Why Linear Aggregation instead of Softmax?</strong>
+                        <p>Linear aggregation of MinMax normalized scores preserves the relative mathematical distance and underlying distribution of the retrieval scores. Applying a Softmax function across the retrievers would exponentially exaggerate slight numeric differences, effectively destroying the fine-tuned calibration between the dense semantic similarities and the collaborative dot-products.</p>
+                    </div>`
+            },
+            'reranker': {
+                category: 'Post-Processing',
+                title: 'Qwen3 / BGE Reranker',
+                content: `
+                    <div class="bg-slate-800 p-4 rounded-md border-l-2 border-blue-500">
+                        <p class="text-rose-300 text-sm"><strong>Limitation:</strong> Running a 4B parameter cross-encoder in real-time inference across 100+ candidates strictly violates 50ms latency SLAs without dedicated TensorRT/vLLM serving infrastructure. It is currently disabled/unwired for prototype speed.</p>
+                    </div>`
+            },
+            'dpp-diversity': {
+                category: 'Post-Processing',
+                title: 'Diversity: DPP vs. MMR',
+                content: `
+                    <div class="bg-slate-800 p-4 rounded-md border-l-2 border-blue-500">
+                        <strong class="text-blue-400 block mb-2 text-lg">Why DPP over MMR?</strong>
+                        <p class="mb-2">To break the relevance echo-chamber, we must explicitly rerank for diversity. While many systems use Maximal Marginal Relevance (MMR), we selected a <strong>Determinantal Point Process (DPP)</strong>.</p>
+                        <ul class="list-disc pl-5 space-y-2 text-slate-300 text-sm">
+                            <li><strong>How DPP Works:</strong> It takes the candidate list and builds an item-item similarity matrix (a kernel). It then calculates the 'volume' (determinant) of different subsets. A subset with very similar items has a small, flat volume. A subset with very different, orthogonal items has a large volume. DPP selects the subset with the maximum volume, guaranteeing a diverse mix of genres/topics.</li>
+                            <li><strong>MMR Flaw:</strong> MMR is a greedy, sequential algorithm that suffers from local optima. DPP provides a <em>global diversity guarantee</em> across the entire set.</li>
+                        </ul>
+                    </div>`
+            },
+            'metrics': {
+                category: 'Evaluation',
+                title: 'Evaluation Metrics (Layman Terms)',
+                content: `
+                    <div class="bg-slate-800 p-4 rounded-md border-l-2 border-slate-500 space-y-4 text-slate-300 text-sm">
+                        <p><strong class="text-emerald-400">NDCG (Normalized Discounted Cumulative Gain):</strong> This evaluates ranking quality. It essentially checks if the absolute best, most highly relevant items appear at the very top of your recommendation list. If a great recommendation is pushed far down the list, NDCG penalizes your score significantly.</p>
+                        <p><strong class="text-emerald-400">Hit Rate:</strong> The simplest measure. It just checks if at least one correct or highly relevant recommendation actually appeared anywhere in the final list shown to the user.</p>
+                        <p><strong class="text-emerald-400">MRR (Mean Reciprocal Rank):</strong> This focuses entirely on the very first correct recommendation in a list. If the correct item is ranked first, the score is perfect. If it is ranked second, the score is cut in half, and it drops extremely fast the further down the first good recommendation appears.</p>
+                        <p><strong class="text-blue-400">ILD (Intra-List Diversity):</strong> This checks how different the recommended items are from one another. It ensures the system does not just spam the exact same type or genre of item in a single batch of recommendations.</p>
+                        <p><strong class="text-blue-400">CCDR (Category Coverage and Diversity Ratio):</strong> This evaluates the balance between overall recommendation accuracy and the spread of item categories. It makes sure that while the system is trying to be accurate, no single category or genre completely monopolizes the user's experience.</p>
+                        <p><strong class="text-blue-400">Coverage:</strong> This measures the scope of the system. It tracks what percentage of the entire available movie catalog the system is genuinely capable of recommending to your total user base, ensuring hidden gems are not functionally invisible.</p>
+                    </div>`
+            },
+            'baselines': {
+                category: 'Evaluation',
+                title: 'Baselines',
+                content: `
+                    <div class="bg-slate-800 p-4 rounded-md border-l-2 border-slate-500">
+                        <strong class="text-slate-300 block mb-2 text-lg"> Comparative Testing</strong>
+                        <ul class="grid grid-cols-2 gap-2 text-[11px] text-slate-300">
+                            <li class="bg-slate-700/50 p-2 rounded"><strong class="text-white">Random:</strong> Trivial lower bound.</li>
+                            <li class="bg-slate-700/50 p-2 rounded"><strong class="text-white">Popular:</strong> Top-K by best_votes globally. Trivial upper bound.</li>
+                            <li class="bg-slate-700/50 p-2 rounded"><strong class="text-white">ItemKNN:</strong> Classic heuristic CF.</li>
+                            <li class="bg-slate-700/50 p-2 rounded"><strong class="text-white">BPR-MF:</strong> Standard matrix factorization benchmark.</li>
+                            <li class="bg-slate-700/50 p-2 rounded"><strong class="text-white">DeepFM:</strong> Feature-rich interaction modeling.</li>
+                            <li class="bg-slate-700/50 p-2 rounded"><strong class="text-indigo-300">LightGCN:</strong> Core SOTA graph baseline.</li>
+                            <li class="bg-slate-700/50 p-2 rounded"><strong class="text-indigo-300">SGL-ED:</strong> Self-supervised Graph with Edge Drop.</li>
+                            <li class="bg-slate-700/50 p-2 rounded"><strong class="text-indigo-300">Adaptive GCL:</strong> Dynamic augmentation models.</li>
+                            <li class="bg-slate-700/50 p-2 rounded"><strong class="text-emerald-300">Content-Only:</strong> FAISS only (α=1, β=0).</li>
+                            <li class="bg-slate-700/50 p-2 rounded"><strong class="text-indigo-300">CF-Only:</strong> XSimGCL only (α=0, β=1).</li>
+                        </ul>
+                        <div class="bg-primary/20 p-2 mt-2 rounded border border-primary/50 text-white font-bold text-center text-sm">CineMatch Full Fusion (The proposed system)</div>
+                    </div>`
+            },
+            'future-work': {
+                category: 'System Limitations & Roadmaps',
+                title: 'Future Work',
+                content: `
+                    <div class="bg-slate-800 p-4 rounded-md border-l-2 border-rose-500 mb-4">
+                        <strong class="text-rose-400 block mb-2 text-lg">The "Fold-in" issue</strong>
+                        <p class="text-sm"><strong>The Flaw:</strong> Transductive GCNs cannot be mathematically folded into like SVD. Currently mitigated via Brute-Force Offline Batching.</p>
+                    </div>
+                    
+                    <ol class="list-decimal pl-5 space-y-3 text-slate-300 text-sm">
+                        <li><strong>Feature-Initialized Inductive GNN:</strong> To solve fold-in permanently, replace random <code>nn.Embedding</code> ID initialization with a fixed feature matrix of BGE-M3 vectors. Train the aggregation weights. A new movie's vector is dropped in, and the GCN dynamically averages it. <em>Crucial implementation detail:</em> For users, since they lack text "plots", we initialize their nodes by mean-pooling their historical interacted item embeddings as a starting vector.</li>
+                        <li><strong>RAG + LLM NLP Queries:</strong> Incorporate natural language onboarding. A user asks "Give me a heist movie like Inception", an LLM processes it, converts it to an embedding, and adds it to their synthetic FAISS query.</li>
+                        <li><strong>Test Fusion Formula:</strong> Try to test the fusion formula and improve it dynamically (training the MLP) rather than using static weights.</li>
+                        <li><strong>MongoDB + Advanced UI:</strong> Move from flat files to a persistent MongoDB database combined with a full web UI architecture.</li>
+                        <li><strong>Finalize Encoder Index:</strong> Empirically decide which of the 3 generated indexes (TMDB Qwen-4B, BGE-M3, or IMDb-subset BGE-M3) yields the optimal NDCG vs. memory footprint trade-off for production.</li>
+                    </ol>`
+            }
+        };
+
+        let activeNode = null;
+
+        function showDetails(nodeId) {
+            // Update UI State
+            if (activeNode) {
+                activeNode.classList.remove('ring-2', 'ring-offset-2', 'ring-offset-slate-900', 'ring-white');
+            }
+            activeNode = event.currentTarget;
+            activeNode.classList.add('ring-2', 'ring-offset-2', 'ring-offset-slate-900', 'ring-white');
+
+            // Show right panel
+            document.getElementById('right-pane').classList.remove('hidden');
+            document.getElementById('left-pane').classList.remove('w-full');
+            document.getElementById('left-pane').classList.add('w-[60%]');
+
+            // Populate Data
+            const data = defenseData[nodeId];
+            if(data) {
+                document.getElementById('detail-category').innerText = data.category;
+                document.getElementById('detail-category').className = `text-[11px] font-bold uppercase tracking-wider mb-2 ${getCategoryColor(nodeId)}`;
+                document.getElementById('detail-title').innerText = data.title;
+                document.getElementById('detail-content').innerHTML = data.content;
+            }
+        }
+
+        function hideDetails() {
+            // Hide right panel and expand left pane
+            document.getElementById('right-pane').classList.add('hidden');
+            document.getElementById('left-pane').classList.remove('w-[60%]');
+            document.getElementById('left-pane').classList.add('w-full');
+            
+            // Clear active node highlight
+            if (activeNode) {
+                activeNode.classList.remove('ring-2', 'ring-offset-2', 'ring-offset-slate-900', 'ring-white');
+                activeNode = null;
+            }
+        }
+
+        function getCategoryColor(nodeId) {
+            if(nodeId.includes('data') || nodeId.includes('two') || nodeId.includes('baselines') || nodeId.includes('metrics')) return 'text-slate-400';
+            if(nodeId.includes('patha')) return 'text-emerald-500';
+            if(nodeId.includes('pathb')) return 'text-indigo-400';
+            if(nodeId.includes('fusion') || nodeId.includes('gate') || nodeId.includes('user')) return 'text-amber-500';
+            if(nodeId.includes('ui')) return 'text-pink-400';
+            if(nodeId.includes('future') || nodeId.includes('limit')) return 'text-rose-500';
+            return 'text-blue-400';
+        }
+    </script>
+</body>
+</html>
