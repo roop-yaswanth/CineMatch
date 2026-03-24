@@ -17,4 +17,3 @@ models/
 #temp
 update_faiss.py
 update_gcl.py
-9)Evaluation.ipynb
