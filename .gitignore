@@ -12,6 +12,7 @@ src/log_tensorboard/
 Data/
 Test/
 models/ 
+RecBole-GNN/
 
 
 #temp
