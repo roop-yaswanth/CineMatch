@@ -3,6 +3,7 @@ __pypackages__/
 __pycache__/
 .DS_Store
 .vscode/
+src/log_tensorboard/
 
 
 .env
