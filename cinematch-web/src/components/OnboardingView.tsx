@@ -8,6 +8,8 @@ import {
   apiBuildSlate,
   apiRateOnboarding,
   apiOnboardingNav,
+  REGION_OPTIONS,
+  AGE_GROUP_OPTIONS,
   type UserSession,
   type OnboardingState,
 } from "@/lib/api";
@@ -16,13 +18,14 @@ interface Props {
   session: UserSession;
   onComplete: (session: UserSession) => void;
   onLogout: () => void;
+  forcePreferences?: boolean;
 }
 
 const RATING_OPTIONS = [
-  { value: "like", label: "Like", shortcut: "L" },
-  { value: "okay", label: "Okay", shortcut: "O" },
-  { value: "dislike", label: "Dislike", shortcut: "D" },
-  { value: "not_watched", label: "Skip", shortcut: "S" },
+  { value: "like", label: "Like", shortcut: "L", color: "var(--color-like)" },
+  { value: "okay", label: "Okay", shortcut: "O", color: "var(--color-okay)" },
+  { value: "dislike", label: "Dislike", shortcut: "D", color: "var(--color-dislike)" },
+  { value: "not_watched", label: "Skip", shortcut: "S", color: "var(--color-skip)" },
 ] as const;
 
 const ease = [0.25, 0.1, 0.25, 1] as [number, number, number, number];
@@ -33,88 +36,43 @@ const cardVariants = {
   exit: { opacity: 0, x: -60, scale: 0.97, transition: { duration: 0.25 } },
 };
 
-/* ─── Styles ──────────────────────────────────────────────────── */
+const LANGUAGES_LIST = [
+  { code: "en", label: "English" },
+  { code: "te", label: "Telugu" },
+  { code: "hi", label: "Hindi" },
+  { code: "ta", label: "Tamil" },
+  { code: "ml", label: "Malayalam" },
+  { code: "ko", label: "Korean" },
+  { code: "ja", label: "Japanese" },
+  { code: "es", label: "Spanish" },
+  { code: "fr", label: "French" },
+  { code: "de", label: "German" },
+  { code: "it", label: "Italian" },
+  { code: "pt", label: "Portuguese" },
+  { code: "zh", label: "Chinese" },
+  { code: "ar", label: "Arabic" },
+];
 
-const containerStyle: React.CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  minHeight: "100dvh",
-  padding: "24px",
-  fontFamily: "var(--font-sans)",
-  width: "100%",
-};
+const GENRE_LIST = [
+  "Action", "Adventure", "Animation", "Comedy", "Crime", "Documentary",
+  "Drama", "Family", "Fantasy", "Horror", "Romance", "Science Fiction",
+  "Thriller", "Mystery",
+];
 
-const prefContainerStyle: React.CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  justifyContent: "center",
-  minHeight: "100dvh",
-  padding: "24px",
-  fontFamily: "var(--font-sans)",
-  width: "100%",
-};
-
-const prefBoxStyle: React.CSSProperties = {
-  width: "100%",
-  maxWidth: "480px",
-  textAlign: "center",
-};
-
-const headerStyle: React.CSSProperties = {
-  width: "100%",
-  maxWidth: "500px",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  marginBottom: "32px",
-};
-
-const navBtnStyle: React.CSSProperties = {
-  fontSize: "13px",
-  color: "var(--color-text-muted)",
-  background: "none",
-  border: "none",
-  cursor: "pointer",
-  fontFamily: "inherit",
-  transition: "color 0.2s",
-};
-
-const progressBarStyle: React.CSSProperties = {
-  width: "100%",
-  maxWidth: "500px",
-  marginBottom: "32px",
-};
-
-const actionBtnStyle: React.CSSProperties = {
-  flex: 1,
-  padding: "16px 0",
-  borderRadius: "9999px",
-  fontSize: "15px",
-  fontWeight: 500,
-  border: "1px solid var(--color-border)",
-  backgroundColor: "transparent",
-  color: "var(--color-text-secondary)",
-  cursor: "pointer",
-  fontFamily: "inherit",
-  transition: "all 0.2s",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: "6px",
-};
-
-export default function OnboardingView({ session, onComplete, onLogout }: Props) {
+export default function OnboardingView({ session, onComplete, onLogout, forcePreferences }: Props) {
   const [state, setState] = useState<OnboardingState | null>(null);
   const [loading, setLoading] = useState(false);
-  const [buildingSlate, setBuildingSlate] = useState(!session.onboarding_complete && !session.is_returning);
+  const [buildingSlate, setBuildingSlate] = useState(
+    forcePreferences || (!session.onboarding_complete && !session.is_returning)
+  );
   const [showPrefs, setShowPrefs] = useState(false);
   const [preferences, setPreferences] = useState({
     languages: ["en"],
     genres: [] as string[],
     semantic_index: "tmdb_bge_m3",
-    include_classics: true,
+    include_classics: false,
+    age_group: "18-24",
+    region: "USA",
   });
 
   const x = useMotionValue(0);
@@ -143,6 +101,8 @@ export default function OnboardingView({ session, onComplete, onLogout }: Props)
         genres: preferences.genres,
         semantic_index: preferences.semantic_index,
         include_classics: preferences.include_classics,
+        age_group: preferences.age_group,
+        region: preferences.region,
       });
       setState(result);
       setBuildingSlate(false);
@@ -160,6 +120,7 @@ export default function OnboardingView({ session, onComplete, onLogout }: Props)
       try {
         const result = await apiRateOnboarding(session.session_id, state.movie.id, rating);
         setState(result);
+        // Only auto-redirect when is_ready (is_complete AND enough likes)
         if (result.is_ready) {
           onComplete(result.session);
         }
@@ -188,79 +149,90 @@ export default function OnboardingView({ session, onComplete, onLogout }: Props)
     [session.session_id, loading]
   );
 
-  const handleDragEnd = (event: any, info: any) => {
+  const handleDragEnd = (_event: unknown, info: { offset: { x: number; y: number } }) => {
     if (!state?.movie || loading) return;
     const offset = info.offset;
     const threshold = 80;
 
     if (Math.abs(offset.x) > Math.abs(offset.y) && Math.abs(offset.x) > threshold) {
-      if (offset.x > 0) handleRate("like"); // Right
-      else handleRate("dislike"); // Left
+      if (offset.x > 0) handleRate("like");
+      else handleRate("dislike");
     } else if (Math.abs(offset.y) > threshold) {
-      if (offset.y > 0) handleRate("okay"); // Down (positive y)
-      else handleRate("not_watched"); // Up (negative y) -> Skip
+      if (offset.y > 0) handleRate("okay");
+      else handleRate("not_watched");
     }
   };
 
+  const likeCount = state?.feedback_counts?.like || 0;
+  const minLikes = state?.session?.min_likes_needed || 10;
+
+  /* ─── Preferences Step ─────────────────────────── */
   if (buildingSlate) {
     return (
-      <div style={prefContainerStyle}>
+      <div style={{
+        display: "flex", flexDirection: "column", alignItems: "center",
+        justifyContent: "center", minHeight: "100dvh", padding: "20px",
+        fontFamily: "var(--font-sans)", width: "100%",
+      }}>
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          style={prefBoxStyle}
+          style={{ width: "100%", maxWidth: "520px", textAlign: "center" }}
         >
-          <p style={{ fontSize: "12px", color: "var(--color-text-muted)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "8px" }}>
+          <p style={{ fontSize: "11px", color: "var(--color-text-muted)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "6px" }}>
             Step 1
           </p>
-          <h2 style={{ fontSize: "clamp(1.5rem, 4vw, 2.25rem)", fontWeight: 300, letterSpacing: "-0.03em", margin: 0 }}>
+          <h2 style={{ fontSize: "clamp(1.3rem, 3vw, 1.8rem)", fontWeight: 300, letterSpacing: "-0.03em", margin: 0 }}>
             Set your preferences
           </h2>
-          <p style={{ marginTop: "12px", fontSize: "14px", color: "var(--color-text-muted)", fontWeight: 300 }}>
+          <p style={{ marginTop: "8px", fontSize: "13px", color: "var(--color-text-muted)", fontWeight: 300 }}>
             We&apos;ll build a personalized slate of movies for you to rate.
           </p>
 
-          <div style={{ marginTop: "48px", textAlign: "left", display: "flex", flexDirection: "column", gap: "32px" }}>
+          <div style={{ marginTop: "28px", textAlign: "left", display: "flex", flexDirection: "column", gap: "20px" }}>
+            {/* Region */}
+            <div>
+              <label style={sectionLabelStyle}>Region</label>
+              <div style={{ marginTop: "8px", display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                {REGION_OPTIONS.map((region) => (
+                  <PrefPill
+                    key={region}
+                    label={region}
+                    active={preferences.region === region}
+                    onClick={() => setPreferences((p) => ({ ...p, region }))}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* Age Group */}
+            <div>
+              <label style={sectionLabelStyle}>Age Group</label>
+              <div style={{ marginTop: "8px", display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                {AGE_GROUP_OPTIONS.map((age) => (
+                  <PrefPill
+                    key={age}
+                    label={age}
+                    active={preferences.age_group === age}
+                    onClick={() => setPreferences((p) => ({ ...p, age_group: age }))}
+                  />
+                ))}
+              </div>
+            </div>
+
             {/* Languages */}
             <div>
-              <label style={{ fontSize: "12px", color: "var(--color-text-secondary)", fontWeight: 500, letterSpacing: "0.05em", textTransform: "uppercase" }}>
-                Languages
-              </label>
-              <div style={{ marginTop: "16px", display: "flex", flexWrap: "wrap", gap: "10px" }}>
-                {["en", "te", "hi", "ta", "ml", "ko", "ja", "es", "fr", "de"].map((lang) => {
-                  const isSelected = preferences.languages.includes(lang);
+              <label style={sectionLabelStyle}>Languages</label>
+              <div style={{ marginTop: "8px", display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                {LANGUAGES_LIST.map(({ code, label }) => {
+                  const isSelected = preferences.languages.includes(code);
                   return (
-                    <button
-                      key={lang}
-                      onClick={() =>
-                        setPreferences((p) => ({
-                          ...p,
-                          languages: isSelected
-                            ? p.languages.filter((l) => l !== lang)
-                            : [...p.languages, lang],
-                        }))
-                      }
-                      style={{
-                        padding: "10px 20px",
-                        borderRadius: "9999px",
-                        fontSize: "13px",
-                        fontWeight: 500,
-                        border: isSelected ? "1px solid var(--color-text-primary)" : "1px solid var(--color-border)",
-                        backgroundColor: isSelected ? "var(--color-surface)" : "transparent",
-                        color: isSelected ? "var(--color-text-primary)" : "var(--color-text-muted)",
-                        cursor: "pointer",
-                        transition: "all 0.2s",
-                      }}
-                      onMouseEnter={(e) => {
-                        if (!isSelected) e.currentTarget.style.borderColor = "var(--color-text-secondary)";
-                      }}
-                      onMouseLeave={(e) => {
-                        if (!isSelected) e.currentTarget.style.borderColor = "var(--color-border)";
-                      }}
-                    >
-                      {langLabel(lang)}
-                    </button>
+                    <PrefPill key={code} label={label} active={isSelected}
+                      onClick={() => setPreferences((p) => ({
+                        ...p, languages: isSelected ? p.languages.filter((l) => l !== code) : [...p.languages, code],
+                      }))}
+                    />
                   );
                 })}
               </div>
@@ -268,46 +240,28 @@ export default function OnboardingView({ session, onComplete, onLogout }: Props)
 
             {/* Genres */}
             <div>
-              <label style={{ fontSize: "12px", color: "var(--color-text-secondary)", fontWeight: 500, letterSpacing: "0.05em", textTransform: "uppercase" }}>
-                Genres (optional)
-              </label>
-              <div style={{ marginTop: "16px", display: "flex", flexWrap: "wrap", gap: "10px" }}>
-                {["Action", "Comedy", "Drama", "Horror", "Romance", "Sci-Fi", "Thriller", "Fantasy", "Animation", "Documentary"].map((genre) => {
+              <label style={sectionLabelStyle}>Genres (optional)</label>
+              <div style={{ marginTop: "8px", display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                {GENRE_LIST.map((genre) => {
                   const isSelected = preferences.genres.includes(genre);
                   return (
-                    <button
-                      key={genre}
-                      onClick={() =>
-                        setPreferences((p) => ({
-                          ...p,
-                          genres: isSelected
-                            ? p.genres.filter((g) => g !== genre)
-                            : [...p.genres, genre],
-                        }))
-                      }
-                      style={{
-                        padding: "10px 20px",
-                        borderRadius: "9999px",
-                        fontSize: "13px",
-                        fontWeight: 500,
-                        border: isSelected ? "1px solid var(--color-text-primary)" : "1px solid var(--color-border)",
-                        backgroundColor: isSelected ? "var(--color-surface)" : "transparent",
-                        color: isSelected ? "var(--color-text-primary)" : "var(--color-text-muted)",
-                        cursor: "pointer",
-                        transition: "all 0.2s",
-                      }}
-                      onMouseEnter={(e) => {
-                        if (!isSelected) e.currentTarget.style.borderColor = "var(--color-text-secondary)";
-                      }}
-                      onMouseLeave={(e) => {
-                        if (!isSelected) e.currentTarget.style.borderColor = "var(--color-border)";
-                      }}
-                    >
-                      {genre}
-                    </button>
+                    <PrefPill key={genre} label={genre} active={isSelected}
+                      onClick={() => setPreferences((p) => ({
+                        ...p, genres: isSelected ? p.genres.filter((g) => g !== genre) : [...p.genres, genre],
+                      }))}
+                    />
                   );
                 })}
               </div>
+            </div>
+
+            {/* Include Classics toggle */}
+            <div>
+              <PrefPill
+                label="Include Pre-2000 Classics"
+                active={preferences.include_classics}
+                onClick={() => setPreferences((p) => ({ ...p, include_classics: !p.include_classics }))}
+              />
             </div>
           </div>
 
@@ -316,19 +270,13 @@ export default function OnboardingView({ session, onComplete, onLogout }: Props)
             whileTap={{ scale: 0.99 }}
             onClick={handleBuildSlate}
             disabled={loading || preferences.languages.length === 0}
+            className="glass-button"
             style={{
-              marginTop: "56px",
-              width: "100%",
-              padding: "18px 0",
-              backgroundColor: "var(--color-text-primary)",
-              color: "var(--color-bg)",
-              fontSize: "15px",
-              fontWeight: 500,
-              borderRadius: "9999px",
-              border: "none",
-              cursor: loading || preferences.languages.length === 0 ? "not-allowed" : "pointer",
+              marginTop: "32px", width: "100%", padding: "14px 0",
+              background: "rgba(255,255,255,0.12)",
+              color: "var(--color-text-primary)", fontSize: "14px", fontWeight: 500,
+              borderRadius: "var(--radius-pill)", cursor: loading ? "not-allowed" : "pointer",
               opacity: loading || preferences.languages.length === 0 ? 0.4 : 1,
-              transition: "all 0.2s",
             }}
           >
             {loading ? "Building slate..." : "Build my slate"}
@@ -338,217 +286,151 @@ export default function OnboardingView({ session, onComplete, onLogout }: Props)
     );
   }
 
+  /* ─── Rating Step ──────────────────────────────── */
   return (
-    <div style={containerStyle}>
+    <div style={{
+      display: "flex", flexDirection: "column", alignItems: "center",
+      justifyContent: "space-between",
+      height: "100dvh", padding: "12px 16px",
+      fontFamily: "var(--font-sans)", width: "100%", overflow: "hidden",
+    }}>
       {/* Header */}
-      <div style={headerStyle}>
-        <button
-          onClick={onLogout}
-          style={navBtnStyle}
-          onMouseEnter={(e) => { e.currentTarget.style.color = "var(--color-text-secondary)"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = "var(--color-text-muted)"; }}
-        >
+      <div style={{
+        width: "100%", maxWidth: "500px",
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        flexShrink: 0,
+      }}>
+        <button onClick={onLogout} className="glass-pill"
+          style={{ fontSize: "12px", color: "var(--color-text-muted)", cursor: "pointer", padding: "5px 12px" }}>
           Sign out
         </button>
-
         {state && (
-          <div style={{ fontSize: "12px", color: "var(--color-text-muted)", fontWeight: 300 }}>
+          <div style={{ fontSize: "11px", color: "var(--color-text-muted)", fontWeight: 300 }}>
             {state.session.onboarding_index + 1} / {state.session.onboarding_total}
           </div>
         )}
-
-        <button
-          onClick={() => setShowPrefs(true)}
-          style={navBtnStyle}
-          onMouseEnter={(e) => { e.currentTarget.style.color = "var(--color-text-secondary)"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = "var(--color-text-muted)"; }}
-        >
+        <button onClick={() => setShowPrefs(true)} className="glass-pill"
+          style={{ fontSize: "12px", color: "var(--color-text-muted)", cursor: "pointer", padding: "5px 12px" }}>
           Preferences
         </button>
       </div>
 
       {/* Progress bar */}
       {state && (
-        <div style={progressBarStyle}>
-          <div style={{ height: "1px", backgroundColor: "var(--color-border)", borderRadius: "9999px", overflow: "hidden" }}>
+        <div style={{ width: "100%", maxWidth: "500px", marginTop: "8px", flexShrink: 0 }}>
+          <div style={{ height: "2px", backgroundColor: "var(--color-border)", borderRadius: "var(--radius-pill)", overflow: "hidden" }}>
             <motion.div
-              style={{ height: "100%", backgroundColor: "var(--color-text-primary)" }}
+              style={{ height: "100%", backgroundColor: "var(--color-text-primary)", borderRadius: "var(--radius-pill)" }}
               initial={{ width: 0 }}
-              animate={{
-                width: `${((state.session.onboarding_index + 1) / Math.max(state.session.onboarding_total, 1)) * 100}%`,
-              }}
+              animate={{ width: `${((state.session.onboarding_index + 1) / Math.max(state.session.onboarding_total, 1)) * 100}%` }}
               transition={{ duration: 0.4, ease: "easeOut" }}
             />
           </div>
-          <div style={{ marginTop: "12px", display: "flex", justifyContent: "space-between", fontSize: "11px", color: "var(--color-text-muted)", fontWeight: 300 }}>
-            <span>
-              {state.feedback_counts.like || 0} liked
-              {state.session.min_likes_needed > 0 && ` / ${state.session.min_likes_needed} needed`}
-            </span>
-            <span>
-              {Object.values(state.feedback_counts).reduce((a, b) => a + b, 0)} rated
-            </span>
+          <div style={{ marginTop: "6px", display: "flex", justifyContent: "space-between", fontSize: "10px", color: "var(--color-text-muted)", fontWeight: 300 }}>
+            <span>{likeCount} liked / {minLikes} needed</span>
+            <span>{Object.values(state.feedback_counts).reduce((a, b) => a + b, 0)} rated</span>
           </div>
         </div>
       )}
 
-      {/* Movie card */}
-      <div style={{ width: "100%", maxWidth: "380px", flex: 1, display: "flex", alignItems: "center", justifyContent: "center", minHeight: "400px" }}>
+      {/* Movie card — fills remaining space */}
+      <div style={{ width: "100%", maxWidth: "420px", flex: 1, display: "flex", alignItems: "center", justifyContent: "center", minHeight: 0, overflow: "hidden", margin: "4px 0" }}>
         <AnimatePresence mode="wait">
           {state?.movie ? (
             <motion.div
               key={state.movie.id}
               variants={cardVariants}
-              initial="enter"
-              animate="center"
-              exit="exit"
+              initial="enter" animate="center" exit="exit"
               style={{ x, y, rotate, width: "100%", cursor: "grab" }}
-              drag
-              dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
-              dragElastic={0.8}
-              onDragEnd={handleDragEnd}
-              whileDrag={{ scale: 1.02 }}
+              drag dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
+              dragElastic={0.8} onDragEnd={handleDragEnd} whileDrag={{ scale: 1.02 }}
             >
               <MovieCard movie={state.movie} priority />
             </motion.div>
           ) : !loading && (
-            <motion.div
-              key="empty"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              style={{ textAlign: "center", width: "100%", padding: "80px 0" }}
-            >
-              <p style={{ fontSize: "14px", color: "var(--color-text-muted)" }}>
-                No more movies in this slate.
-              </p>
+            <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+              style={{ textAlign: "center", width: "100%", padding: "40px 0" }}>
+              <p style={{ fontSize: "13px", color: "var(--color-text-muted)" }}>No more movies in this slate.</p>
+              <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+                onClick={() => setBuildingSlate(true)} className="glass-button"
+                style={{ marginTop: "16px", padding: "10px 24px", borderRadius: "var(--radius-pill)", fontSize: "12px", fontWeight: 500, color: "var(--color-text-primary)", cursor: "pointer" }}>
+                Rebuild slate
+              </motion.button>
             </motion.div>
           )}
         </AnimatePresence>
       </div>
 
-      {/* Action buttons */}
-      {state?.movie && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          style={{ width: "100%", maxWidth: "600px", marginTop: "40px", marginBottom: "24px" }}
-        >
-          <div style={{ display: "flex", gap: "16px", justifyContent: "center" }}>
-            {RATING_OPTIONS.map((opt) => {
-              const isLike = opt.value === "like";
-              return (
-                <motion.button
-                  key={opt.value}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.97 }}
-                  onClick={() => handleRate(opt.value)}
-                  disabled={loading}
+      {/* Action buttons — fixed at bottom */}
+      <div style={{ width: "100%", maxWidth: "600px", flexShrink: 0, paddingBottom: "8px" }}>
+        {state?.movie && (
+          <>
+            <div style={{ display: "flex", gap: "8px", justifyContent: "center" }}>
+              {RATING_OPTIONS.map((opt) => (
+                <motion.button key={opt.value} whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
+                  onClick={() => handleRate(opt.value)} disabled={loading} className="glass-button"
                   style={{
-                    ...actionBtnStyle,
-                    borderColor: isLike ? "var(--color-text-primary)" : "var(--color-border)",
-                    color: isLike ? "var(--color-text-primary)" : "var(--color-text-secondary)",
-                    opacity: loading ? 0.4 : 1,
-                  }}
-                  onMouseEnter={(e) => {
-                    if (loading) return;
-                    if (isLike) {
-                      e.currentTarget.style.backgroundColor = "var(--color-text-primary)";
-                      e.currentTarget.style.color = "var(--color-bg)";
-                    } else {
-                      e.currentTarget.style.borderColor = "var(--color-text-secondary)";
-                      e.currentTarget.style.color = "var(--color-text-primary)";
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (loading) return;
-                    e.currentTarget.style.backgroundColor = "transparent";
-                    if (isLike) {
-                      e.currentTarget.style.color = "var(--color-text-primary)";
-                    } else {
-                      e.currentTarget.style.borderColor = "var(--color-border)";
-                      e.currentTarget.style.color = "var(--color-text-secondary)";
-                    }
-                  }}
-                >
+                    flex: 1, padding: "12px 0", borderRadius: "var(--radius-pill)",
+                    fontSize: "13px", fontWeight: 500, color: opt.color,
+                    cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.4 : 1,
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: "4px",
+                  }}>
                   <span>{opt.label}</span>
-                  <span style={{ fontSize: "10px", opacity: 0.4, marginLeft: "4px" }}>
-                    {opt.shortcut}
-                  </span>
+                  <span style={{ fontSize: "9px", opacity: 0.4 }}>{opt.shortcut}</span>
                 </motion.button>
-              );
-            })}
-          </div>
+              ))}
+            </div>
 
-          {/* Nav arrows */}
-          <div style={{ display: "flex", justifyContent: "space-between", marginTop: "24px", padding: "0 16px" }}>
-            <button
-              onClick={() => handleNav("prev")}
-              disabled={loading || !state || state.session.onboarding_index <= 0}
-              style={{ ...navBtnStyle, opacity: (loading || !state || state.session.onboarding_index <= 0) ? 0.2 : 1 }}
-            >
-              ← Previous
-            </button>
-            <button
-              onClick={() => handleNav("next")}
-              disabled={loading}
-              style={{ ...navBtnStyle, opacity: loading ? 0.2 : 1 }}
-            >
-              Next →
-            </button>
-          </div>
-        </motion.div>
-      )}
+            {/* Nav arrows */}
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: "12px" }}>
+              <button onClick={() => handleNav("prev")}
+                disabled={loading || !state || state.session.onboarding_index <= 0}
+                className="glass-pill"
+                style={{ fontSize: "12px", color: "var(--color-text-muted)", cursor: "pointer", padding: "5px 12px", opacity: (loading || !state || state.session.onboarding_index <= 0) ? 0.2 : 1 }}>
+                ← Previous
+              </button>
+              <button onClick={() => handleNav("next")} disabled={loading} className="glass-pill"
+                style={{ fontSize: "12px", color: "var(--color-text-muted)", cursor: "pointer", padding: "5px 12px", opacity: loading ? 0.2 : 1 }}>
+                Next →
+              </button>
+            </div>
+          </>
+        )}
 
-      {/* Generate button */}
-      {state?.is_complete && (
-        <motion.button
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          whileHover={{ scale: 1.01 }}
-          whileTap={{ scale: 0.99 }}
-          onClick={() => onComplete(state.session)}
-          style={{
-            marginBottom: "24px",
-            padding: "16px 40px",
-            backgroundColor: "var(--color-text-primary)",
-            color: "var(--color-bg)",
-            fontSize: "15px",
-            fontWeight: 500,
-            borderRadius: "9999px",
-            border: "none",
-            cursor: "pointer",
-          }}
-          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "var(--color-accent)"}
-          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "var(--color-text-primary)"}
-        >
-          Generate recommendations
-        </motion.button>
-      )}
+        {/* Generate button — ONLY when is_ready (enough likes AND all rated) */}
+        {state?.is_ready && (
+          <motion.button initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+            whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}
+            onClick={() => onComplete(state.session)} className="glass-button"
+            style={{
+              marginTop: "12px", width: "100%", padding: "14px 0",
+              background: "rgba(255,255,255,0.12)", color: "var(--color-text-primary)",
+              fontSize: "14px", fontWeight: 500, borderRadius: "var(--radius-pill)", cursor: "pointer",
+            }}>
+            Generate recommendations →
+          </motion.button>
+        )}
+      </div>
 
       {showPrefs && (
-        <PreferencesModal
-          preferences={preferences}
-          onUpdate={setPreferences}
-          onClose={() => setShowPrefs(false)}
-        />
+        <PreferencesModal preferences={preferences} onUpdate={setPreferences}
+          onClose={() => setShowPrefs(false)} />
       )}
     </div>
   );
 }
 
-function langLabel(code: string): string {
-  const labels: Record<string, string> = {
-    en: "English",
-    te: "Telugu",
-    hi: "Hindi",
-    ta: "Tamil",
-    ml: "Malayalam",
-    ko: "Korean",
-    ja: "Japanese",
-    es: "Spanish",
-    fr: "French",
-    de: "German",
-  };
-  return labels[code] || code.toUpperCase();
+const sectionLabelStyle: React.CSSProperties = {
+  fontSize: "11px", color: "var(--color-text-secondary)", fontWeight: 500,
+  letterSpacing: "0.05em", textTransform: "uppercase",
+};
+
+function PrefPill({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button onClick={onClick} className={active ? "glass-pill-active" : "glass-pill"}
+      style={{ padding: "6px 14px", fontSize: "12px", fontWeight: 500,
+        color: active ? "var(--color-text-primary)" : "var(--color-text-muted)", cursor: "pointer" }}>
+      {label}
+    </button>
+  );
 }

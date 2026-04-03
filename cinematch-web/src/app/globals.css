@@ -2,18 +2,27 @@
 
 :root {
   --font-sans: var(--font-inter), system-ui, sans-serif;
-  --color-bg: #0a0a0a;
-  --color-surface: #141414;
-  --color-surface-hover: #1a1a1a;
-  --color-border: #222222;
-  --color-border-subtle: #1a1a1a;
+  --color-bg: #09090b;
+  --color-surface: #131316;
+  --color-surface-hover: #1c1c21;
+  --color-surface-elevated: #18181b;
+  --color-border: #27272a;
+  --color-border-subtle: #1e1e22;
   --color-text-primary: #fafafa;
   --color-text-secondary: #a1a1aa;
   --color-text-muted: #52525b;
   --color-accent: #e4e4e7;
   --color-accent-warm: #f59e0b;
-  --color-success: #22c55e;
-  --color-danger: #ef4444;
+  --color-success: #34d399;
+  --color-danger: #f87171;
+  --color-like: #34d399;
+  --color-okay: #60a5fa;
+  --color-dislike: #f87171;
+  --color-skip: #a1a1aa;
+  --radius-card: 20px;
+  --radius-pill: 9999px;
+  --radius-modal: 24px;
+  --radius-poster: 16px;
 }
 
 * {
@@ -42,7 +51,7 @@ select {
   font: inherit;
 }
 
-/* Scrollbar */
+/* ─── Scrollbar ─────────────────────────────────── */
 ::-webkit-scrollbar {
   width: 4px;
 }
@@ -54,39 +63,203 @@ select {
   border-radius: 2px;
 }
 
-/* Selection */
+/* ─── Selection ─────────────────────────────────── */
 ::selection {
   background: rgba(250, 250, 250, 0.12);
 }
 
-/* Focus ring */
+/* ─── Focus Ring ────────────────────────────────── */
 *:focus-visible {
   outline: 1px solid var(--color-text-muted);
   outline-offset: 2px;
 }
 
-/* Smooth transitions on interactive elements */
+/* ─── Transitions ───────────────────────────────── */
 button, a, input {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Glass morphism utility */
+/* ─── Apple Liquid Glass / Frosted Glass ────────── */
 .glass {
-  background: rgba(20, 20, 20, 0.7);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid var(--color-border-subtle);
+  background: rgba(20, 20, 24, 0.55);
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    inset 0 0.5px 0 0 rgba(255, 255, 255, 0.06),
+    0 0 0 0.5px rgba(0, 0, 0, 0.2);
 }
 
-/* Poster image styling */
+.glass-subtle {
+  background: rgba(20, 20, 24, 0.35);
+  backdrop-filter: blur(24px) saturate(150%);
+  -webkit-backdrop-filter: blur(24px) saturate(150%);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.glass-button {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow:
+    inset 0 0.5px 0 0 rgba(255, 255, 255, 0.08),
+    0 2px 8px -2px rgba(0, 0, 0, 0.3);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow:
+    inset 0 0.5px 0 0 rgba(255, 255, 255, 0.12),
+    0 4px 16px -4px rgba(0, 0, 0, 0.4);
+}
+
+.glass-card {
+  background: rgba(20, 20, 24, 0.5);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-card);
+  box-shadow:
+    0 0 0 0.5px rgba(255, 255, 255, 0.04),
+    0 8px 32px -8px rgba(0, 0, 0, 0.5);
+}
+
+.glass-modal {
+  background: rgba(16, 16, 20, 0.75);
+  backdrop-filter: blur(60px) saturate(200%);
+  -webkit-backdrop-filter: blur(60px) saturate(200%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-modal);
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.06),
+    0 25px 80px -12px rgba(0, 0, 0, 0.6),
+    0 0 0 0.5px rgba(0, 0, 0, 0.3);
+}
+
+/* ─── Pill/Tab Glass Style ──────────────────────── */
+.glass-pill {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-pill);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-pill:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.glass-pill-active {
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: var(--radius-pill);
+  box-shadow:
+    inset 0 0.5px 0 0 rgba(255, 255, 255, 0.1),
+    0 2px 8px -2px rgba(0, 0, 0, 0.3);
+}
+
+/* ─── Movie Card Hover Glow ─────────────────────── */
+.movie-poster-wrap {
+  position: relative;
+  border-radius: var(--radius-poster);
+  overflow: hidden;
+  background: var(--color-surface);
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 24px -4px rgba(0, 0, 0, 0.5);
+}
+
+.movie-poster-wrap::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  border: 1.5px solid transparent;
+  pointer-events: none;
+  transition: border-color 0.35s ease;
+}
+
+.movie-poster-wrap:hover {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow:
+    0 8px 40px -8px rgba(0, 0, 0, 0.6),
+    0 0 20px -4px rgba(255, 255, 255, 0.03);
+}
+
+.movie-poster-wrap:hover::after {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* ─── Poster Styling ────────────────────────────── */
 .poster-shadow {
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 16px 40px -8px rgba(0, 0, 0, 0.6);
 }
 
-/* Prevent text selection on cards */
+/* ─── Section Headers ───────────────────────────── */
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.section-header h3 {
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--color-text-primary);
+}
+
+.section-header .count {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  font-weight: 400;
+}
+
+/* ─── Prevent Text Selection on Cards ───────────── */
 .no-select {
   user-select: none;
   -webkit-user-select: none;
+}
+
+/* ─── Animations ────────────────────────────────── */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--color-surface) 25%,
+    var(--color-surface-hover) 50%,
+    var(--color-surface) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
 }
 
 /* Hide number input spinners */

@@ -1,6 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 750" fill="none">
-  <rect width="500" height="750" rx="8" fill="#141414"/>
-  <path d="M220 345 L280 345 L280 405 L220 405 Z" stroke="#333" stroke-width="2" fill="none"/>
-  <circle cx="240" cy="362" r="6" stroke="#333" stroke-width="2" fill="none"/>
-  <path d="M222 400 L245 378 L258 390 L270 380 L278 390" stroke="#333" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="500" height="750" viewBox="0 0 500 750">
+  <rect width="500" height="750" fill="#131316"/>
+  <rect x="1" y="1" width="498" height="748" fill="none" stroke="#27272a" stroke-width="1" rx="8"/>
+  <g transform="translate(250, 350)" text-anchor="middle">
+    <rect x="-30" y="-30" width="60" height="60" rx="12" fill="none" stroke="#3f3f46" stroke-width="1.5"/>
+    <line x1="-10" y1="0" x2="10" y2="0" stroke="#3f3f46" stroke-width="1.5" stroke-linecap="round"/>
+    <circle cx="-8" cy="-10" r="5" fill="none" stroke="#3f3f46" stroke-width="1.5"/>
+    <polygon points="-14,16 0,2 10,12 20,4" fill="none" stroke="#3f3f46" stroke-width="1.5" stroke-linejoin="round"/>
+    <text y="60" font-family="system-ui, sans-serif" font-size="14" fill="#52525b" font-weight="300">
+      No poster
+    </text>
+  </g>
 </svg>

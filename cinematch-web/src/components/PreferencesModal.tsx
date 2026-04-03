@@ -2,12 +2,18 @@
 
 import { motion } from "framer-motion";
 import { useState } from "react";
+import {
+  REGION_OPTIONS,
+  AGE_GROUP_OPTIONS,
+} from "@/lib/api";
 
 interface Preferences {
   languages: string[];
   genres: string[];
   semantic_index: string;
   include_classics: boolean;
+  age_group: string;
+  region: string;
 }
 
 interface Props {
@@ -27,11 +33,18 @@ const LANGUAGES = [
   { code: "es", label: "Spanish" },
   { code: "fr", label: "French" },
   { code: "de", label: "German" },
+  { code: "it", label: "Italian" },
+  { code: "pt", label: "Portuguese" },
+  { code: "ru", label: "Russian" },
+  { code: "zh", label: "Chinese" },
+  { code: "ar", label: "Arabic" },
+  { code: "th", label: "Thai" },
 ];
 
 const GENRES = [
-  "Action", "Comedy", "Drama", "Horror", "Romance", "Sci-Fi", "Thriller",
-  "Fantasy", "Animation", "Documentary", "Crime", "Mystery", "Adventure", "Family"
+  "Action", "Adventure", "Animation", "Comedy", "Crime", "Documentary",
+  "Drama", "Family", "Fantasy", "History", "Horror", "Music", "Mystery",
+  "Romance", "Science Fiction", "Thriller", "War", "Western",
 ];
 
 const INDEXES = [
@@ -41,7 +54,6 @@ const INDEXES = [
 ];
 
 export default function PreferencesModal({ preferences, onUpdate, onClose }: Props) {
-  // Use local state so we don't dispatch on every click, only on "Apply"
   const [localPrefs, setLocalPrefs] = useState<Preferences>(preferences);
 
   const toggle = (field: "languages" | "genres", value: string) => {
@@ -69,45 +81,78 @@ export default function PreferencesModal({ preferences, onUpdate, onClose }: Pro
         onClick={onClose}
         style={{
           position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-          zIndex: 50, backgroundColor: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)"
+          zIndex: 50, backgroundColor: "rgba(0,0,0,0.5)",
+          backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
         }}
       />
 
       {/* Modal */}
       <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.95 }}
-        transition={{ type: "spring", damping: 25, stiffness: 300 }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.2 }}
         style={{
           position: "fixed", zIndex: 51,
-          top: "50%", left: "50%", transform: "translate(-50%, -50%)",
-          width: "90%", maxWidth: "480px", maxHeight: "85vh",
-          overflowY: "auto", boxSizing: "border-box",
-          backgroundColor: "var(--color-bg)", border: "1px solid var(--color-border)",
-          borderRadius: "16px", padding: "24px", fontFamily: "var(--font-sans)",
-          boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)"
+          inset: 0,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          pointerEvents: "none",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px" }}>
-          <h2 style={{ fontSize: "16px", fontWeight: 500, letterSpacing: "-0.01em", margin: 0 }}>
+        <div
+          className="glass-modal"
+          style={{
+            width: "90%", maxWidth: "520px", maxHeight: "85vh",
+            overflowY: "auto", boxSizing: "border-box",
+            padding: "24px", pointerEvents: "auto",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "24px" }}>
+          <h2 style={{ fontSize: "18px", fontWeight: 600, letterSpacing: "-0.02em", margin: 0 }}>
             Preferences
           </h2>
           <button
             onClick={onClose}
-            style={{ fontSize: "13px", color: "var(--color-text-muted)", background: "none", border: "none", cursor: "pointer" }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = "var(--color-text-secondary)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = "var(--color-text-muted)"; }}
+            className="glass-pill"
+            style={{ fontSize: "12px", color: "var(--color-text-muted)", cursor: "pointer", padding: "6px 14px" }}
           >
             Close
           </button>
         </div>
 
+        {/* Region */}
+        <Section title="Region">
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+            {REGION_OPTIONS.map((region) => (
+              <GlassPill
+                key={region}
+                label={region}
+                active={localPrefs.region === region}
+                onClick={() => setLocalPrefs({ ...localPrefs, region })}
+              />
+            ))}
+          </div>
+        </Section>
+
+        {/* Age Group */}
+        <Section title="Age Group">
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+            {AGE_GROUP_OPTIONS.map((age) => (
+              <GlassPill
+                key={age}
+                label={age}
+                active={localPrefs.age_group === age}
+                onClick={() => setLocalPrefs({ ...localPrefs, age_group: age })}
+              />
+            ))}
+          </div>
+        </Section>
+
         {/* Languages */}
         <Section title="Languages">
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
             {LANGUAGES.map(({ code, label }) => (
-              <PillToggle
+              <GlassPill
                 key={code}
                 label={label}
                 active={localPrefs.languages.includes(code)}
@@ -119,9 +164,9 @@ export default function PreferencesModal({ preferences, onUpdate, onClose }: Pro
 
         {/* Genres */}
         <Section title="Genres">
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
             {GENRES.map((genre) => (
-              <PillToggle
+              <GlassPill
                 key={genre}
                 label={genre}
                 active={localPrefs.genres.includes(genre)}
@@ -129,20 +174,20 @@ export default function PreferencesModal({ preferences, onUpdate, onClose }: Pro
               />
             ))}
           </div>
-          <p style={{ marginTop: "12px", fontSize: "11px", color: "var(--color-text-muted)" }}>
+          <p style={{ marginTop: "10px", fontSize: "11px", color: "var(--color-text-muted)" }}>
             Leave empty for all genres.
           </p>
         </Section>
 
         {/* Semantic Index & Options */}
-        <div style={{ display: "flex", gap: "20px", flexWrap: "wrap", marginBottom: "20px" }}>
+        <div style={{ display: "flex", gap: "20px", flexWrap: "wrap", marginBottom: "24px" }}>
           <div style={{ flex: 1, minWidth: "150px" }}>
             <label style={{ display: "block", fontSize: "11px", color: "var(--color-text-secondary)", fontWeight: 500, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: "10px" }}>
-              Search index
+              Search Index
             </label>
             <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
               {INDEXES.map(({ value, label }) => (
-                <PillToggle
+                <GlassPill
                   key={value}
                   label={label}
                   active={localPrefs.semantic_index === value}
@@ -155,14 +200,14 @@ export default function PreferencesModal({ preferences, onUpdate, onClose }: Pro
           </div>
 
           <div>
-             <label style={{ display: "block", fontSize: "11px", color: "var(--color-text-secondary)", fontWeight: 500, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: "10px" }}>
+            <label style={{ display: "block", fontSize: "11px", color: "var(--color-text-secondary)", fontWeight: 500, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: "10px" }}>
               Options
             </label>
-            <PillToggle 
-              label="Pre-2000 Classics" 
-              active={localPrefs.include_classics} 
-              onClick={() => setLocalPrefs({...localPrefs, include_classics: !localPrefs.include_classics})}
-             />
+            <GlassPill
+              label="Pre-2000 Classics"
+              active={localPrefs.include_classics}
+              onClick={() => setLocalPrefs({ ...localPrefs, include_classics: !localPrefs.include_classics })}
+            />
           </div>
         </div>
 
@@ -171,17 +216,18 @@ export default function PreferencesModal({ preferences, onUpdate, onClose }: Pro
           whileHover={{ scale: 1.01 }}
           whileTap={{ scale: 0.99 }}
           onClick={handleApply}
+          className="glass-button"
           style={{
-            marginTop: "10px", width: "100%", padding: "14px 0",
-            backgroundColor: "var(--color-text-primary)", color: "var(--color-bg)",
+            marginTop: "8px", width: "100%", padding: "14px 0",
+            background: "rgba(255,255,255,0.12)",
+            color: "var(--color-text-primary)",
             fontSize: "14px", fontWeight: 500, letterSpacing: "0.02em",
-            borderRadius: "9999px", border: "none", cursor: "pointer"
+            borderRadius: "var(--radius-pill)", cursor: "pointer",
           }}
-          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "var(--color-accent)"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "var(--color-text-primary)"; }}
         >
           Apply Changes
         </motion.button>
+        </div>
       </motion.div>
     </>
   );
@@ -189,7 +235,7 @@ export default function PreferencesModal({ preferences, onUpdate, onClose }: Pro
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div style={{ marginBottom: "20px" }}>
+    <div style={{ marginBottom: "24px" }}>
       <label style={{ display: "block", fontSize: "11px", color: "var(--color-text-secondary)", fontWeight: 500, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: "10px" }}>
         {title}
       </label>
@@ -198,19 +244,16 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function PillToggle({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+function GlassPill({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
+      className={active ? "glass-pill-active" : "glass-pill"}
       style={{
-        padding: "6px 14px", borderRadius: "9999px", fontSize: "12px", fontWeight: 500,
-        border: active ? "1px solid var(--color-text-primary)" : "1px solid var(--color-border)",
-        backgroundColor: active ? "var(--color-surface)" : "transparent",
+        padding: "7px 16px", fontSize: "12px", fontWeight: 500,
         color: active ? "var(--color-text-primary)" : "var(--color-text-muted)",
-        cursor: "pointer", transition: "all 0.2s"
+        cursor: "pointer",
       }}
-      onMouseEnter={(e) => { if (!active) e.currentTarget.style.borderColor = "var(--color-text-secondary)"; }}
-      onMouseLeave={(e) => { if (!active) e.currentTarget.style.borderColor = "var(--color-border)"; }}
     >
       {label}
     </button>

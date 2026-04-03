@@ -78,6 +78,7 @@ export interface Recommendation {
   original_language?: string;
   director?: string;
   imdb_rating?: number;
+  primary_genre?: string;
 }
 
 export interface RecommendationPage {
@@ -94,6 +95,34 @@ export interface HistoryItem {
   rating: string;
   context: "onboarding" | "recommendation";
   year?: number;
+}
+
+/* ─── Constants ─────────────────────────────────────────────── */
+
+export const REGION_OPTIONS = [
+  "India", "USA", "Canada", "UK", "Europe", "Latin-America",
+  "East Asia", "South-East Asia", "Middle-East", "Africa", "Other",
+] as const;
+
+export const AGE_GROUP_OPTIONS = [
+  "18-24", "25-34", "35-44", "45-54", "55+", "Prefer not to say",
+] as const;
+
+export const LANGUAGE_LABELS: Record<string, string> = {
+  ar: "Arabic", bn: "Bengali", cn: "Chinese", da: "Danish",
+  de: "German", el: "Greek", en: "English", es: "Spanish",
+  fa: "Persian", fi: "Finnish", fr: "French", he: "Hebrew",
+  hi: "Hindi", id: "Indonesian", it: "Italian", ja: "Japanese",
+  kn: "Kannada", ko: "Korean", ml: "Malayalam", mr: "Marathi",
+  nl: "Dutch", no: "Norwegian", pl: "Polish", pt: "Portuguese",
+  ro: "Romanian", ru: "Russian", sv: "Swedish", ta: "Tamil",
+  te: "Telugu", th: "Thai", tr: "Turkish", uk: "Ukrainian",
+  ur: "Urdu", zh: "Chinese",
+};
+
+export function languageLabel(code: string): string {
+  if (!code) return "Unknown";
+  return LANGUAGE_LABELS[code.toLowerCase()] || code.toUpperCase();
 }
 
 /* ─── Endpoints ─────────────────────────────────────────────── */
@@ -201,3 +230,25 @@ export function posterUrl(path: string | null | undefined, size = "w500"): strin
   if (path.startsWith("http")) return path;
   return `https://image.tmdb.org/t/p/${size}${path}`;
 }
+
+/* ─── TMDB Poster Fallback ──────────────────────── */
+
+const posterCache: Record<number, string | null> = {};
+
+export async function fetchTmdbPoster(tmdbId: number): Promise<string | null> {
+  if (tmdbId in posterCache) return posterCache[tmdbId];
+  try {
+    const res = await fetch(`/api/tmdb?id=${tmdbId}`);
+    if (!res.ok) {
+      posterCache[tmdbId] = null;
+      return null;
+    }
+    const data = await res.json();
+    posterCache[tmdbId] = data.poster_path || null;
+    return data.poster_path || null;
+  } catch {
+    posterCache[tmdbId] = null;
+    return null;
+  }
+}
+

@@ -20,6 +20,8 @@ const pageVariants = {
 export default function Home() {
   const [phase, setPhase] = useState<AppPhase>("login");
   const [session, setSession] = useState<UserSession | null>(null);
+  // When re-onboarding, force show preferences step
+  const [forcePreferences, setForcePreferences] = useState(false);
 
   const handleLogin = useCallback((s: UserSession) => {
     setSession(s);
@@ -32,15 +34,18 @@ export default function Home() {
 
   const handleOnboardingDone = useCallback((s: UserSession) => {
     setSession(s);
+    setForcePreferences(false);
     setPhase("recommendations");
   }, []);
 
   const handleBackToOnboarding = useCallback(() => {
+    setForcePreferences(true);
     setPhase("onboarding");
   }, []);
 
   const handleLogout = useCallback(() => {
     setSession(null);
+    setForcePreferences(false);
     setPhase("login");
   }, []);
 
@@ -55,7 +60,12 @@ export default function Home() {
 
         {phase === "onboarding" && session && (
           <motion.div key="onboarding" variants={pageVariants} initial="initial" animate="animate" exit="exit">
-            <OnboardingView session={session} onComplete={handleOnboardingDone} onLogout={handleLogout} />
+            <OnboardingView
+              session={session}
+              onComplete={handleOnboardingDone}
+              onLogout={handleLogout}
+              forcePreferences={forcePreferences}
+            />
           </motion.div>
         )}
 

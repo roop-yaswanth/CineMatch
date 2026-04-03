@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import HistoryDrawer from "@/components/HistoryDrawer";
@@ -8,11 +8,12 @@ import PreferencesModal from "@/components/PreferencesModal";
 import {
   apiGenerateRecommendations,
   apiRecommendationAction,
-  posterUrl,
+  languageLabel,
   type UserSession,
   type Recommendation,
   type RecommendationPage,
 } from "@/lib/api";
+import { usePoster } from "@/lib/usePoster";
 
 interface Props {
   session: UserSession;
@@ -21,86 +22,74 @@ interface Props {
   onLogout: () => void;
 }
 
-/* ─── Styles ──────────────────────────────────────────────────── */
+/* ─── Stack partitioning (mirrors Gradio gradio_partition_recommendations) ─── */
 
-const containerStyle: React.CSSProperties = {
-  minHeight: "100dvh",
-  display: "flex",
-  flexDirection: "column",
-  fontFamily: "var(--font-sans)",
-};
+interface Stack {
+  id: string;
+  label: string;
+  subtitle: string;
+  movies: Recommendation[];
+}
 
-const headerStyle: React.CSSProperties = {
-  position: "sticky",
-  top: 0,
-  zIndex: 40,
-  background: "rgba(10, 10, 10, 0.85)",
-  backdropFilter: "blur(20px)",
-  WebkitBackdropFilter: "blur(20px)",
-  borderBottom: "1px solid var(--color-border-subtle)",
-};
+function partitionIntoStacks(
+  movies: Recommendation[],
+  selectedLanguages: string[]
+): Stack[] {
+  const selectedNonEnglish = selectedLanguages.filter((l) => l && l !== "en");
 
-const headerInnerStyle: React.CSSProperties = {
-  maxWidth: "1100px",
-  margin: "0 auto",
-  padding: "12px 24px",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-};
+  const english: Recommendation[] = [];
+  const matched: Recommendation[] = [];
+  const other: Recommendation[] = [];
 
-const navBtnStyle: React.CSSProperties = {
-  fontSize: "13px",
-  color: "var(--color-text-muted)",
-  background: "none",
-  border: "none",
-  cursor: "pointer",
-  fontFamily: "inherit",
-  transition: "color 0.2s",
-};
+  for (const m of movies) {
+    const lang = m.original_language || "en";
+    if (lang === "en") {
+      english.push(m);
+    } else if (selectedNonEnglish.includes(lang)) {
+      matched.push(m);
+    } else {
+      other.push(m);
+    }
+  }
 
-const contentStyle: React.CSSProperties = {
-  flex: 1,
-  maxWidth: "1100px",
-  margin: "0 auto",
-  width: "100%",
-  padding: "32px 24px 48px",
-};
+  const matchedText =
+    selectedNonEnglish.map((c) => languageLabel(c)).join(", ") ||
+    "regional languages";
 
-const controlsRowStyle: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  marginBottom: "32px",
-};
+  const stacks: Stack[] = [];
 
-const pillBtnStyle: React.CSSProperties = {
-  padding: "8px 20px",
-  borderRadius: "9999px",
-  fontSize: "13px",
-  fontWeight: 500,
-  border: "1px solid var(--color-border)",
-  color: "var(--color-text-muted)",
-  background: "transparent",
-  cursor: "pointer",
-  fontFamily: "inherit",
-  transition: "all 0.2s",
-};
+  if (english.length > 0) {
+    stacks.push({
+      id: "english",
+      label: `Hollywood / English (${english.length})`,
+      subtitle: "English-language recommendations from the active pool.",
+      movies: english,
+    });
+  }
 
-const refreshBtnStyle: React.CSSProperties = {
-  padding: "8px 24px",
-  borderRadius: "9999px",
-  fontSize: "13px",
-  fontWeight: 500,
-  backgroundColor: "var(--color-text-primary)",
-  color: "var(--color-bg)",
-  border: "none",
-  cursor: "pointer",
-  fontFamily: "inherit",
-  transition: "all 0.2s",
-};
+  if (matched.length > 0) {
+    stacks.push({
+      id: "matched",
+      label: `Matched Non-English (${matched.length})`,
+      subtitle: `Recommendations in your selected languages: ${matchedText}.`,
+      movies: matched,
+    });
+  }
 
-/* ─── Component ──────────────────────────────────────────────── */
+  if (other.length > 0) {
+    stacks.push({
+      id: "other",
+      label: `Other-Language Discovery (${other.length})`,
+      subtitle:
+        "Non-English titles outside your selected languages that still scored high.",
+      movies: other,
+    });
+  }
+
+  return stacks;
+}
+
+/* ─── Main Component ─── */
 
 export default function RecommendationsView({
   session,
@@ -114,16 +103,21 @@ export default function RecommendationsView({
   const [initialLoad, setInitialLoad] = useState(true);
   const [showHistory, setShowHistory] = useState(false);
   const [showPrefs, setShowPrefs] = useState(false);
-  const [expandedId, setExpandedId] = useState<number | null>(null);
-  const [hoveredId, setHoveredId] = useState<number | null>(null);
-  const [preferences, setPreferences] = useState<{languages: string[]; genres: string[]; semantic_index: string; include_classics: boolean}>({
+  const [preferences, setPreferences] = useState({
     languages: ["en"],
-    genres: [],
+    genres: [] as string[],
     semantic_index: "tmdb_bge_m3",
-    include_classics: true,
+    include_classics: false,
+    age_group: "18-24",
+    region: "USA",
   });
 
-  // Auto-generate on first mount
+  // Partition movies into Netflix-style stacks
+  const stacks = useMemo(
+    () => partitionIntoStacks(movies, preferences.languages),
+    [movies, preferences.languages]
+  );
+
   useEffect(() => {
     if (initialLoad) {
       generate();
@@ -139,11 +133,11 @@ export default function RecommendationsView({
         session.session_id,
         preferences
       );
-      setMovies(result.movies);
-      setStatus(result.status);
+      setMovies(result.movies || []);
+      setStatus(result.status || "");
       onSessionUpdate(result.session);
     } catch (err) {
-      setStatus("Failed to load recommendations. Try refreshing.");
+      setStatus("Failed to load. Try refreshing.");
       console.error(err);
     } finally {
       setLoading(false);
@@ -158,16 +152,8 @@ export default function RecommendationsView({
           tmdbId,
           action
         );
-        // Remove the acted-on movie with animation, then update list
-        setMovies((prev) => prev.filter((m) => m.id !== tmdbId));
-        // If we got new movies back, merge them
-        setTimeout(() => {
-          setMovies(result.movies);
-          onSessionUpdate(result.session);
-          if (result.movies.length === 0) {
-            setStatus("You've gone through all recommendations. Try refreshing.");
-          }
-        }, 350);
+        setMovies(result.movies || []);
+        onSessionUpdate(result.session);
       } catch (err) {
         console.error("Action failed:", err);
       }
@@ -176,15 +162,42 @@ export default function RecommendationsView({
   );
 
   return (
-    <div style={containerStyle}>
-      {/* Top bar */}
-      <header style={headerStyle}>
-        <div style={headerInnerStyle}>
+    <div
+      style={{
+        minHeight: "100dvh",
+        display: "flex",
+        flexDirection: "column",
+        fontFamily: "var(--font-sans)",
+      }}
+    >
+      {/* ─── Top bar ─── */}
+      <header
+        className="glass"
+        style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 40,
+          borderBottom: "none",
+        }}
+      >
+        <div
+          style={{
+            width: "100%",
+            padding: "10px 20px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
           <button
             onClick={onLogout}
-            style={navBtnStyle}
-            onMouseEnter={(e) => { e.currentTarget.style.color = "var(--color-text-secondary)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = "var(--color-text-muted)"; }}
+            className="glass-pill"
+            style={{
+              fontSize: "12px",
+              color: "var(--color-text-muted)",
+              cursor: "pointer",
+              padding: "5px 12px",
+            }}
           >
             Sign out
           </button>
@@ -193,7 +206,7 @@ export default function RecommendationsView({
             style={{
               fontSize: "15px",
               fontWeight: 600,
-              letterSpacing: "-0.01em",
+              letterSpacing: "-0.02em",
               color: "var(--color-text-primary)",
               margin: 0,
             }}
@@ -201,20 +214,28 @@ export default function RecommendationsView({
             CineMatch
           </h1>
 
-          <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
             <button
               onClick={() => setShowHistory(true)}
-              style={navBtnStyle}
-              onMouseEnter={(e) => { e.currentTarget.style.color = "var(--color-text-secondary)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = "var(--color-text-muted)"; }}
+              className="glass-pill"
+              style={{
+                fontSize: "12px",
+                color: "var(--color-text-muted)",
+                cursor: "pointer",
+                padding: "5px 12px",
+              }}
             >
               History
             </button>
             <button
               onClick={() => setShowPrefs(true)}
-              style={navBtnStyle}
-              onMouseEnter={(e) => { e.currentTarget.style.color = "var(--color-text-secondary)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = "var(--color-text-muted)"; }}
+              className="glass-pill"
+              style={{
+                fontSize: "12px",
+                color: "var(--color-text-muted)",
+                cursor: "pointer",
+                padding: "5px 12px",
+              }}
             >
               Preferences
             </button>
@@ -222,14 +243,22 @@ export default function RecommendationsView({
         </div>
       </header>
 
-      {/* Content */}
-      <div style={contentStyle}>
+      {/* ─── Content ─── */}
+      <div style={{ flex: 1, width: "100%", padding: "20px 0 40px" }}>
         {/* Controls row */}
-        <div style={controlsRowStyle}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "0 24px",
+            marginBottom: "24px",
+          }}
+        >
           <div>
             <h2
               style={{
-                fontSize: "clamp(1.5rem, 3vw, 2rem)",
+                fontSize: "clamp(1.2rem, 2.5vw, 1.6rem)",
                 fontWeight: 300,
                 letterSpacing: "-0.03em",
                 margin: 0,
@@ -240,8 +269,8 @@ export default function RecommendationsView({
             {status && (
               <p
                 style={{
-                  marginTop: "4px",
-                  fontSize: "12px",
+                  marginTop: "2px",
+                  fontSize: "11px",
                   color: "var(--color-text-muted)",
                   fontWeight: 300,
                 }}
@@ -251,28 +280,35 @@ export default function RecommendationsView({
             )}
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            <button
+          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
               onClick={onBackToOnboarding}
-              style={pillBtnStyle}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = "var(--color-text-secondary)";
-                e.currentTarget.style.color = "var(--color-text-secondary)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = "var(--color-border)";
-                e.currentTarget.style.color = "var(--color-text-muted)";
+              className="glass-pill"
+              style={{
+                padding: "6px 16px",
+                fontSize: "12px",
+                fontWeight: 500,
+                color: "var(--color-text-muted)",
+                cursor: "pointer",
               }}
             >
               Re-onboard
-            </button>
+            </motion.button>
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={generate}
               disabled={loading}
+              className="glass-button"
               style={{
-                ...refreshBtnStyle,
+                padding: "6px 18px",
+                borderRadius: "var(--radius-pill)",
+                fontSize: "12px",
+                fontWeight: 500,
+                background: "rgba(255,255,255,0.12)",
+                color: "var(--color-text-primary)",
                 opacity: loading ? 0.4 : 1,
                 cursor: loading ? "not-allowed" : "pointer",
               }}
@@ -282,265 +318,52 @@ export default function RecommendationsView({
           </div>
         </div>
 
-        {/* Loading skeleton */}
+        {/* Loading skeleton — horizontal rows */}
         {loading && movies.length === 0 && (
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(5, 1fr)",
-              gap: "20px",
-            }}
-          >
-            {Array.from({ length: 15 }).map((_, i) => (
-              <div key={i}>
+          <div style={{ padding: "0 24px" }}>
+            {[0, 1, 2].map((i) => (
+              <div key={i} style={{ marginBottom: "32px" }}>
                 <div
+                  className="skeleton-shimmer"
                   style={{
-                    aspectRatio: "2/3",
-                    borderRadius: "12px",
-                    background: "var(--color-surface)",
-                    animation: "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
-                  }}
-                />
-                <div
-                  style={{
-                    marginTop: "10px",
-                    height: "12px",
-                    width: "75%",
+                    height: "18px",
+                    width: "200px",
                     borderRadius: "4px",
-                    background: "var(--color-surface)",
+                    marginBottom: "12px",
                   }}
                 />
                 <div
                   style={{
-                    marginTop: "6px",
-                    height: "10px",
-                    width: "50%",
-                    borderRadius: "4px",
-                    background: "var(--color-surface)",
+                    display: "flex",
+                    gap: "14px",
+                    overflow: "hidden",
                   }}
-                />
+                >
+                  {Array.from({ length: 10 }).map((_, j) => (
+                    <div key={j} style={{ flexShrink: 0, width: "160px" }}>
+                      <div
+                        className="skeleton-shimmer"
+                        style={{
+                          aspectRatio: "2/3",
+                          borderRadius: "var(--radius-poster)",
+                        }}
+                      />
+                      <div
+                        className="skeleton-shimmer"
+                        style={{
+                          marginTop: "8px",
+                          height: "10px",
+                          width: "75%",
+                          borderRadius: "3px",
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
               </div>
             ))}
           </div>
         )}
-
-        {/* Empty state */}
-        {!loading && movies.length === 0 && (
-          <div style={{ textAlign: "center", padding: "100px 0", width: "100%", gridColumn: "1 / -1" }}>
-            <p style={{ fontSize: "15px", color: "var(--color-text-muted)", fontWeight: 300 }}>
-              No more movies to recommend in this stack.
-            </p>
-            <p style={{ fontSize: "13px", color: "var(--color-text-secondary)", marginTop: "8px" }}>
-              Try adjusting your preferences or re-onboarding to discover more.
-            </p>
-          </div>
-        )}
-
-        {/* Movie grid */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(5, 1fr)",
-            gap: "20px",
-          }}
-        >
-          <AnimatePresence>
-            {movies.map((movie) => (
-              <motion.div
-                key={movie.id}
-                layout
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.25 } }}
-                transition={{ duration: 0.35, ease: [0.25, 0.1, 0.25, 1] as [number, number, number, number] }}
-                style={{ position: "relative" }}
-                onMouseEnter={() => setHoveredId(movie.id)}
-                onMouseLeave={() => setHoveredId(null)}
-              >
-                {/* Poster */}
-                <div
-                  style={{
-                    position: "relative",
-                    aspectRatio: "2/3",
-                    borderRadius: "12px",
-                    overflow: "hidden",
-                    background: "var(--color-surface)",
-                    cursor: "pointer",
-                  }}
-                  onClick={() =>
-                    setExpandedId(expandedId === movie.id ? null : movie.id)
-                  }
-                >
-                  <Image
-                    src={posterUrl(movie.poster_path)}
-                    alt={movie.title}
-                    fill
-                    sizes="(max-width: 640px) 45vw, (max-width: 1024px) 30vw, 20vw"
-                    style={{
-                      objectFit: "cover",
-                      transition: "transform 0.5s ease",
-                      transform: hoveredId === movie.id ? "scale(1.05)" : "scale(1)",
-                    }}
-                    unoptimized
-                  />
-
-                  {/* Hover overlay with actions */}
-                  <div
-                    style={{
-                      position: "absolute",
-                      inset: 0,
-                      background: hoveredId === movie.id ? "rgba(0,0,0,0.6)" : "rgba(0,0,0,0)",
-                      transition: "background 0.3s ease",
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: "8px",
-                      opacity: hoveredId === movie.id ? 1 : 0,
-                      pointerEvents: hoveredId === movie.id ? "auto" : "none",
-                    }}
-                  >
-                    <ActionButton
-                      label="Like"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleAction(movie.id, "like");
-                      }}
-                      variant="primary"
-                    />
-                    <ActionButton
-                      label="Okay"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleAction(movie.id, "okay");
-                      }}
-                    />
-                    <ActionButton
-                      label="Skip"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleAction(movie.id, "dislike");
-                      }}
-                    />
-                  </div>
-                </div>
-
-                {/* Title & info */}
-                <div style={{ marginTop: "10px", padding: "0 2px" }}>
-                  <h3
-                    style={{
-                      fontSize: "13px",
-                      fontWeight: 500,
-                      color: "var(--color-text-primary)",
-                      lineHeight: 1.3,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                      margin: 0,
-                    }}
-                  >
-                    {movie.title}
-                  </h3>
-                  <div
-                    style={{
-                      marginTop: "4px",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
-                      fontSize: "11px",
-                      color: "var(--color-text-muted)",
-                    }}
-                  >
-                    {movie.year && <span>{movie.year}</span>}
-                    {movie.vote_average && (
-                      <span>
-                        <span style={{ color: "var(--color-accent-warm)" }}>★</span>{" "}
-                        {movie.vote_average.toFixed(1)}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Expanded info */}
-                <AnimatePresence>
-                  {expandedId === movie.id && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{ opacity: 0, height: 0 }}
-                      style={{ overflow: "hidden" }}
-                    >
-                      <div
-                        style={{
-                          marginTop: "8px",
-                          padding: "12px",
-                          borderRadius: "8px",
-                          background: "var(--color-surface)",
-                          border: "1px solid var(--color-border)",
-                        }}
-                      >
-                        {movie.genres && (
-                          <div
-                            style={{
-                              display: "flex",
-                              flexWrap: "wrap",
-                              gap: "4px",
-                              marginBottom: "8px",
-                            }}
-                          >
-                            {movie.genres.map((g) => (
-                              <span
-                                key={g}
-                                style={{
-                                  fontSize: "9px",
-                                  padding: "2px 8px",
-                                  borderRadius: "9999px",
-                                  border: "1px solid var(--color-border)",
-                                  color: "var(--color-text-muted)",
-                                }}
-                              >
-                                {g}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                        {movie.overview && (
-                          <p
-                            style={{
-                              fontSize: "11px",
-                              color: "var(--color-text-muted)",
-                              fontWeight: 300,
-                              lineHeight: 1.6,
-                              display: "-webkit-box",
-                              WebkitLineClamp: 4,
-                              WebkitBoxOrient: "vertical",
-                              overflow: "hidden",
-                              margin: 0,
-                            }}
-                          >
-                            {movie.overview}
-                          </p>
-                        )}
-                        {movie.reason && (
-                          <p
-                            style={{
-                              marginTop: "8px",
-                              fontSize: "10px",
-                              color: "var(--color-text-secondary)",
-                              fontStyle: "italic",
-                            }}
-                          >
-                            {movie.reason}
-                          </p>
-                        )}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        </div>
 
         {/* Empty state */}
         {!loading && movies.length === 0 && (
@@ -550,7 +373,7 @@ export default function RecommendationsView({
               flexDirection: "column",
               alignItems: "center",
               justifyContent: "center",
-              padding: "128px 0",
+              padding: "80px 0",
               textAlign: "center",
             }}
           >
@@ -563,47 +386,100 @@ export default function RecommendationsView({
             >
               No recommendations yet.
             </p>
+            <p
+              style={{
+                fontSize: "12px",
+                color: "var(--color-text-muted)",
+                marginTop: "6px",
+              }}
+            >
+              Complete onboarding with at least 10 likes, then hit Refresh.
+            </p>
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={generate}
+              className="glass-button"
               style={{
-                marginTop: "24px",
-                padding: "12px 24px",
-                borderRadius: "9999px",
-                fontSize: "14px",
+                marginTop: "20px",
+                padding: "10px 24px",
+                borderRadius: "var(--radius-pill)",
+                fontSize: "13px",
                 fontWeight: 500,
-                backgroundColor: "var(--color-text-primary)",
-                color: "var(--color-bg)",
-                border: "none",
+                color: "var(--color-text-primary)",
                 cursor: "pointer",
-                fontFamily: "inherit",
               }}
             >
-              Generate recommendations
+              Generate
             </motion.button>
           </div>
         )}
+
+        {/* ─── Netflix-style horizontal stacks ─── */}
+        {!loading &&
+          stacks.map((stack) => (
+            <div key={stack.id} style={{ marginBottom: "32px" }}>
+              {/* Stack header */}
+              <div style={{ padding: "0 24px", marginBottom: "12px" }}>
+                <h3
+                  style={{
+                    fontSize: "15px",
+                    fontWeight: 600,
+                    letterSpacing: "-0.01em",
+                    color: "var(--color-text-primary)",
+                    margin: 0,
+                  }}
+                >
+                  {stack.label}
+                </h3>
+                <p
+                  style={{
+                    fontSize: "11px",
+                    color: "var(--color-text-muted)",
+                    marginTop: "2px",
+                    fontWeight: 300,
+                  }}
+                >
+                  {stack.subtitle}
+                </p>
+              </div>
+
+              {/* Horizontal scrollable row */}
+              <div
+                style={{
+                  display: "flex",
+                  gap: "14px",
+                  overflowX: "auto",
+                  overflowY: "hidden",
+                  padding: "0 24px 8px",
+                  scrollbarWidth: "none",
+                  msOverflowStyle: "none",
+                  WebkitOverflowScrolling: "touch",
+                }}
+                className="hide-scrollbar"
+              >
+                <AnimatePresence>
+                  {stack.movies.map((movie) => (
+                    <RecCard
+                      key={movie.id}
+                      movie={movie}
+                      onAction={handleAction}
+                    />
+                  ))}
+                </AnimatePresence>
+              </div>
+            </div>
+          ))}
       </div>
 
-      {/* Responsive grid styles */}
+      {/* Hide scrollbar CSS */}
       <style jsx global>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.5; }
+        .hide-scrollbar::-webkit-scrollbar {
+          display: none;
         }
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-        @media (max-width: 1024px) {
-          .recs-grid { grid-template-columns: repeat(4, 1fr) !important; }
-        }
-        @media (max-width: 768px) {
-          .recs-grid { grid-template-columns: repeat(3, 1fr) !important; }
-        }
-        @media (max-width: 480px) {
-          .recs-grid { grid-template-columns: repeat(2, 1fr) !important; }
+        .hide-scrollbar {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
         }
       `}</style>
 
@@ -629,38 +505,148 @@ export default function RecommendationsView({
   );
 }
 
-/* ─── Sub-components ─────────────────────────────────────────── */
+/* ─── Recommendation Card (Netflix-style) ─── */
 
-function ActionButton({
-  label,
-  onClick,
-  variant = "default",
+function RecCard({
+  movie,
+  onAction,
 }: {
-  label: string;
-  onClick: (e: React.MouseEvent) => void;
-  variant?: "primary" | "default";
+  movie: Recommendation;
+  onAction: (tmdbId: number, action: string) => void;
 }) {
-  const isPrimary = variant === "primary";
+  const [hovered, setHovered] = useState(false);
+  const poster = usePoster(movie.poster_path, movie.id);
+
+  const lang = movie.original_language
+    ? languageLabel(movie.original_language)
+    : "";
+  const imdb = movie.imdb_rating
+    ? `IMDb ${movie.imdb_rating.toFixed(1)}`
+    : movie.vote_average
+    ? `★ ${movie.vote_average.toFixed(1)}`
+    : "";
+  const genres = movie.genres?.slice(0, 2).join(", ") || "";
+
   return (
-    <motion.button
-      whileTap={{ scale: 0.93 }}
-      onClick={onClick}
+    <motion.div
+      layout
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
+      transition={{ duration: 0.3 }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       style={{
-        padding: "8px 24px",
-        borderRadius: "9999px",
-        fontSize: "13px",
-        fontWeight: 500,
-        border: "none",
+        flexShrink: 0,
+        width: "160px",
         cursor: "pointer",
-        fontFamily: "inherit",
-        transition: "all 0.2s",
-        backgroundColor: isPrimary ? "var(--color-text-primary)" : "rgba(255,255,255,0.15)",
-        color: isPrimary ? "var(--color-bg)" : "#ffffff",
-        backdropFilter: isPrimary ? "none" : "blur(8px)",
-        minWidth: "80px",
       }}
     >
-      {label}
-    </motion.button>
+      {/* Poster */}
+      <div
+        className="movie-poster-wrap"
+        style={{ width: "160px", height: "240px", position: "relative", overflow: "hidden", borderRadius: "var(--radius-poster)" }}
+      >
+        <Image
+          src={poster}
+          alt={movie.title}
+          fill
+          sizes="160px"
+          style={{
+            objectFit: "cover",
+            transition: "transform 0.4s ease",
+            transform: hovered ? "scale(1.05)" : "scale(1)",
+          }}
+          unoptimized
+        />
+
+        {/* Hover overlay — action buttons */}
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            background: hovered ? "rgba(0,0,0,0.6)" : "transparent",
+            backdropFilter: hovered ? "blur(2px)" : "none",
+            transition: "all 0.3s ease",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "6px",
+            opacity: hovered ? 1 : 0,
+            pointerEvents: hovered ? "auto" : "none",
+            borderRadius: "inherit",
+          }}
+        >
+          {[
+            { label: "❤️", action: "like" },
+            { label: "🙂", action: "okay" },
+            { label: "👎", action: "dislike" },
+            { label: "✖️", action: "remove" },
+          ].map((btn) => (
+            <motion.button
+              key={btn.action}
+              whileTap={{ scale: 0.9 }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onAction(movie.id, btn.action);
+              }}
+              className="glass-button"
+              style={{
+                padding: "5px 20px",
+                borderRadius: "var(--radius-pill)",
+                fontSize: "16px",
+                cursor: "pointer",
+                minWidth: "70px",
+              }}
+            >
+              {btn.label}
+            </motion.button>
+          ))}
+        </div>
+      </div>
+
+      {/* Info below poster */}
+      <div style={{ marginTop: "8px", padding: "0 2px" }}>
+        <p
+          style={{
+            fontSize: "12px",
+            fontWeight: 600,
+            color: "var(--color-text-primary)",
+            lineHeight: 1.3,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            margin: 0,
+          }}
+        >
+          {movie.title}
+        </p>
+        {/* Year · Lang · IMDb */}
+        <p
+          style={{
+            marginTop: "3px",
+            fontSize: "10px",
+            color: "#93c5fd",
+            margin: 0,
+          }}
+        >
+          {[movie.year, lang, imdb].filter(Boolean).join(" · ")}
+        </p>
+        {/* Genres */}
+        {genres && (
+          <p
+            style={{
+              marginTop: "2px",
+              fontSize: "10px",
+              color: "var(--color-text-muted)",
+              margin: 0,
+            }}
+          >
+            {genres}
+          </p>
+        )}
+      </div>
+    </motion.div>
   );
 }
