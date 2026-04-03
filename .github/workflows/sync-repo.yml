@@ -1,0 +1,24 @@
+name: Sync UI Folder to Second Repo
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'cinematch-web/**' # Only trigger when the UI folder changes
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Push folder to another repository
+        uses: cpina/github-action-push-to-another-repository@main
+        env:
+          API_TOKEN_GITHUB: ${{ secrets.API_TOKEN_GITHUB }}
+        with:
+          source-directory: 'cinematch-web'
+          destination-github-username: 'Yash-render'
+          destination-repository-name: 'cinematch-web'
+          user-email: 'roopyaswanth1729@gmail.com'
+          target-branch: main
