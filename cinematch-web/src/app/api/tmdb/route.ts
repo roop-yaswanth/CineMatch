@@ -1,6 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const TMDB_BEARER = process.env.TMDB_BEARER_TOKEN || "";
+const TMDB_HEADERS = {
+  Authorization: `Bearer ${TMDB_BEARER}`,
+  accept: "application/json",
+};
+
+async function fetchTmdbEntity(kind: "movie" | "tv", tmdbId: string) {
+  const response = await fetch(
+    `https://api.themoviedb.org/3/${kind}/${tmdbId}?language=en-US`,
+    {
+      headers: TMDB_HEADERS,
+      next: { revalidate: 86400 },
+    }
+  );
+
+  if (!response.ok) return null;
+  return response.json();
+}
 
 export async function GET(req: NextRequest) {
   const tmdbId = req.nextUrl.searchParams.get("id");
@@ -13,22 +30,14 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const res = await fetch(
-      `https://api.themoviedb.org/3/movie/${tmdbId}?language=en-US`,
-      {
-        headers: {
-          Authorization: `Bearer ${TMDB_BEARER}`,
-          accept: "application/json",
-        },
-        next: { revalidate: 86400 }, // Cache for 24 hours
-      }
-    );
+    const movie = await fetchTmdbEntity("movie", tmdbId);
+    const tv = movie?.poster_path ? null : await fetchTmdbEntity("tv", tmdbId);
+    const data = movie?.poster_path ? movie : tv ?? movie;
 
-    if (!res.ok) {
+    if (!data) {
       return NextResponse.json({ poster_path: null }, { status: 200 });
     }
 
-    const data = await res.json();
     return NextResponse.json({
       poster_path: data.poster_path || null,
       backdrop_path: data.backdrop_path || null,

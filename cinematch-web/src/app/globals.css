@@ -38,10 +38,15 @@ html {
 }
 
 body {
-  background: var(--color-bg);
+  background:
+    radial-gradient(circle at top left, rgba(90, 168, 255, 0.11), transparent 28%),
+    radial-gradient(circle at 85% 18%, rgba(255, 174, 97, 0.1), transparent 30%),
+    radial-gradient(circle at 50% 120%, rgba(104, 255, 210, 0.08), transparent 32%),
+    var(--color-bg);
   color: var(--color-text-primary);
   min-height: 100dvh;
   overflow-x: hidden;
+  position: relative;
 }
 
 input,
@@ -81,13 +86,14 @@ button, a, input {
 
 /* ─── Apple Liquid Glass / Frosted Glass ────────── */
 .glass {
-  background: rgba(20, 20, 24, 0.55);
-  backdrop-filter: blur(40px) saturate(180%);
-  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  background: linear-gradient(180deg, rgba(24, 28, 36, 0.68), rgba(14, 17, 24, 0.5));
+  backdrop-filter: blur(34px) saturate(180%);
+  -webkit-backdrop-filter: blur(34px) saturate(180%);
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow:
-    inset 0 0.5px 0 0 rgba(255, 255, 255, 0.06),
-    0 0 0 0.5px rgba(0, 0, 0, 0.2);
+    inset 0 0.5px 0 0 rgba(255, 255, 255, 0.08),
+    0 0 0 0.5px rgba(0, 0, 0, 0.24),
+    0 18px 40px -30px rgba(0, 0, 0, 0.72);
 }
 
 .glass-subtle {
@@ -98,33 +104,33 @@ button, a, input {
 }
 
 .glass-button {
-  background: rgba(255, 255, 255, 0.06);
-  backdrop-filter: blur(20px) saturate(160%);
-  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.04));
+  backdrop-filter: blur(22px) saturate(170%);
+  -webkit-backdrop-filter: blur(22px) saturate(170%);
   border: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow:
     inset 0 0.5px 0 0 rgba(255, 255, 255, 0.08),
-    0 2px 8px -2px rgba(0, 0, 0, 0.3);
+    0 16px 28px -22px rgba(0, 0, 0, 0.75);
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .glass-button:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.06));
   border-color: rgba(255, 255, 255, 0.15);
   box-shadow:
     inset 0 0.5px 0 0 rgba(255, 255, 255, 0.12),
-    0 4px 16px -4px rgba(0, 0, 0, 0.4);
+    0 18px 32px -22px rgba(0, 0, 0, 0.82);
 }
 
 .glass-card {
-  background: rgba(20, 20, 24, 0.5);
-  backdrop-filter: blur(16px) saturate(140%);
-  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  background: linear-gradient(180deg, rgba(22, 26, 34, 0.6), rgba(10, 13, 20, 0.48));
+  backdrop-filter: blur(18px) saturate(145%);
+  -webkit-backdrop-filter: blur(18px) saturate(145%);
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: var(--radius-card);
   box-shadow:
     0 0 0 0.5px rgba(255, 255, 255, 0.04),
-    0 8px 32px -8px rgba(0, 0, 0, 0.5);
+    0 22px 50px -26px rgba(0, 0, 0, 0.85);
 }
 
 .glass-modal {
@@ -141,9 +147,9 @@ button, a, input {
 
 /* ─── Pill/Tab Glass Style ──────────────────────── */
 .glass-pill {
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.04));
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: var(--radius-pill);
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
@@ -155,14 +161,14 @@ button, a, input {
 }
 
 .glass-pill-active {
-  background: rgba(255, 255, 255, 0.12);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.08));
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: var(--radius-pill);
   box-shadow:
     inset 0 0.5px 0 0 rgba(255, 255, 255, 0.1),
-    0 2px 8px -2px rgba(0, 0, 0, 0.3);
+    0 18px 30px -24px rgba(0, 0, 0, 0.72);
 }
 
 /* ─── Movie Card Hover Glow ─────────────────────── */
