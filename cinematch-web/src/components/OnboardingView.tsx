@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useMotionValue, useTransform } from "framer-motion";
 import MovieCard from "@/components/MovieCard";
 import PreferencesModal from "@/components/PreferencesModal";
 import {
@@ -21,7 +21,8 @@ interface Props {
 const RATING_OPTIONS = [
   { value: "like", label: "Like", shortcut: "L" },
   { value: "okay", label: "Okay", shortcut: "O" },
-  { value: "dislike", label: "Skip", shortcut: "S" },
+  { value: "dislike", label: "Dislike", shortcut: "D" },
+  { value: "not_watched", label: "Skip", shortcut: "S" },
 ] as const;
 
 const ease = [0.25, 0.1, 0.25, 1] as [number, number, number, number];
@@ -43,13 +44,18 @@ export default function OnboardingView({ session, onComplete, onLogout }: Props)
     semantic_index: "tmdb_bge_m3",
   });
 
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+  const rotate = useTransform(x, [-200, 200], [-10, 10]);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (!state?.movie || loading) return;
       if (e.key === "l" || e.key === "L") handleRate("like");
       else if (e.key === "o" || e.key === "O") handleRate("okay");
-      else if (e.key === "s" || e.key === "S") handleRate("dislike");
+      else if (e.key === "d" || e.key === "D") handleRate("dislike");
+      else if (e.key === "s" || e.key === "S") handleRate("not_watched");
       else if (e.key === "ArrowLeft") handleNav("prev");
       else if (e.key === "ArrowRight") handleNav("next");
     };
@@ -108,6 +114,20 @@ export default function OnboardingView({ session, onComplete, onLogout }: Props)
     },
     [session.session_id, loading]
   );
+
+  const handleDragEnd = (event: any, info: any) => {
+    if (!state?.movie || loading) return;
+    const offset = info.offset;
+    const threshold = 80;
+
+    if (Math.abs(offset.x) > Math.abs(offset.y) && Math.abs(offset.x) > threshold) {
+      if (offset.x > 0) handleRate("like"); // Right
+      else handleRate("dislike"); // Left
+    } else if (Math.abs(offset.y) > threshold) {
+      if (offset.y > 0) handleRate("okay"); // Down (positive y)
+      else handleRate("not_watched"); // Up (negative y) -> Skip
+    }
+  };
 
   // Show preferences setup first
   if (buildingSlate) {
@@ -282,7 +302,13 @@ export default function OnboardingView({ session, onComplete, onLogout }: Props)
               initial="enter"
               animate="center"
               exit="exit"
-              className="w-full"
+              style={{ x, y, rotate }}
+              drag
+              dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
+              dragElastic={0.8}
+              onDragEnd={handleDragEnd}
+              whileDrag={{ scale: 1.02 }}
+              className="w-full cursor-grab active:cursor-grabbing"
             >
               <MovieCard movie={state.movie} priority />
             </motion.div>
