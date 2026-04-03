@@ -2,7 +2,12 @@
 
 import { motion } from "framer-motion";
 import Image from "next/image";
-import { languageLabel, type Movie, type Recommendation } from "@/lib/api";
+import {
+  languageLabel,
+  recommendationId,
+  type Movie,
+  type Recommendation,
+} from "@/lib/api";
 import { usePoster } from "@/lib/usePoster";
 
 type MovieLike = Movie | Recommendation;
@@ -15,7 +20,7 @@ interface Props {
 }
 
 export default function MovieCard({ movie, priority = false, className = "", compact = false }: Props) {
-  const poster = usePoster(movie.poster_path, movie.id, "w780");
+  const poster = usePoster(movie.poster_path, recommendationId(movie), "w780");
   const year = movie.year || "";
   const lang = movie.original_language ? languageLabel(movie.original_language) : "";
   const genres = movie.genres?.slice(0, 2) || [];

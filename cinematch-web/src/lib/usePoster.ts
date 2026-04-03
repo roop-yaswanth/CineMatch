@@ -12,23 +12,28 @@ export function usePoster(
   tmdbId: number,
   size = "w500"
 ): string {
-  const [resolvedPath, setResolvedPath] = useState(posterPath);
+  const [fallbackPoster, setFallbackPoster] = useState<{
+    tmdbId: number;
+    path: string | null;
+  }>({ tmdbId, path: null });
 
   useEffect(() => {
     if (posterPath) {
-      setResolvedPath(posterPath);
       return;
     }
 
     // No poster_path — try TMDB API
     let cancelled = false;
     fetchTmdbPoster(tmdbId).then((path) => {
-      if (!cancelled && path) {
-        setResolvedPath(path);
+      if (!cancelled) {
+        setFallbackPoster({ tmdbId, path });
       }
     });
     return () => { cancelled = true; };
   }, [posterPath, tmdbId]);
+
+  const resolvedPath =
+    posterPath ?? (fallbackPoster.tmdbId === tmdbId ? fallbackPoster.path : null);
 
   return posterUrl(resolvedPath, size);
 }

@@ -27,6 +27,7 @@ async function request<T>(
 
 export interface Movie {
   id: number;
+  tmdb_id?: number;
   title: string;
   original_title?: string;
   year?: number;
@@ -43,12 +44,20 @@ export interface Movie {
   runtime?: number;
 }
 
+export interface UserProfile {
+  preferred_languages?: string[];
+  preferred_genres?: string[];
+  include_classics?: boolean;
+  age_group?: string;
+  region?: string;
+}
+
 export interface UserSession {
   session_id: string;
   user_id: string;
   identifier: string;
   is_returning: boolean;
-  profile: Record<string, unknown>;
+  profile: UserProfile;
   onboarding_complete: boolean;
   onboarding_index: number;
   onboarding_total: number;
@@ -67,6 +76,7 @@ export interface OnboardingState {
 
 export interface Recommendation {
   id: number;
+  tmdb_id?: number;
   title: string;
   year?: number;
   poster_path?: string;
@@ -86,6 +96,15 @@ export interface RecommendationPage {
   movies: Recommendation[];
   status: string;
   total_pool_size: number;
+}
+
+export interface RecommendationPreferences {
+  languages: string[];
+  genres: string[];
+  semantic_index: string;
+  include_classics: boolean;
+  age_group: string;
+  region: string;
 }
 
 export interface HistoryItem {
@@ -108,6 +127,20 @@ export const AGE_GROUP_OPTIONS = [
   "18-24", "25-34", "35-44", "45-54", "55+", "Prefer not to say",
 ] as const;
 
+export const REGION_LANGUAGE_MAP: Record<string, string[]> = {
+  India: ["hi", "te", "ta", "ml", "kn"],
+  USA: ["en"],
+  Canada: ["en", "fr"],
+  UK: ["en"],
+  Europe: ["fr", "de", "it", "es"],
+  "Latin-America": ["es", "pt"],
+  "East Asia": ["ja", "ko", "zh"],
+  "South-East Asia": ["th", "id"],
+  "Middle-East": ["ar", "fa", "tr"],
+  Africa: ["ar", "en", "fr"],
+  Other: ["en"],
+};
+
 export const LANGUAGE_LABELS: Record<string, string> = {
   ar: "Arabic", bn: "Bengali", cn: "Chinese", da: "Danish",
   de: "German", el: "Greek", en: "English", es: "Spanish",
@@ -123,6 +156,32 @@ export const LANGUAGE_LABELS: Record<string, string> = {
 export function languageLabel(code: string): string {
   if (!code) return "Unknown";
   return LANGUAGE_LABELS[code.toLowerCase()] || code.toUpperCase();
+}
+
+export function recommendationId(
+  movie: Pick<Movie, "id" | "tmdb_id"> | Pick<Recommendation, "id" | "tmdb_id">
+): number {
+  return movie.tmdb_id ?? movie.id;
+}
+
+export function preferencesFromProfile(
+  profile?: UserProfile | null
+): RecommendationPreferences {
+  return {
+    languages:
+      profile?.preferred_languages?.filter(Boolean) && profile.preferred_languages.length > 0
+        ? profile.preferred_languages
+        : ["en"],
+    genres: profile?.preferred_genres ?? [],
+    semantic_index: "tmdb_bge_m3",
+    include_classics: profile?.include_classics ?? false,
+    age_group: profile?.age_group ?? "18-24",
+    region: profile?.region ?? "USA",
+  };
+}
+
+export function regionLanguages(region?: string): string[] {
+  return REGION_LANGUAGE_MAP[region || "Other"] ?? ["en"];
 }
 
 /* ─── Endpoints ─────────────────────────────────────────────── */
@@ -179,8 +238,11 @@ export async function apiOnboardingNav(
 export async function apiGenerateRecommendations(
   sessionId: string,
   preferences?: {
+    age_group?: string;
+    region?: string;
     languages?: string[];
     genres?: string[];
+    include_classics?: boolean;
     semantic_index?: string;
   }
 ): Promise<RecommendationPage> {
@@ -251,4 +313,3 @@ export async function fetchTmdbPoster(tmdbId: number): Promise<string | null> {
     return null;
   }
 }
-

@@ -1,15 +1,16 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
-import { motion, AnimatePresence, useMotionValue, useTransform } from "framer-motion";
+import { useState, useCallback, useEffect, useEffectEvent } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import MovieCard from "@/components/MovieCard";
 import PreferencesModal from "@/components/PreferencesModal";
 import {
   apiBuildSlate,
   apiRateOnboarding,
-  apiOnboardingNav,
   REGION_OPTIONS,
   AGE_GROUP_OPTIONS,
+  preferencesFromProfile,
+  recommendationId,
   type UserSession,
   type OnboardingState,
 } from "@/lib/api";
@@ -30,10 +31,31 @@ const RATING_OPTIONS = [
 
 const ease = [0.25, 0.1, 0.25, 1] as [number, number, number, number];
 
+type SwipeDirection = "left" | "right" | "up" | "down";
+
 const cardVariants = {
-  enter: { opacity: 0, x: 60, scale: 0.97 },
-  center: { opacity: 1, x: 0, scale: 1, transition: { duration: 0.35, ease } },
-  exit: { opacity: 0, x: -60, scale: 0.97, transition: { duration: 0.25 } },
+  enter: (direction: SwipeDirection) => ({
+    opacity: 0,
+    x: direction === "left" ? -42 : direction === "right" ? 42 : 0,
+    y: direction === "up" ? -42 : direction === "down" ? 42 : 0,
+    scale: 0.97,
+  }),
+  center: {
+    opacity: 1,
+    x: 0,
+    y: 0,
+    rotate: 0,
+    scale: 1,
+    transition: { duration: 0.35, ease },
+  },
+  exit: (direction: SwipeDirection) => ({
+    opacity: 0,
+    x: direction === "left" ? -240 : direction === "right" ? 240 : 0,
+    y: direction === "up" ? -220 : direction === "down" ? 220 : 0,
+    rotate: direction === "left" ? -10 : direction === "right" ? 10 : 0,
+    scale: 0.95,
+    transition: { duration: 0.22, ease },
+  }),
 };
 
 const LANGUAGES_LIST = [
@@ -66,32 +88,41 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
     forcePreferences || (!session.onboarding_complete && !session.is_returning)
   );
   const [showPrefs, setShowPrefs] = useState(false);
-  const [preferences, setPreferences] = useState({
-    languages: ["en"],
-    genres: [] as string[],
-    semantic_index: "tmdb_bge_m3",
-    include_classics: false,
-    age_group: "18-24",
-    region: "USA",
-  });
+  const [preferences, setPreferences] = useState(() =>
+    preferencesFromProfile(session.profile)
+  );
+  const [lastSwipe, setLastSwipe] = useState<SwipeDirection>("right");
 
-  const x = useMotionValue(0);
-  const y = useMotionValue(0);
-  const rotate = useTransform(x, [-200, 200], [-10, 10]);
+  const ratingDirection = useCallback((rating: string): SwipeDirection => {
+    switch (rating) {
+      case "like":
+        return "right";
+      case "dislike":
+        return "left";
+      case "okay":
+        return "down";
+      case "not_watched":
+      default:
+        return "up";
+    }
+  }, []);
+
+  const handleKeyboard = useEffectEvent((e: KeyboardEvent) => {
+    if (!state?.movie || loading) return;
+    if (e.key === "l" || e.key === "L") handleRate("like");
+    else if (e.key === "o" || e.key === "O") handleRate("okay");
+    else if (e.key === "d" || e.key === "D") handleRate("dislike");
+    else if (e.key === "s" || e.key === "S") handleRate("not_watched");
+    else if (e.key === "ArrowLeft") handleRate("dislike");
+    else if (e.key === "ArrowRight") handleRate("like");
+    else if (e.key === "ArrowUp") handleRate("not_watched");
+    else if (e.key === "ArrowDown") handleRate("okay");
+  });
 
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (!state?.movie || loading) return;
-      if (e.key === "l" || e.key === "L") handleRate("like");
-      else if (e.key === "o" || e.key === "O") handleRate("okay");
-      else if (e.key === "d" || e.key === "D") handleRate("dislike");
-      else if (e.key === "s" || e.key === "S") handleRate("not_watched");
-      else if (e.key === "ArrowLeft") handleNav("prev");
-      else if (e.key === "ArrowRight") handleNav("next");
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  });
+    window.addEventListener("keydown", handleKeyboard);
+    return () => window.removeEventListener("keydown", handleKeyboard);
+  }, []);
 
   const handleBuildSlate = useCallback(async () => {
     setLoading(true);
@@ -116,9 +147,14 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
   const handleRate = useCallback(
     async (rating: string) => {
       if (!state?.movie || loading) return;
+      setLastSwipe(ratingDirection(rating));
       setLoading(true);
       try {
-        const result = await apiRateOnboarding(session.session_id, state.movie.id, rating);
+        const result = await apiRateOnboarding(
+          session.session_id,
+          recommendationId(state.movie),
+          rating
+        );
         setState(result);
         // Only auto-redirect when is_ready (is_complete AND enough likes)
         if (result.is_ready) {
@@ -130,29 +166,13 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
         setLoading(false);
       }
     },
-    [state, session.session_id, loading, onComplete]
-  );
-
-  const handleNav = useCallback(
-    async (direction: "prev" | "next") => {
-      if (loading) return;
-      setLoading(true);
-      try {
-        const result = await apiOnboardingNav(session.session_id, direction);
-        setState(result);
-      } catch (err) {
-        console.error("Navigation failed:", err);
-      } finally {
-        setLoading(false);
-      }
-    },
-    [session.session_id, loading]
+    [state, session.session_id, loading, onComplete, ratingDirection]
   );
 
   const handleDragEnd = (_event: unknown, info: { offset: { x: number; y: number } }) => {
     if (!state?.movie || loading) return;
     const offset = info.offset;
-    const threshold = 80;
+    const threshold = 70;
 
     if (Math.abs(offset.x) > Math.abs(offset.y) && Math.abs(offset.x) > threshold) {
       if (offset.x > 0) handleRate("like");
@@ -335,15 +355,20 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
 
       {/* Movie card — fills remaining space */}
       <div style={{ width: "100%", maxWidth: "420px", flex: 1, display: "flex", alignItems: "center", justifyContent: "center", minHeight: 0, overflow: "hidden", margin: "4px 0" }}>
-        <AnimatePresence mode="wait">
+        <AnimatePresence initial={false} custom={lastSwipe} mode="wait">
           {state?.movie ? (
             <motion.div
               key={state.movie.id}
+              custom={lastSwipe}
               variants={cardVariants}
               initial="enter" animate="center" exit="exit"
-              style={{ x, y, rotate, width: "100%", cursor: "grab" }}
-              drag dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
-              dragElastic={0.8} onDragEnd={handleDragEnd} whileDrag={{ scale: 1.02 }}
+              style={{ width: "clamp(280px, 78vw, 380px)", maxWidth: "100%", cursor: "grab", touchAction: "none" }}
+              drag
+              dragDirectionLock
+              dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
+              dragElastic={0.16}
+              onDragEnd={handleDragEnd}
+              whileDrag={{ scale: 1.02, rotate: 1.5, cursor: "grabbing" }}
             >
               <MovieCard movie={state.movie} priority />
             </motion.div>
@@ -365,12 +390,15 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
       <div style={{ width: "100%", maxWidth: "600px", flexShrink: 0, paddingBottom: "8px" }}>
         {state?.movie && (
           <>
-            <div style={{ display: "flex", gap: "8px", justifyContent: "center" }}>
+            <p style={{ marginBottom: "10px", textAlign: "center", fontSize: "11px", color: "var(--color-text-muted)", fontWeight: 300 }}>
+              Swipe right to like, left to dislike, down for okay, up to skip.
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "8px", justifyContent: "center" }}>
               {RATING_OPTIONS.map((opt) => (
                 <motion.button key={opt.value} whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
                   onClick={() => handleRate(opt.value)} disabled={loading} className="glass-button"
                   style={{
-                    flex: 1, padding: "12px 0", borderRadius: "var(--radius-pill)",
+                    padding: "12px 0", borderRadius: "var(--radius-pill)",
                     fontSize: "13px", fontWeight: 500, color: opt.color,
                     cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.4 : 1,
                     display: "flex", alignItems: "center", justifyContent: "center", gap: "4px",
@@ -379,20 +407,6 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
                   <span style={{ fontSize: "9px", opacity: 0.4 }}>{opt.shortcut}</span>
                 </motion.button>
               ))}
-            </div>
-
-            {/* Nav arrows */}
-            <div style={{ display: "flex", justifyContent: "space-between", marginTop: "12px" }}>
-              <button onClick={() => handleNav("prev")}
-                disabled={loading || !state || state.session.onboarding_index <= 0}
-                className="glass-pill"
-                style={{ fontSize: "12px", color: "var(--color-text-muted)", cursor: "pointer", padding: "5px 12px", opacity: (loading || !state || state.session.onboarding_index <= 0) ? 0.2 : 1 }}>
-                ← Previous
-              </button>
-              <button onClick={() => handleNav("next")} disabled={loading} className="glass-pill"
-                style={{ fontSize: "12px", color: "var(--color-text-muted)", cursor: "pointer", padding: "5px 12px", opacity: loading ? 0.2 : 1 }}>
-                Next →
-              </button>
             </div>
           </>
         )}
