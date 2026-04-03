@@ -1,11 +1,11 @@
 /* ─── CineMatch API Client ─────────────────────────────────────
- *  Talks to the FastAPI backend running on Colab.
- *  The base URL is set via NEXT_PUBLIC_API_URL env variable,
- *  defaulting to localhost:8000 for local development.
+ *  Talks to the FastAPI backend running on Colab via the
+ *  Next.js proxy (/api/* → backend). This avoids CORS entirely
+ *  because the browser only ever talks to localhost.
  * ──────────────────────────────────────────────────────────── */
 
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+// Always relative — requests are proxied by next.config.ts rewrites
+const API_BASE = "";
 
 async function request<T>(
   path: string,

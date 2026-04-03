@@ -33,6 +33,78 @@ const cardVariants = {
   exit: { opacity: 0, x: -60, scale: 0.97, transition: { duration: 0.25 } },
 };
 
+/* ─── Styles ──────────────────────────────────────────────────── */
+
+const containerStyle: React.CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  minHeight: "100dvh",
+  padding: "24px",
+  fontFamily: "var(--font-sans)",
+  width: "100%",
+};
+
+const prefContainerStyle: React.CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",
+  minHeight: "100dvh",
+  padding: "24px",
+  fontFamily: "var(--font-sans)",
+  width: "100%",
+};
+
+const prefBoxStyle: React.CSSProperties = {
+  width: "100%",
+  maxWidth: "480px",
+  textAlign: "center",
+};
+
+const headerStyle: React.CSSProperties = {
+  width: "100%",
+  maxWidth: "500px",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  marginBottom: "32px",
+};
+
+const navBtnStyle: React.CSSProperties = {
+  fontSize: "13px",
+  color: "var(--color-text-muted)",
+  background: "none",
+  border: "none",
+  cursor: "pointer",
+  fontFamily: "inherit",
+  transition: "color 0.2s",
+};
+
+const progressBarStyle: React.CSSProperties = {
+  width: "100%",
+  maxWidth: "500px",
+  marginBottom: "32px",
+};
+
+const actionBtnStyle: React.CSSProperties = {
+  flex: 1,
+  padding: "16px 0",
+  borderRadius: "9999px",
+  fontSize: "15px",
+  fontWeight: 500,
+  border: "1px solid var(--color-border)",
+  backgroundColor: "transparent",
+  color: "var(--color-text-secondary)",
+  cursor: "pointer",
+  fontFamily: "inherit",
+  transition: "all 0.2s",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "6px",
+};
+
 export default function OnboardingView({ session, onComplete, onLogout }: Props) {
   const [state, setState] = useState<OnboardingState | null>(null);
   const [loading, setLoading] = useState(false);
@@ -42,13 +114,13 @@ export default function OnboardingView({ session, onComplete, onLogout }: Props)
     languages: ["en"],
     genres: [] as string[],
     semantic_index: "tmdb_bge_m3",
+    include_classics: true,
   });
 
   const x = useMotionValue(0);
   const y = useMotionValue(0);
   const rotate = useTransform(x, [-200, 200], [-10, 10]);
 
-  // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (!state?.movie || loading) return;
@@ -70,6 +142,7 @@ export default function OnboardingView({ session, onComplete, onLogout }: Props)
         languages: preferences.languages,
         genres: preferences.genres,
         semantic_index: preferences.semantic_index,
+        include_classics: preferences.include_classics,
       });
       setState(result);
       setBuildingSlate(false);
@@ -129,92 +202,111 @@ export default function OnboardingView({ session, onComplete, onLogout }: Props)
     }
   };
 
-  // Show preferences setup first
   if (buildingSlate) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-dvh px-6">
+      <div style={prefContainerStyle}>
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="w-full max-w-md text-center"
+          style={prefBoxStyle}
         >
-          <p className="text-xs text-[var(--color-text-muted)] font-light tracking-widest uppercase mb-2">
+          <p style={{ fontSize: "12px", color: "var(--color-text-muted)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "8px" }}>
             Step 1
           </p>
-          <h2 className="text-2xl md:text-3xl font-light tracking-[-0.03em]">
+          <h2 style={{ fontSize: "clamp(1.5rem, 4vw, 2.25rem)", fontWeight: 300, letterSpacing: "-0.03em", margin: 0 }}>
             Set your preferences
           </h2>
-          <p className="mt-3 text-sm text-[var(--color-text-muted)] font-light">
+          <p style={{ marginTop: "12px", fontSize: "14px", color: "var(--color-text-muted)", fontWeight: 300 }}>
             We&apos;ll build a personalized slate of movies for you to rate.
           </p>
 
-          <div className="mt-10 space-y-6 text-left">
+          <div style={{ marginTop: "48px", textAlign: "left", display: "flex", flexDirection: "column", gap: "32px" }}>
             {/* Languages */}
             <div>
-              <label className="text-xs text-[var(--color-text-secondary)] font-medium tracking-wide uppercase">
+              <label style={{ fontSize: "12px", color: "var(--color-text-secondary)", fontWeight: 500, letterSpacing: "0.05em", textTransform: "uppercase" }}>
                 Languages
               </label>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {["en", "te", "hi", "ta", "ml", "ko", "ja", "es", "fr", "de"].map((lang) => (
-                  <button
-                    key={lang}
-                    onClick={() =>
-                      setPreferences((p) => ({
-                        ...p,
-                        languages: p.languages.includes(lang)
-                          ? p.languages.filter((l) => l !== lang)
-                          : [...p.languages, lang],
-                      }))
-                    }
-                    className={`
-                      px-4 py-2 rounded-full text-xs font-medium tracking-wide
-                      border transition-all duration-200
-                      ${
-                        preferences.languages.includes(lang)
-                          ? "border-[var(--color-text-primary)] text-[var(--color-text-primary)] bg-[var(--color-surface)]"
-                          : "border-[var(--color-border)] text-[var(--color-text-muted)] hover:border-[var(--color-text-secondary)]"
+              <div style={{ marginTop: "16px", display: "flex", flexWrap: "wrap", gap: "10px" }}>
+                {["en", "te", "hi", "ta", "ml", "ko", "ja", "es", "fr", "de"].map((lang) => {
+                  const isSelected = preferences.languages.includes(lang);
+                  return (
+                    <button
+                      key={lang}
+                      onClick={() =>
+                        setPreferences((p) => ({
+                          ...p,
+                          languages: isSelected
+                            ? p.languages.filter((l) => l !== lang)
+                            : [...p.languages, lang],
+                        }))
                       }
-                    `}
-                  >
-                    {langLabel(lang)}
-                  </button>
-                ))}
+                      style={{
+                        padding: "10px 20px",
+                        borderRadius: "9999px",
+                        fontSize: "13px",
+                        fontWeight: 500,
+                        border: isSelected ? "1px solid var(--color-text-primary)" : "1px solid var(--color-border)",
+                        backgroundColor: isSelected ? "var(--color-surface)" : "transparent",
+                        color: isSelected ? "var(--color-text-primary)" : "var(--color-text-muted)",
+                        cursor: "pointer",
+                        transition: "all 0.2s",
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isSelected) e.currentTarget.style.borderColor = "var(--color-text-secondary)";
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isSelected) e.currentTarget.style.borderColor = "var(--color-border)";
+                      }}
+                    >
+                      {langLabel(lang)}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
             {/* Genres */}
             <div>
-              <label className="text-xs text-[var(--color-text-secondary)] font-medium tracking-wide uppercase">
+              <label style={{ fontSize: "12px", color: "var(--color-text-secondary)", fontWeight: 500, letterSpacing: "0.05em", textTransform: "uppercase" }}>
                 Genres (optional)
               </label>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {["Action", "Comedy", "Drama", "Horror", "Romance", "Sci-Fi", "Thriller", "Fantasy", "Animation", "Documentary"].map(
-                  (genre) => (
+              <div style={{ marginTop: "16px", display: "flex", flexWrap: "wrap", gap: "10px" }}>
+                {["Action", "Comedy", "Drama", "Horror", "Romance", "Sci-Fi", "Thriller", "Fantasy", "Animation", "Documentary"].map((genre) => {
+                  const isSelected = preferences.genres.includes(genre);
+                  return (
                     <button
                       key={genre}
                       onClick={() =>
                         setPreferences((p) => ({
                           ...p,
-                          genres: p.genres.includes(genre)
+                          genres: isSelected
                             ? p.genres.filter((g) => g !== genre)
                             : [...p.genres, genre],
                         }))
                       }
-                      className={`
-                        px-4 py-2 rounded-full text-xs font-medium tracking-wide
-                        border transition-all duration-200
-                        ${
-                          preferences.genres.includes(genre)
-                            ? "border-[var(--color-text-primary)] text-[var(--color-text-primary)] bg-[var(--color-surface)]"
-                            : "border-[var(--color-border)] text-[var(--color-text-muted)] hover:border-[var(--color-text-secondary)]"
-                        }
-                      `}
+                      style={{
+                        padding: "10px 20px",
+                        borderRadius: "9999px",
+                        fontSize: "13px",
+                        fontWeight: 500,
+                        border: isSelected ? "1px solid var(--color-text-primary)" : "1px solid var(--color-border)",
+                        backgroundColor: isSelected ? "var(--color-surface)" : "transparent",
+                        color: isSelected ? "var(--color-text-primary)" : "var(--color-text-muted)",
+                        cursor: "pointer",
+                        transition: "all 0.2s",
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isSelected) e.currentTarget.style.borderColor = "var(--color-text-secondary)";
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isSelected) e.currentTarget.style.borderColor = "var(--color-border)";
+                      }}
                     >
                       {genre}
                     </button>
-                  )
-                )}
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -224,14 +316,20 @@ export default function OnboardingView({ session, onComplete, onLogout }: Props)
             whileTap={{ scale: 0.99 }}
             onClick={handleBuildSlate}
             disabled={loading || preferences.languages.length === 0}
-            className="
-              mt-10 w-full py-3.5
-              bg-[var(--color-text-primary)] text-[var(--color-bg)]
-              text-sm font-medium tracking-wide
-              rounded-full
-              hover:bg-[var(--color-accent)]
-              disabled:opacity-40 disabled:cursor-not-allowed
-            "
+            style={{
+              marginTop: "56px",
+              width: "100%",
+              padding: "18px 0",
+              backgroundColor: "var(--color-text-primary)",
+              color: "var(--color-bg)",
+              fontSize: "15px",
+              fontWeight: 500,
+              borderRadius: "9999px",
+              border: "none",
+              cursor: loading || preferences.languages.length === 0 ? "not-allowed" : "pointer",
+              opacity: loading || preferences.languages.length === 0 ? 0.4 : 1,
+              transition: "all 0.2s",
+            }}
           >
             {loading ? "Building slate..." : "Build my slate"}
           </motion.button>
@@ -240,27 +338,30 @@ export default function OnboardingView({ session, onComplete, onLogout }: Props)
     );
   }
 
-  // Rating interface
   return (
-    <div className="flex flex-col items-center min-h-dvh px-4 py-6 md:py-10">
+    <div style={containerStyle}>
       {/* Header */}
-      <div className="w-full max-w-lg flex items-center justify-between mb-6">
+      <div style={headerStyle}>
         <button
           onClick={onLogout}
-          className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors"
+          style={navBtnStyle}
+          onMouseEnter={(e) => { e.currentTarget.style.color = "var(--color-text-secondary)"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = "var(--color-text-muted)"; }}
         >
           Sign out
         </button>
 
         {state && (
-          <div className="text-xs text-[var(--color-text-muted)] font-light">
+          <div style={{ fontSize: "12px", color: "var(--color-text-muted)", fontWeight: 300 }}>
             {state.session.onboarding_index + 1} / {state.session.onboarding_total}
           </div>
         )}
 
         <button
           onClick={() => setShowPrefs(true)}
-          className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors"
+          style={navBtnStyle}
+          onMouseEnter={(e) => { e.currentTarget.style.color = "var(--color-text-secondary)"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = "var(--color-text-muted)"; }}
         >
           Preferences
         </button>
@@ -268,10 +369,10 @@ export default function OnboardingView({ session, onComplete, onLogout }: Props)
 
       {/* Progress bar */}
       {state && (
-        <div className="w-full max-w-lg mb-8">
-          <div className="h-px bg-[var(--color-border)] rounded-full overflow-hidden">
+        <div style={progressBarStyle}>
+          <div style={{ height: "1px", backgroundColor: "var(--color-border)", borderRadius: "9999px", overflow: "hidden" }}>
             <motion.div
-              className="h-full bg-[var(--color-text-primary)]"
+              style={{ height: "100%", backgroundColor: "var(--color-text-primary)" }}
               initial={{ width: 0 }}
               animate={{
                 width: `${((state.session.onboarding_index + 1) / Math.max(state.session.onboarding_total, 1)) * 100}%`,
@@ -279,11 +380,10 @@ export default function OnboardingView({ session, onComplete, onLogout }: Props)
               transition={{ duration: 0.4, ease: "easeOut" }}
             />
           </div>
-          <div className="mt-2 flex justify-between text-[10px] text-[var(--color-text-muted)] font-light">
+          <div style={{ marginTop: "12px", display: "flex", justifyContent: "space-between", fontSize: "11px", color: "var(--color-text-muted)", fontWeight: 300 }}>
             <span>
               {state.feedback_counts.like || 0} liked
-              {state.session.min_likes_needed > 0 &&
-                ` / ${state.session.min_likes_needed} needed`}
+              {state.session.min_likes_needed > 0 && ` / ${state.session.min_likes_needed} needed`}
             </span>
             <span>
               {Object.values(state.feedback_counts).reduce((a, b) => a + b, 0)} rated
@@ -293,35 +393,32 @@ export default function OnboardingView({ session, onComplete, onLogout }: Props)
       )}
 
       {/* Movie card */}
-      <div className="w-full max-w-[340px] md:max-w-[380px] flex-1 flex items-center">
+      <div style={{ width: "100%", maxWidth: "380px", flex: 1, display: "flex", alignItems: "center", justifyContent: "center", minHeight: "400px" }}>
         <AnimatePresence mode="wait">
-          {state?.movie && (
+          {state?.movie ? (
             <motion.div
               key={state.movie.id}
               variants={cardVariants}
               initial="enter"
               animate="center"
               exit="exit"
-              style={{ x, y, rotate }}
+              style={{ x, y, rotate, width: "100%", cursor: "grab" }}
               drag
               dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
               dragElastic={0.8}
               onDragEnd={handleDragEnd}
               whileDrag={{ scale: 1.02 }}
-              className="w-full cursor-grab active:cursor-grabbing"
             >
               <MovieCard movie={state.movie} priority />
             </motion.div>
-          )}
-
-          {!state?.movie && !loading && (
+          ) : !loading && (
             <motion.div
               key="empty"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="text-center w-full py-20"
+              style={{ textAlign: "center", width: "100%", padding: "80px 0" }}
             >
-              <p className="text-sm text-[var(--color-text-muted)]">
+              <p style={{ fontSize: "14px", color: "var(--color-text-muted)" }}>
                 No more movies in this slate.
               </p>
             </motion.div>
@@ -335,48 +432,67 @@ export default function OnboardingView({ session, onComplete, onLogout }: Props)
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="w-full max-w-sm mt-8 mb-6"
+          style={{ width: "100%", maxWidth: "600px", marginTop: "40px", marginBottom: "24px" }}
         >
-          <div className="flex gap-3">
-            {RATING_OPTIONS.map((opt) => (
-              <motion.button
-                key={opt.value}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.97 }}
-                onClick={() => handleRate(opt.value)}
-                disabled={loading}
-                className={`
-                  flex-1 py-3.5 rounded-full text-sm font-medium tracking-wide
-                  border transition-all duration-200
-                  disabled:opacity-40
-                  ${
-                    opt.value === "like"
-                      ? "border-[var(--color-text-primary)] text-[var(--color-text-primary)] hover:bg-[var(--color-text-primary)] hover:text-[var(--color-bg)]"
-                      : "border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-text-secondary)]"
-                  }
-                `}
-              >
-                <span>{opt.label}</span>
-                <span className="hidden md:inline ml-1 text-[10px] opacity-40">
-                  {opt.shortcut}
-                </span>
-              </motion.button>
-            ))}
+          <div style={{ display: "flex", gap: "16px", justifyContent: "center" }}>
+            {RATING_OPTIONS.map((opt) => {
+              const isLike = opt.value === "like";
+              return (
+                <motion.button
+                  key={opt.value}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => handleRate(opt.value)}
+                  disabled={loading}
+                  style={{
+                    ...actionBtnStyle,
+                    borderColor: isLike ? "var(--color-text-primary)" : "var(--color-border)",
+                    color: isLike ? "var(--color-text-primary)" : "var(--color-text-secondary)",
+                    opacity: loading ? 0.4 : 1,
+                  }}
+                  onMouseEnter={(e) => {
+                    if (loading) return;
+                    if (isLike) {
+                      e.currentTarget.style.backgroundColor = "var(--color-text-primary)";
+                      e.currentTarget.style.color = "var(--color-bg)";
+                    } else {
+                      e.currentTarget.style.borderColor = "var(--color-text-secondary)";
+                      e.currentTarget.style.color = "var(--color-text-primary)";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (loading) return;
+                    e.currentTarget.style.backgroundColor = "transparent";
+                    if (isLike) {
+                      e.currentTarget.style.color = "var(--color-text-primary)";
+                    } else {
+                      e.currentTarget.style.borderColor = "var(--color-border)";
+                      e.currentTarget.style.color = "var(--color-text-secondary)";
+                    }
+                  }}
+                >
+                  <span>{opt.label}</span>
+                  <span style={{ fontSize: "10px", opacity: 0.4, marginLeft: "4px" }}>
+                    {opt.shortcut}
+                  </span>
+                </motion.button>
+              );
+            })}
           </div>
 
           {/* Nav arrows */}
-          <div className="flex justify-between mt-4">
+          <div style={{ display: "flex", justifyContent: "space-between", marginTop: "24px", padding: "0 16px" }}>
             <button
               onClick={() => handleNav("prev")}
               disabled={loading || !state || state.session.onboarding_index <= 0}
-              className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] disabled:opacity-20 transition-colors"
+              style={{ ...navBtnStyle, opacity: (loading || !state || state.session.onboarding_index <= 0) ? 0.2 : 1 }}
             >
               ← Previous
             </button>
             <button
               onClick={() => handleNav("next")}
               disabled={loading}
-              className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] disabled:opacity-20 transition-colors"
+              style={{ ...navBtnStyle, opacity: loading ? 0.2 : 1 }}
             >
               Next →
             </button>
@@ -392,13 +508,19 @@ export default function OnboardingView({ session, onComplete, onLogout }: Props)
           whileHover={{ scale: 1.01 }}
           whileTap={{ scale: 0.99 }}
           onClick={() => onComplete(state.session)}
-          className="
-            mb-6 px-8 py-3.5
-            bg-[var(--color-text-primary)] text-[var(--color-bg)]
-            text-sm font-medium tracking-wide
-            rounded-full
-            hover:bg-[var(--color-accent)]
-          "
+          style={{
+            marginBottom: "24px",
+            padding: "16px 40px",
+            backgroundColor: "var(--color-text-primary)",
+            color: "var(--color-bg)",
+            fontSize: "15px",
+            fontWeight: 500,
+            borderRadius: "9999px",
+            border: "none",
+            cursor: "pointer",
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "var(--color-accent)"}
+          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "var(--color-text-primary)"}
         >
           Generate recommendations
         </motion.button>

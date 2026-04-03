@@ -21,6 +21,87 @@ interface Props {
   onLogout: () => void;
 }
 
+/* ─── Styles ──────────────────────────────────────────────────── */
+
+const containerStyle: React.CSSProperties = {
+  minHeight: "100dvh",
+  display: "flex",
+  flexDirection: "column",
+  fontFamily: "var(--font-sans)",
+};
+
+const headerStyle: React.CSSProperties = {
+  position: "sticky",
+  top: 0,
+  zIndex: 40,
+  background: "rgba(10, 10, 10, 0.85)",
+  backdropFilter: "blur(20px)",
+  WebkitBackdropFilter: "blur(20px)",
+  borderBottom: "1px solid var(--color-border-subtle)",
+};
+
+const headerInnerStyle: React.CSSProperties = {
+  maxWidth: "1100px",
+  margin: "0 auto",
+  padding: "12px 24px",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+};
+
+const navBtnStyle: React.CSSProperties = {
+  fontSize: "13px",
+  color: "var(--color-text-muted)",
+  background: "none",
+  border: "none",
+  cursor: "pointer",
+  fontFamily: "inherit",
+  transition: "color 0.2s",
+};
+
+const contentStyle: React.CSSProperties = {
+  flex: 1,
+  maxWidth: "1100px",
+  margin: "0 auto",
+  width: "100%",
+  padding: "32px 24px 48px",
+};
+
+const controlsRowStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  marginBottom: "32px",
+};
+
+const pillBtnStyle: React.CSSProperties = {
+  padding: "8px 20px",
+  borderRadius: "9999px",
+  fontSize: "13px",
+  fontWeight: 500,
+  border: "1px solid var(--color-border)",
+  color: "var(--color-text-muted)",
+  background: "transparent",
+  cursor: "pointer",
+  fontFamily: "inherit",
+  transition: "all 0.2s",
+};
+
+const refreshBtnStyle: React.CSSProperties = {
+  padding: "8px 24px",
+  borderRadius: "9999px",
+  fontSize: "13px",
+  fontWeight: 500,
+  backgroundColor: "var(--color-text-primary)",
+  color: "var(--color-bg)",
+  border: "none",
+  cursor: "pointer",
+  fontFamily: "inherit",
+  transition: "all 0.2s",
+};
+
+/* ─── Component ──────────────────────────────────────────────── */
+
 export default function RecommendationsView({
   session,
   onSessionUpdate,
@@ -34,10 +115,12 @@ export default function RecommendationsView({
   const [showHistory, setShowHistory] = useState(false);
   const [showPrefs, setShowPrefs] = useState(false);
   const [expandedId, setExpandedId] = useState<number | null>(null);
-  const [preferences, setPreferences] = useState<{languages: string[]; genres: string[]; semantic_index: string}>({
+  const [hoveredId, setHoveredId] = useState<number | null>(null);
+  const [preferences, setPreferences] = useState<{languages: string[]; genres: string[]; semantic_index: string; include_classics: boolean}>({
     languages: ["en"],
     genres: [],
     semantic_index: "tmdb_bge_m3",
+    include_classics: true,
   });
 
   // Auto-generate on first mount
@@ -93,31 +176,45 @@ export default function RecommendationsView({
   );
 
   return (
-    <div className="min-h-dvh flex flex-col">
+    <div style={containerStyle}>
       {/* Top bar */}
-      <header className="sticky top-0 z-40 glass">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+      <header style={headerStyle}>
+        <div style={headerInnerStyle}>
           <button
             onClick={onLogout}
-            className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors"
+            style={navBtnStyle}
+            onMouseEnter={(e) => { e.currentTarget.style.color = "var(--color-text-secondary)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = "var(--color-text-muted)"; }}
           >
             Sign out
           </button>
 
-          <h1 className="text-sm font-medium tracking-[-0.01em] text-[var(--color-text-primary)]">
+          <h1
+            style={{
+              fontSize: "15px",
+              fontWeight: 600,
+              letterSpacing: "-0.01em",
+              color: "var(--color-text-primary)",
+              margin: 0,
+            }}
+          >
             CineMatch
           </h1>
 
-          <div className="flex items-center gap-4">
+          <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
             <button
               onClick={() => setShowHistory(true)}
-              className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors"
+              style={navBtnStyle}
+              onMouseEnter={(e) => { e.currentTarget.style.color = "var(--color-text-secondary)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = "var(--color-text-muted)"; }}
             >
               History
             </button>
             <button
               onClick={() => setShowPrefs(true)}
-              className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors"
+              style={navBtnStyle}
+              onMouseEnter={(e) => { e.currentTarget.style.color = "var(--color-text-secondary)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = "var(--color-text-muted)"; }}
             >
               Preferences
             </button>
@@ -126,29 +223,46 @@ export default function RecommendationsView({
       </header>
 
       {/* Content */}
-      <div className="flex-1 max-w-5xl mx-auto w-full px-4 py-8">
+      <div style={contentStyle}>
         {/* Controls row */}
-        <div className="flex items-center justify-between mb-8">
+        <div style={controlsRowStyle}>
           <div>
-            <h2 className="text-xl md:text-2xl font-light tracking-[-0.03em]">
+            <h2
+              style={{
+                fontSize: "clamp(1.5rem, 3vw, 2rem)",
+                fontWeight: 300,
+                letterSpacing: "-0.03em",
+                margin: 0,
+              }}
+            >
               For you
             </h2>
             {status && (
-              <p className="mt-1 text-xs text-[var(--color-text-muted)] font-light">
+              <p
+                style={{
+                  marginTop: "4px",
+                  fontSize: "12px",
+                  color: "var(--color-text-muted)",
+                  fontWeight: 300,
+                }}
+              >
                 {status}
               </p>
             )}
           </div>
 
-          <div className="flex items-center gap-3">
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
             <button
               onClick={onBackToOnboarding}
-              className="
-                px-4 py-2 rounded-full text-xs font-medium
-                border border-[var(--color-border)] text-[var(--color-text-muted)]
-                hover:border-[var(--color-text-secondary)] hover:text-[var(--color-text-secondary)]
-                transition-all
-              "
+              style={pillBtnStyle}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = "var(--color-text-secondary)";
+                e.currentTarget.style.color = "var(--color-text-secondary)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = "var(--color-border)";
+                e.currentTarget.style.color = "var(--color-text-muted)";
+              }}
             >
               Re-onboard
             </button>
@@ -157,13 +271,11 @@ export default function RecommendationsView({
               whileTap={{ scale: 0.98 }}
               onClick={generate}
               disabled={loading}
-              className="
-                px-5 py-2 rounded-full text-xs font-medium
-                bg-[var(--color-text-primary)] text-[var(--color-bg)]
-                hover:bg-[var(--color-accent)]
-                disabled:opacity-40 disabled:cursor-not-allowed
-                transition-colors
-              "
+              style={{
+                ...refreshBtnStyle,
+                opacity: loading ? 0.4 : 1,
+                cursor: loading ? "not-allowed" : "pointer",
+              }}
             >
               {loading ? "Loading..." : "Refresh"}
             </motion.button>
@@ -172,19 +284,66 @@ export default function RecommendationsView({
 
         {/* Loading skeleton */}
         {loading && movies.length === 0 && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
-            {Array.from({ length: 10 }).map((_, i) => (
-              <div key={i} className="animate-pulse">
-                <div className="aspect-[2/3] rounded-xl bg-[var(--color-surface)]" />
-                <div className="mt-3 h-3 w-3/4 rounded bg-[var(--color-surface)]" />
-                <div className="mt-2 h-2 w-1/2 rounded bg-[var(--color-surface)]" />
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(5, 1fr)",
+              gap: "20px",
+            }}
+          >
+            {Array.from({ length: 15 }).map((_, i) => (
+              <div key={i}>
+                <div
+                  style={{
+                    aspectRatio: "2/3",
+                    borderRadius: "12px",
+                    background: "var(--color-surface)",
+                    animation: "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+                  }}
+                />
+                <div
+                  style={{
+                    marginTop: "10px",
+                    height: "12px",
+                    width: "75%",
+                    borderRadius: "4px",
+                    background: "var(--color-surface)",
+                  }}
+                />
+                <div
+                  style={{
+                    marginTop: "6px",
+                    height: "10px",
+                    width: "50%",
+                    borderRadius: "4px",
+                    background: "var(--color-surface)",
+                  }}
+                />
               </div>
             ))}
           </div>
         )}
 
+        {/* Empty state */}
+        {!loading && movies.length === 0 && (
+          <div style={{ textAlign: "center", padding: "100px 0", width: "100%", gridColumn: "1 / -1" }}>
+            <p style={{ fontSize: "15px", color: "var(--color-text-muted)", fontWeight: 300 }}>
+              No more movies to recommend in this stack.
+            </p>
+            <p style={{ fontSize: "13px", color: "var(--color-text-secondary)", marginTop: "8px" }}>
+              Try adjusting your preferences or re-onboarding to discover more.
+            </p>
+          </div>
+        )}
+
         {/* Movie grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(5, 1fr)",
+            gap: "20px",
+          }}
+        >
           <AnimatePresence>
             {movies.map((movie) => (
               <motion.div
@@ -194,11 +353,20 @@ export default function RecommendationsView({
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.25 } }}
                 transition={{ duration: 0.35, ease: [0.25, 0.1, 0.25, 1] as [number, number, number, number] }}
-                className="group relative"
+                style={{ position: "relative" }}
+                onMouseEnter={() => setHoveredId(movie.id)}
+                onMouseLeave={() => setHoveredId(null)}
               >
                 {/* Poster */}
                 <div
-                  className="relative aspect-[2/3] rounded-xl overflow-hidden bg-[var(--color-surface)] cursor-pointer"
+                  style={{
+                    position: "relative",
+                    aspectRatio: "2/3",
+                    borderRadius: "12px",
+                    overflow: "hidden",
+                    background: "var(--color-surface)",
+                    cursor: "pointer",
+                  }}
                   onClick={() =>
                     setExpandedId(expandedId === movie.id ? null : movie.id)
                   }
@@ -208,73 +376,89 @@ export default function RecommendationsView({
                     alt={movie.title}
                     fill
                     sizes="(max-width: 640px) 45vw, (max-width: 1024px) 30vw, 20vw"
-                    className="object-cover transition-transform duration-500 group-hover:scale-105"
+                    style={{
+                      objectFit: "cover",
+                      transition: "transform 0.5s ease",
+                      transform: hoveredId === movie.id ? "scale(1.05)" : "scale(1)",
+                    }}
                     unoptimized
                   />
 
                   {/* Hover overlay with actions */}
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/60 transition-colors duration-300 flex items-end justify-center pb-4 opacity-0 group-hover:opacity-100">
-                    <div className="flex gap-2">
-                      <ActionButton
-                        label="Like"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleAction(movie.id, "like");
-                        }}
-                        variant="primary"
-                      />
-                      <ActionButton
-                        label="Okay"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleAction(movie.id, "okay");
-                        }}
-                      />
-                      <ActionButton
-                        label="Skip"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleAction(movie.id, "dislike");
-                        }}
-                      />
-                    </div>
+                  <div
+                    style={{
+                      position: "absolute",
+                      inset: 0,
+                      background: hoveredId === movie.id ? "rgba(0,0,0,0.6)" : "rgba(0,0,0,0)",
+                      transition: "background 0.3s ease",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "8px",
+                      opacity: hoveredId === movie.id ? 1 : 0,
+                      pointerEvents: hoveredId === movie.id ? "auto" : "none",
+                    }}
+                  >
+                    <ActionButton
+                      label="Like"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAction(movie.id, "like");
+                      }}
+                      variant="primary"
+                    />
+                    <ActionButton
+                      label="Okay"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAction(movie.id, "okay");
+                      }}
+                    />
+                    <ActionButton
+                      label="Skip"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAction(movie.id, "dislike");
+                      }}
+                    />
                   </div>
                 </div>
 
-                {/* Title */}
-                <div className="mt-2.5 px-0.5">
-                  <h3 className="text-xs font-medium text-[var(--color-text-primary)] leading-tight truncate">
+                {/* Title & info */}
+                <div style={{ marginTop: "10px", padding: "0 2px" }}>
+                  <h3
+                    style={{
+                      fontSize: "13px",
+                      fontWeight: 500,
+                      color: "var(--color-text-primary)",
+                      lineHeight: 1.3,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      margin: 0,
+                    }}
+                  >
                     {movie.title}
                   </h3>
-                  <div className="mt-1 flex items-center gap-2 text-[10px] text-[var(--color-text-muted)]">
+                  <div
+                    style={{
+                      marginTop: "4px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      fontSize: "11px",
+                      color: "var(--color-text-muted)",
+                    }}
+                  >
                     {movie.year && <span>{movie.year}</span>}
                     {movie.vote_average && (
                       <span>
-                        <span className="text-[var(--color-accent-warm)]">★</span>{" "}
+                        <span style={{ color: "var(--color-accent-warm)" }}>★</span>{" "}
                         {movie.vote_average.toFixed(1)}
                       </span>
                     )}
                   </div>
-                </div>
-
-                {/* Mobile action buttons (always visible) */}
-                <div className="md:hidden flex gap-1.5 mt-2">
-                  <ActionButton
-                    label="Like"
-                    onClick={() => handleAction(movie.id, "like")}
-                    variant="primary"
-                    small
-                  />
-                  <ActionButton
-                    label="Okay"
-                    onClick={() => handleAction(movie.id, "okay")}
-                    small
-                  />
-                  <ActionButton
-                    label="Skip"
-                    onClick={() => handleAction(movie.id, "dislike")}
-                    small
-                  />
                 </div>
 
                 {/* Expanded info */}
@@ -284,15 +468,36 @@ export default function RecommendationsView({
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: "auto" }}
                       exit={{ opacity: 0, height: 0 }}
-                      className="overflow-hidden"
+                      style={{ overflow: "hidden" }}
                     >
-                      <div className="mt-2 p-3 rounded-lg bg-[var(--color-surface)] border border-[var(--color-border)]">
+                      <div
+                        style={{
+                          marginTop: "8px",
+                          padding: "12px",
+                          borderRadius: "8px",
+                          background: "var(--color-surface)",
+                          border: "1px solid var(--color-border)",
+                        }}
+                      >
                         {movie.genres && (
-                          <div className="flex flex-wrap gap-1 mb-2">
+                          <div
+                            style={{
+                              display: "flex",
+                              flexWrap: "wrap",
+                              gap: "4px",
+                              marginBottom: "8px",
+                            }}
+                          >
                             {movie.genres.map((g) => (
                               <span
                                 key={g}
-                                className="text-[9px] px-2 py-0.5 rounded-full border border-[var(--color-border)] text-[var(--color-text-muted)]"
+                                style={{
+                                  fontSize: "9px",
+                                  padding: "2px 8px",
+                                  borderRadius: "9999px",
+                                  border: "1px solid var(--color-border)",
+                                  color: "var(--color-text-muted)",
+                                }}
                               >
                                 {g}
                               </span>
@@ -300,12 +505,31 @@ export default function RecommendationsView({
                           </div>
                         )}
                         {movie.overview && (
-                          <p className="text-[11px] text-[var(--color-text-muted)] font-light leading-relaxed line-clamp-4">
+                          <p
+                            style={{
+                              fontSize: "11px",
+                              color: "var(--color-text-muted)",
+                              fontWeight: 300,
+                              lineHeight: 1.6,
+                              display: "-webkit-box",
+                              WebkitLineClamp: 4,
+                              WebkitBoxOrient: "vertical",
+                              overflow: "hidden",
+                              margin: 0,
+                            }}
+                          >
                             {movie.overview}
                           </p>
                         )}
                         {movie.reason && (
-                          <p className="mt-2 text-[10px] text-[var(--color-text-secondary)] italic">
+                          <p
+                            style={{
+                              marginTop: "8px",
+                              fontSize: "10px",
+                              color: "var(--color-text-secondary)",
+                              fontStyle: "italic",
+                            }}
+                          >
                             {movie.reason}
                           </p>
                         )}
@@ -320,25 +544,68 @@ export default function RecommendationsView({
 
         {/* Empty state */}
         {!loading && movies.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-32 text-center">
-            <p className="text-sm text-[var(--color-text-muted)] font-light">
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "128px 0",
+              textAlign: "center",
+            }}
+          >
+            <p
+              style={{
+                fontSize: "14px",
+                color: "var(--color-text-muted)",
+                fontWeight: 300,
+              }}
+            >
               No recommendations yet.
             </p>
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={generate}
-              className="
-                mt-6 px-6 py-3 rounded-full text-sm font-medium
-                bg-[var(--color-text-primary)] text-[var(--color-bg)]
-                hover:bg-[var(--color-accent)]
-              "
+              style={{
+                marginTop: "24px",
+                padding: "12px 24px",
+                borderRadius: "9999px",
+                fontSize: "14px",
+                fontWeight: 500,
+                backgroundColor: "var(--color-text-primary)",
+                color: "var(--color-bg)",
+                border: "none",
+                cursor: "pointer",
+                fontFamily: "inherit",
+              }}
             >
               Generate recommendations
             </motion.button>
           </div>
         )}
       </div>
+
+      {/* Responsive grid styles */}
+      <style jsx global>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.5; }
+        }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        @media (max-width: 1024px) {
+          .recs-grid { grid-template-columns: repeat(4, 1fr) !important; }
+        }
+        @media (max-width: 768px) {
+          .recs-grid { grid-template-columns: repeat(3, 1fr) !important; }
+        }
+        @media (max-width: 480px) {
+          .recs-grid { grid-template-columns: repeat(2, 1fr) !important; }
+        }
+      `}</style>
 
       {/* Drawers/Modals */}
       {showHistory && (
@@ -368,26 +635,30 @@ function ActionButton({
   label,
   onClick,
   variant = "default",
-  small = false,
 }: {
   label: string;
   onClick: (e: React.MouseEvent) => void;
   variant?: "primary" | "default";
-  small?: boolean;
 }) {
+  const isPrimary = variant === "primary";
   return (
     <motion.button
       whileTap={{ scale: 0.93 }}
       onClick={onClick}
-      className={`
-        rounded-full font-medium transition-all duration-200
-        ${small ? "px-3 py-1.5 text-[10px]" : "px-4 py-2 text-xs"}
-        ${
-          variant === "primary"
-            ? "bg-[var(--color-text-primary)] text-[var(--color-bg)] hover:bg-[var(--color-accent)]"
-            : "bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm"
-        }
-      `}
+      style={{
+        padding: "8px 24px",
+        borderRadius: "9999px",
+        fontSize: "13px",
+        fontWeight: 500,
+        border: "none",
+        cursor: "pointer",
+        fontFamily: "inherit",
+        transition: "all 0.2s",
+        backgroundColor: isPrimary ? "var(--color-text-primary)" : "rgba(255,255,255,0.15)",
+        color: isPrimary ? "var(--color-bg)" : "#ffffff",
+        backdropFilter: isPrimary ? "none" : "blur(8px)",
+        minWidth: "80px",
+      }}
     >
       {label}
     </motion.button>

@@ -1,5 +1,8 @@
 import type { NextConfig } from "next";
 
+const API_UPSTREAM =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
 const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
@@ -10,6 +13,14 @@ const nextConfig: NextConfig = {
       },
     ],
     unoptimized: true,
+  },
+  async rewrites() {
+    return [
+      {
+        source: "/api/:path*",
+        destination: `${API_UPSTREAM}/api/:path*`,
+      },
+    ];
   },
 };
 

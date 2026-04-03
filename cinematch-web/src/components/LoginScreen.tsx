@@ -35,18 +35,49 @@ export default function LoginScreen({ onLogin }: Props) {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-dvh px-6">
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        minHeight: "100dvh",
+        width: "100%",
+        padding: "0 24px",
+        fontFamily: "var(--font-sans)",
+      }}
+    >
       {/* Brand */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.7, delay: 0.1, ease: [0.25, 0.1, 0.25, 1] }}
-        className="text-center mb-16"
+        style={{
+          textAlign: "center",
+          marginBottom: "10vh",
+        }}
       >
-        <h1 className="text-[2.5rem] md:text-[3.5rem] font-light tracking-[-0.04em] text-[var(--color-text-primary)]">
+        <h1
+          style={{
+            fontSize: "clamp(4rem, 12vw, 7.2rem)",
+            lineHeight: 0.95,
+            fontWeight: 300,
+            letterSpacing: "-0.05em",
+            color: "var(--color-text-primary)",
+            margin: 0,
+          }}
+        >
           CineMatch
         </h1>
-        <p className="mt-3 text-sm text-[var(--color-text-muted)] font-light tracking-wide">
+        <p
+          style={{
+            marginTop: "12px",
+            fontSize: "clamp(1.05rem, 2.5vw, 1.5rem)",
+            color: "var(--color-text-muted)",
+            fontWeight: 300,
+            letterSpacing: "0.04em",
+          }}
+        >
           Discover movies you&apos;ll love
         </p>
       </motion.div>
@@ -57,9 +88,12 @@ export default function LoginScreen({ onLogin }: Props) {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.7, delay: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
         onSubmit={handleSubmit}
-        className="w-full max-w-sm"
+        style={{
+          width: "100%",
+          maxWidth: "420px",
+        }}
       >
-        <div className="relative">
+        <div style={{ position: "relative" }}>
           <input
             ref={inputRef}
             id="email-input"
@@ -70,23 +104,26 @@ export default function LoginScreen({ onLogin }: Props) {
             autoComplete="email"
             autoFocus
             disabled={loading}
-            className="
-              w-full px-0 py-4
-              bg-transparent
-              border-0 border-b border-[var(--color-border)]
-              text-lg font-light text-[var(--color-text-primary)]
-              placeholder:text-[var(--color-text-muted)]
-              focus:outline-none focus:border-[var(--color-text-secondary)]
-              transition-colors duration-300
-              disabled:opacity-40
-            "
-          />
-          {/* Animated underline */}
-          <motion.div
-            className="absolute bottom-0 left-0 h-px bg-[var(--color-text-primary)]"
-            initial={{ width: "0%" }}
-            whileFocus={{ width: "100%" }}
-            transition={{ duration: 0.4 }}
+            style={{
+              width: "100%",
+              padding: "16px 0",
+              background: "transparent",
+              border: "none",
+              borderBottom: "1px solid var(--color-border)",
+              fontSize: "clamp(1.1rem, 2.5vw, 1.4rem)",
+              fontWeight: 300,
+              color: "var(--color-text-primary)",
+              outline: "none",
+              fontFamily: "inherit",
+              opacity: loading ? 0.4 : 1,
+              transition: "border-color 0.3s ease",
+            }}
+            onFocus={(e) => {
+              e.currentTarget.style.borderBottomColor = "var(--color-text-secondary)";
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.borderBottomColor = "var(--color-border)";
+            }}
           />
         </div>
 
@@ -94,7 +131,12 @@ export default function LoginScreen({ onLogin }: Props) {
           <motion.p
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mt-4 text-xs text-[var(--color-danger)] font-light"
+            style={{
+              marginTop: "16px",
+              fontSize: "12px",
+              color: "var(--color-danger)",
+              fontWeight: 300,
+            }}
           >
             {error}
           </motion.p>
@@ -105,21 +147,49 @@ export default function LoginScreen({ onLogin }: Props) {
           disabled={loading}
           whileHover={{ scale: 1.01 }}
           whileTap={{ scale: 0.99 }}
-          className="
-            mt-10 w-full py-3.5
-            bg-[var(--color-text-primary)] text-[var(--color-bg)]
-            text-sm font-medium tracking-wide
-            rounded-full
-            hover:bg-[var(--color-accent)]
-            disabled:opacity-40 disabled:cursor-not-allowed
-            transition-colors duration-200
-          "
+          style={{
+            marginTop: "40px",
+            width: "100%",
+            padding: "16px 0",
+            backgroundColor: "var(--color-text-primary)",
+            color: "var(--color-bg)",
+            fontSize: "clamp(1rem, 2vw, 1.25rem)",
+            fontWeight: 500,
+            letterSpacing: "0.02em",
+            borderRadius: "9999px",
+            border: "none",
+            cursor: loading ? "not-allowed" : "pointer",
+            opacity: loading ? 0.4 : 1,
+            transition: "background-color 0.2s ease",
+            fontFamily: "inherit",
+          }}
+          onMouseEnter={(e) => {
+            if (!loading) e.currentTarget.style.backgroundColor = "var(--color-accent)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = "var(--color-text-primary)";
+          }}
         >
           {loading ? (
-            <span className="inline-flex items-center gap-2">
-              <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            <span style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}>
+              <svg
+                style={{ animation: "spin 1s linear infinite", height: "16px", width: "16px" }}
+                viewBox="0 0 24 24"
+                fill="none"
+              >
+                <circle
+                  style={{ opacity: 0.25 }}
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                />
+                <path
+                  style={{ opacity: 0.75 }}
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                />
               </svg>
               Connecting
             </span>
@@ -134,9 +204,15 @@ export default function LoginScreen({ onLogin }: Props) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.6, duration: 0.6 }}
-        className="mt-16 text-xs text-[var(--color-text-muted)] font-light"
+        style={{
+          position: "absolute",
+          bottom: "8vh",
+          fontSize: "clamp(0.85rem, 1.5vw, 1rem)",
+          color: "var(--color-text-muted)",
+          fontWeight: 300,
+        }}
       >
-        No password needed. Your email is only used to save progress.
+        No password needed.
       </motion.p>
     </div>
   );
