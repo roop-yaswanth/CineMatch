@@ -172,7 +172,7 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
   const handleDragEnd = (_event: unknown, info: { offset: { x: number; y: number } }) => {
     if (!state?.movie || loading) return;
     const offset = info.offset;
-    const threshold = 70;
+    const threshold = 40;
 
     if (Math.abs(offset.x) > Math.abs(offset.y) && Math.abs(offset.x) > threshold) {
       if (offset.x > 0) handleRate("like");
@@ -364,9 +364,8 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
               initial="enter" animate="center" exit="exit"
               style={{ width: "clamp(280px, 78vw, 380px)", maxWidth: "100%", cursor: "grab", touchAction: "none" }}
               drag
-              dragDirectionLock
               dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
-              dragElastic={0.16}
+              dragElastic={0.65}
               onDragEnd={handleDragEnd}
               whileDrag={{ scale: 1.02, rotate: 1.5, cursor: "grabbing" }}
             >

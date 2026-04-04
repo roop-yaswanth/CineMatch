@@ -10,7 +10,7 @@
   --color-border-subtle: #1e1e22;
   --color-text-primary: #fafafa;
   --color-text-secondary: #a1a1aa;
-  --color-text-muted: #52525b;
+  --color-text-muted: #71717a;
   --color-accent: #e4e4e7;
   --color-accent-warm: #f59e0b;
   --color-success: #34d399;
@@ -19,10 +19,10 @@
   --color-okay: #60a5fa;
   --color-dislike: #f87171;
   --color-skip: #a1a1aa;
-  --radius-card: 20px;
+  --radius-card: 14px;
   --radius-pill: 9999px;
-  --radius-modal: 24px;
-  --radius-poster: 16px;
+  --radius-modal: 20px;
+  --radius-poster: 12px;
 }
 
 * {
@@ -38,11 +38,7 @@ html {
 }
 
 body {
-  background:
-    radial-gradient(circle at top left, rgba(90, 168, 255, 0.11), transparent 28%),
-    radial-gradient(circle at 85% 18%, rgba(255, 174, 97, 0.1), transparent 30%),
-    radial-gradient(circle at 50% 120%, rgba(104, 255, 210, 0.08), transparent 32%),
-    var(--color-bg);
+  background: var(--color-bg);
   color: var(--color-text-primary);
   min-height: 100dvh;
   overflow-x: hidden;
@@ -84,75 +80,47 @@ button, a, input {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* ─── Apple Liquid Glass / Frosted Glass ────────── */
+/* ─── Flat Surface Styles ─────────────────────── */
 .glass {
-  background: linear-gradient(180deg, rgba(24, 28, 36, 0.68), rgba(14, 17, 24, 0.5));
-  backdrop-filter: blur(34px) saturate(180%);
-  -webkit-backdrop-filter: blur(34px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow:
-    inset 0 0.5px 0 0 rgba(255, 255, 255, 0.08),
-    0 0 0 0.5px rgba(0, 0, 0, 0.24),
-    0 18px 40px -30px rgba(0, 0, 0, 0.72);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 
 .glass-subtle {
-  background: rgba(20, 20, 24, 0.35);
-  backdrop-filter: blur(24px) saturate(150%);
-  -webkit-backdrop-filter: blur(24px) saturate(150%);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
 }
 
 .glass-button {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.04));
-  backdrop-filter: blur(22px) saturate(170%);
-  -webkit-backdrop-filter: blur(22px) saturate(170%);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow:
-    inset 0 0.5px 0 0 rgba(255, 255, 255, 0.08),
-    0 16px 28px -22px rgba(0, 0, 0, 0.75);
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  background: var(--color-surface-hover);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .glass-button:hover {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.06));
-  border-color: rgba(255, 255, 255, 0.15);
-  box-shadow:
-    inset 0 0.5px 0 0 rgba(255, 255, 255, 0.12),
-    0 18px 32px -22px rgba(0, 0, 0, 0.82);
+  background: var(--color-surface-elevated);
+  border-color: var(--color-border);
 }
 
 .glass-card {
-  background: linear-gradient(180deg, rgba(22, 26, 34, 0.6), rgba(10, 13, 20, 0.48));
-  backdrop-filter: blur(18px) saturate(145%);
-  -webkit-backdrop-filter: blur(18px) saturate(145%);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-card);
-  box-shadow:
-    0 0 0 0.5px rgba(255, 255, 255, 0.04),
-    0 22px 50px -26px rgba(0, 0, 0, 0.85);
 }
 
 .glass-modal {
-  background: rgba(16, 16, 20, 0.75);
-  backdrop-filter: blur(60px) saturate(200%);
-  -webkit-backdrop-filter: blur(60px) saturate(200%);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(16, 16, 20, 0.95);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-modal);
-  box-shadow:
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.06),
-    0 25px 80px -12px rgba(0, 0, 0, 0.6),
-    0 0 0 0.5px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 25px 80px -12px rgba(0, 0, 0, 0.6);
 }
 
-/* ─── Pill/Tab Glass Style ──────────────────────── */
 .glass-pill {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.04));
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: var(--radius-pill);
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .glass-pill:hover {
@@ -161,50 +129,26 @@ button, a, input {
 }
 
 .glass-pill-active {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.08));
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  background: rgba(255, 255, 255, 0.12);
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: var(--radius-pill);
-  box-shadow:
-    inset 0 0.5px 0 0 rgba(255, 255, 255, 0.1),
-    0 18px 30px -24px rgba(0, 0, 0, 0.72);
 }
 
-/* ─── Movie Card Hover Glow ─────────────────────── */
-.movie-poster-wrap {
+/* ─── Poster Container ─────────────────────────── */
+.poster-container {
   position: relative;
   border-radius: var(--radius-poster);
   overflow: hidden;
   background: var(--color-surface);
-  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 24px -4px rgba(0, 0, 0, 0.5);
 }
 
-.movie-poster-wrap::after {
-  content: "";
-  position: absolute;
-  inset: -1px;
-  border-radius: inherit;
-  border: 1.5px solid transparent;
-  pointer-events: none;
-  transition: border-color 0.35s ease;
+.poster-container .action-overlay {
+  opacity: 0;
+  transition: opacity 0.2s ease;
 }
 
-.movie-poster-wrap:hover {
-  transform: translateY(-4px) scale(1.02);
-  box-shadow:
-    0 8px 40px -8px rgba(0, 0, 0, 0.6),
-    0 0 20px -4px rgba(255, 255, 255, 0.03);
-}
-
-.movie-poster-wrap:hover::after {
-  border-color: rgba(255, 255, 255, 0.2);
-}
-
-/* ─── Poster Styling ────────────────────────────── */
-.poster-shadow {
-  box-shadow: 0 16px 40px -8px rgba(0, 0, 0, 0.6);
+.poster-container:hover .action-overlay {
+  opacity: 1;
 }
 
 /* ─── Section Headers ───────────────────────────── */
@@ -234,6 +178,15 @@ button, a, input {
 .no-select {
   user-select: none;
   -webkit-user-select: none;
+}
+
+/* ─── Hide Scrollbar ────────────────────────────── */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 /* ─── Animations ────────────────────────────────── */

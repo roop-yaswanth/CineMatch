@@ -296,20 +296,50 @@ export function posterUrl(path: string | null | undefined, size = "w500"): strin
 /* ─── TMDB Poster Fallback ──────────────────────── */
 
 const posterCache: Record<number, string | null> = {};
+const pendingFetches: Record<number, Promise<string | null>> = {};
 
 export async function fetchTmdbPoster(tmdbId: number): Promise<string | null> {
   if (tmdbId in posterCache) return posterCache[tmdbId];
-  try {
-    const res = await fetch(`/api/tmdb?id=${tmdbId}`);
-    if (!res.ok) {
+  if (tmdbId in pendingFetches) return pendingFetches[tmdbId];
+
+  const promise = (async () => {
+    try {
+      const res = await fetch(`/api/tmdb?id=${tmdbId}`);
+      if (!res.ok) {
+        posterCache[tmdbId] = null;
+        return null;
+      }
+      const data = await res.json();
+      const path = data.poster_path || null;
+      posterCache[tmdbId] = path;
+      return path;
+    } catch {
       posterCache[tmdbId] = null;
       return null;
+    } finally {
+      delete pendingFetches[tmdbId];
     }
-    const data = await res.json();
-    posterCache[tmdbId] = data.poster_path || null;
-    return data.poster_path || null;
-  } catch {
-    posterCache[tmdbId] = null;
-    return null;
+  })();
+
+  pendingFetches[tmdbId] = promise;
+  return promise;
+}
+
+/* ─── Poster Prefetch ──────────────────────────── */
+
+export async function prefetchPosters(
+  movies: Array<{ poster_path?: string; id: number; tmdb_id?: number }>
+): Promise<void> {
+  const missing = movies.filter((m) => !m.poster_path);
+  await Promise.allSettled(
+    missing.map((m) => fetchTmdbPoster(m.tmdb_id ?? m.id))
+  );
+  // Preload images into browser cache
+  for (const m of movies) {
+    const path = m.poster_path || posterCache[m.tmdb_id ?? m.id];
+    if (path) {
+      const img = new window.Image();
+      img.src = posterUrl(path, "w500");
+    }
   }
 }
