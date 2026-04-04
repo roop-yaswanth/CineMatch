@@ -16,7 +16,6 @@ import {
   apiGenerateRecommendations,
   apiRecommendationAction,
   languageLabel,
-  posterUrl,
   prefetchPosters,
   preferencesFromProfile,
   recommendationId,
@@ -35,7 +34,7 @@ interface Props {
   onLogout: () => void;
 }
 
-type RecommendationAction = "like" | "okay" | "remove";
+type RecommendationAction = "like" | "okay" | "dislike" | "remove";
 type StackId = "hollywood" | "matched" | "other";
 
 interface Stack {
@@ -48,11 +47,13 @@ interface Stack {
 const CARD_ACTIONS: Array<{
   action: RecommendationAction;
   label: string;
+  icon: string;
   color: string;
 }> = [
-  { action: "like", label: "Like", color: "var(--color-like)" },
-  { action: "okay", label: "Okay", color: "var(--color-okay)" },
-  { action: "remove", label: "Skip", color: "var(--color-skip)" },
+  { action: "like",    label: "Like",    icon: "♥", color: "var(--color-like)"    },
+  { action: "okay",    label: "Okay",    icon: "✓", color: "var(--color-okay)"    },
+  { action: "dislike", label: "Dislike", icon: "✕", color: "var(--color-dislike)" },
+  { action: "remove",  label: "Skip",    icon: "→", color: "var(--color-skip)"    },
 ];
 
 function cleanStatus(status: string): string {
@@ -66,6 +67,8 @@ function partitionIntoStacks(
   const selectedNonEnglish = preferences.languages.filter(
     (l) => l && l !== "en"
   );
+  const hasNonEnglish = selectedNonEnglish.length > 0;
+
   const matchedLabel =
     selectedNonEnglish.map((l) => languageLabel(l)).join(", ") ||
     regionLanguages(preferences.region)
@@ -81,36 +84,41 @@ function partitionIntoStacks(
     const lang = (movie.original_language || "").toLowerCase();
     if (lang === "en") {
       hollywood.push(movie);
-    } else if (selectedNonEnglish.includes(lang)) {
+    } else if (hasNonEnglish && selectedNonEnglish.includes(lang)) {
       matched.push(movie);
     } else {
       other.push(movie);
     }
   }
 
-  return [
+  const result: Stack[] = [
     {
       id: "hollywood",
       label: "Hollywood / English",
       subtitle: "English-language recommendations from the active pool.",
       movies: hollywood,
     },
-    {
+  ];
+
+  if (hasNonEnglish) {
+    result.push({
       id: "matched",
       label: matchedLabel
         ? `Matched Non-English · ${matchedLabel}`
         : "Matched Non-English",
       subtitle: "Non-English picks matching your selected languages.",
       movies: matched,
-    },
-    {
-      id: "other",
-      label: "Other-Language Discovery",
-      subtitle:
-        "Profile-matched finds outside your selected languages.",
-      movies: other,
-    },
-  ];
+    });
+  }
+
+  result.push({
+    id: "other",
+    label: "Other-Language Discovery",
+    subtitle: "Profile-matched finds outside your selected languages.",
+    movies: other,
+  });
+
+  return result;
 }
 
 export default function RecommendationsView({
@@ -126,9 +134,13 @@ export default function RecommendationsView({
   const [showHistory, setShowHistory] = useState(false);
   const [showPrefs, setShowPrefs] = useState(false);
   const [actionInFlight, setActionInFlight] = useState(false);
+  const [activeStack, setActiveStack] = useState<StackId | null>(null);
   const [preferences, setPreferences] = useState<RecommendationPreferences>(
     () => preferencesFromProfile(session.profile)
   );
+
+  // Action counter for auto-rerun (mirrors Gradio trigger logic)
+  const actionCountRef = useRef({ positive: 0, negative: 0, total: 0 });
 
   const stacks = useMemo(
     () => partitionIntoStacks(movies, preferences),
@@ -173,11 +185,32 @@ export default function RecommendationsView({
     async (movie: Recommendation, action: RecommendationAction) => {
       if (actionInFlight) return;
 
+      // Update action counters
+      actionCountRef.current.total++;
+      if (action === "like" || action === "okay") actionCountRef.current.positive++;
+      if (action === "dislike") actionCountRef.current.negative++;
+
+      const { positive, negative, total } = actionCountRef.current;
+      const shouldAutoRerun = negative >= 10 || total >= 10 || positive >= 10;
+
       const tmdbId = recommendationId(movie);
       setActionInFlight(true);
       setMovies((prev) =>
         prev.filter((m) => recommendationId(m) !== tmdbId)
       );
+
+      // Auto-rerun if threshold hit — skip normal action result handling
+      if (shouldAutoRerun) {
+        actionCountRef.current = { positive: 0, negative: 0, total: 0 };
+        try {
+          await apiRecommendationAction(session.session_id, tmdbId, action);
+        } catch (err) {
+          console.error("Recommendation action failed:", err);
+        }
+        setActionInFlight(false);
+        void generate(preferences);
+        return;
+      }
 
       try {
         const result = await apiRecommendationAction(
@@ -218,6 +251,9 @@ export default function RecommendationsView({
         display: "flex",
         flexDirection: "column",
         fontFamily: "var(--font-sans)",
+        width: "100%",
+        maxWidth: "100vw",
+        overflowX: "hidden",
       }}
     >
       {/* Header */}
@@ -421,11 +457,24 @@ export default function RecommendationsView({
                 stack={stack}
                 disabled={loading || actionInFlight}
                 onAction={handleAction}
+                onOpenDetail={() => setActiveStack(stack.id)}
               />
             ))}
           </div>
         )}
       </div>
+
+      {/* Stack detail overlay */}
+      <AnimatePresence>
+        {activeStack && (
+          <StackDetailView
+            stack={stacks.find((s) => s.id === activeStack)!}
+            onBack={() => setActiveStack(null)}
+            onAction={handleAction}
+            disabled={loading || actionInFlight}
+          />
+        )}
+      </AnimatePresence>
 
       {showHistory && (
         <HistoryDrawer
@@ -445,74 +494,254 @@ export default function RecommendationsView({
   );
 }
 
-/* ─── Stack Row with Scroll Arrows ─────────────── */
+/* ─── Stack Detail (Full-Screen Grid) ──────────── */
+
+function StackDetailView({
+  stack,
+  onBack,
+  onAction,
+  disabled,
+}: {
+  stack: Stack;
+  onBack: () => void;
+  onAction: (movie: Recommendation, action: RecommendationAction) => void;
+  disabled: boolean;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 20 }}
+      transition={{ duration: 0.25 }}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 50,
+        background: "var(--color-bg)",
+        overflowY: "auto",
+        overflowX: "hidden",
+      }}
+    >
+      {/* Detail header */}
+      <div
+        style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 10,
+          background: "var(--color-bg)",
+          borderBottom: "1px solid var(--color-border-subtle)",
+          padding: "12px 20px",
+          display: "flex",
+          alignItems: "center",
+          gap: "16px",
+        }}
+      >
+        <button
+          onClick={onBack}
+          style={{
+            fontSize: "13px",
+            color: "var(--color-text-muted)",
+            cursor: "pointer",
+            background: "none",
+            border: "none",
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
+            padding: "6px 0",
+          }}
+        >
+          ← Back
+        </button>
+        <div>
+          <h2
+            style={{
+              fontSize: "16px",
+              fontWeight: 600,
+              letterSpacing: "-0.02em",
+              margin: 0,
+              color: "var(--color-text-primary)",
+            }}
+          >
+            {stack.label}
+          </h2>
+          <p style={{ fontSize: "12px", color: "var(--color-text-muted)", marginTop: "2px" }}>
+            {stack.movies.length} movie{stack.movies.length !== 1 ? "s" : ""}
+          </p>
+        </div>
+      </div>
+
+      {/* Grid */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+          gap: "20px",
+          padding: "20px 16px",
+        }}
+      >
+        <AnimatePresence initial={false}>
+          {stack.movies.map((movie, index) => (
+            <PosterCard
+              key={recommendationId(movie)}
+              movie={movie}
+              disabled={disabled}
+              onAction={onAction}
+              priority={index < 4}
+            />
+          ))}
+        </AnimatePresence>
+        {stack.movies.length === 0 && (
+          <p style={{ fontSize: "13px", color: "var(--color-text-muted)", gridColumn: "1 / -1" }}>
+            No movies in this category yet.
+          </p>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
+/* ─── Stack Row — Paged Carousel ───────────────── */
+
+function clamp(v: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, v));
+}
 
 function StackRow({
   stack,
   disabled,
   onAction,
+  onOpenDetail,
 }: {
   stack: Stack;
   disabled: boolean;
   onAction: (movie: Recommendation, action: RecommendationAction) => void;
+  onOpenDetail: () => void;
 }) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(false);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
+  const [page, setPage] = useState(0);
+  const [pageWidth, setPageWidth] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const touchStartX = useRef<number | null>(null);
 
-  const updateScrollState = useCallback(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    setCanScrollLeft(el.scrollLeft > 4);
-    setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 4);
+  // Recalculate page dimensions
+  const recalc = useCallback(() => {
+    const vp = viewportRef.current;
+    const tr = trackRef.current;
+    if (!vp || !tr) return;
+    const vpW = vp.clientWidth;
+    const trackW = tr.scrollWidth;
+    const pw = vpW - 20; // 20px peek affordance on right edge
+    if (pw <= 0) return;
+    setPageWidth(pw);
+    setTotalPages(Math.max(1, Math.ceil(trackW / pw)));
+    setPage((p) => clamp(p, 0, Math.max(0, Math.ceil(trackW / pw) - 1)));
   }, []);
 
   useEffect(() => {
-    updateScrollState();
-    const el = scrollRef.current;
-    if (!el) return;
-    el.addEventListener("scroll", updateScrollState, { passive: true });
-    const ro = new ResizeObserver(updateScrollState);
-    ro.observe(el);
-    return () => {
-      el.removeEventListener("scroll", updateScrollState);
-      ro.disconnect();
-    };
-  }, [updateScrollState, stack.movies.length]);
+    recalc();
+    const vp = viewportRef.current;
+    if (!vp) return;
+    const ro = new ResizeObserver(recalc);
+    ro.observe(vp);
+    return () => ro.disconnect();
+  }, [recalc, stack.movies.length]);
 
-  const scroll = (direction: number) => {
-    scrollRef.current?.scrollBy({ left: direction * 400, behavior: "smooth" });
+  // Reset to page 0 on new movie list
+  useEffect(() => {
+    setPage(0);
+  }, [stack.movies.length]);
+
+  const canGoLeft = page > 0;
+  const canGoRight = page < totalPages - 1;
+
+  const goLeft = () => setPage((p) => clamp(p - 1, 0, totalPages - 1));
+  const goRight = () => setPage((p) => clamp(p + 1, 0, totalPages - 1));
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+  const onTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX.current === null) return;
+    const delta = touchStartX.current - e.changedTouches[0].clientX;
+    if (Math.abs(delta) > 40) {
+      if (delta > 0) goRight();
+      else goLeft();
+    }
+    touchStartX.current = null;
   };
 
+  const translateX = -(page * pageWidth);
+
   return (
-    <section>
+    <section style={{ width: "100%", overflow: "hidden" }}>
       {/* Stack header */}
       <div
         style={{
           padding: "0 20px",
           marginBottom: "12px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
         }}
       >
-        <h3
-          style={{
-            fontSize: "17px",
-            fontWeight: 600,
-            letterSpacing: "-0.02em",
-            color: "var(--color-text-primary)",
-            margin: 0,
-          }}
-        >
-          {stack.label}
-        </h3>
-        <p
-          style={{
-            fontSize: "12px",
-            color: "var(--color-text-muted)",
-            marginTop: "3px",
-          }}
-        >
-          {stack.subtitle}
-        </p>
+        <div>
+          <button
+            onClick={onOpenDetail}
+            style={{
+              background: "none",
+              border: "none",
+              padding: 0,
+              cursor: "pointer",
+              textAlign: "left",
+            }}
+          >
+            <h3
+              style={{
+                fontSize: "17px",
+                fontWeight: 600,
+                letterSpacing: "-0.02em",
+                color: "var(--color-text-primary)",
+                margin: 0,
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+              }}
+            >
+              {stack.label}
+              <span style={{ fontSize: "13px", color: "var(--color-text-muted)", fontWeight: 400 }}>
+                →
+              </span>
+            </h3>
+          </button>
+          <p
+            style={{
+              fontSize: "12px",
+              color: "var(--color-text-muted)",
+              marginTop: "3px",
+            }}
+          >
+            {stack.subtitle}
+          </p>
+        </div>
+
+        {/* Page indicator */}
+        {totalPages > 1 && (
+          <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
+            {Array.from({ length: Math.min(totalPages, 6) }).map((_, i) => (
+              <div
+                key={i}
+                style={{
+                  width: i === page ? "16px" : "6px",
+                  height: "6px",
+                  borderRadius: "999px",
+                  background: i === page ? "var(--color-text-primary)" : "var(--color-border)",
+                  transition: "all 0.2s ease",
+                }}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Empty state */}
@@ -529,85 +758,110 @@ function StackRow({
         </div>
       )}
 
-      {/* Scrollable row with arrows */}
+      {/* Carousel */}
       {stack.movies.length > 0 && (
-        <div style={{ position: "relative" }}>
-          {/* Left arrow */}
-          {canScrollLeft && (
+        <div style={{ padding: "0 20px", width: "100%", boxSizing: "border-box" }}>
+          <div
+            ref={viewportRef}
+            style={{
+              position: "relative",
+              overflow: "hidden",
+              width: "100%",
+            }}
+            onTouchStart={onTouchStart}
+            onTouchEnd={onTouchEnd}
+          >
+            {/* Edge scrims */}
+            {canGoLeft && <div className="carousel-scrim left" />}
+            {canGoRight && <div className="carousel-scrim right" />}
+
+            {/* Left chevron */}
             <button
-              onClick={() => scroll(-1)}
-              aria-label="Scroll left"
+              onClick={goLeft}
+              aria-label="Previous"
               style={{
                 position: "absolute",
-                left: 0,
-                top: 0,
-                bottom: 0,
-                width: "48px",
-                zIndex: 10,
-                border: "none",
-                cursor: "pointer",
+                left: "0",
+                top: "50%",
+                transform: "translateY(-60%)", // shift up a bit (above info text)
+                zIndex: 20,
+                width: 44,
+                height: 44,
+                borderRadius: "50%",
+                background: "rgba(0, 0, 0, 0.75)",
+                border: "1px solid rgba(255, 255, 255, 0.18)",
+                color: "#fff",
+                fontSize: "22px",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                background:
-                  "linear-gradient(to right, var(--color-bg) 40%, transparent)",
-                color: "var(--color-text-primary)",
-                fontSize: "20px",
+                cursor: "pointer",
+                opacity: canGoLeft ? 1 : 0,
+                pointerEvents: canGoLeft ? "auto" : "none",
+                transition: "opacity 0.2s",
+                lineHeight: 1,
               }}
             >
               ‹
             </button>
-          )}
 
-          {/* Right arrow */}
-          {canScrollRight && (
+            {/* Right chevron */}
             <button
-              onClick={() => scroll(1)}
-              aria-label="Scroll right"
+              onClick={goRight}
+              aria-label="Next"
               style={{
                 position: "absolute",
-                right: 0,
-                top: 0,
-                bottom: 0,
-                width: "48px",
-                zIndex: 10,
-                border: "none",
-                cursor: "pointer",
+                right: "0",
+                top: "50%",
+                transform: "translateY(-60%)",
+                zIndex: 20,
+                width: 44,
+                height: 44,
+                borderRadius: "50%",
+                background: "rgba(0, 0, 0, 0.75)",
+                border: "1px solid rgba(255, 255, 255, 0.18)",
+                color: "#fff",
+                fontSize: "22px",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                background:
-                  "linear-gradient(to left, var(--color-bg) 40%, transparent)",
-                color: "var(--color-text-primary)",
-                fontSize: "20px",
+                cursor: "pointer",
+                opacity: canGoRight ? 1 : 0,
+                pointerEvents: canGoRight ? "auto" : "none",
+                transition: "opacity 0.2s",
+                lineHeight: 1,
               }}
             >
               ›
             </button>
-          )}
 
-          <div
-            ref={scrollRef}
-            className="hide-scrollbar"
-            style={{
-              display: "flex",
-              gap: "16px",
-              overflowX: "auto",
-              overflowY: "hidden",
-              padding: "0 20px 4px",
-              WebkitOverflowScrolling: "touch",
-            }}
-          >
-            <AnimatePresence initial={false}>
-              {stack.movies.map((movie) => (
-                <PosterCard
-                  key={recommendationId(movie)}
-                  movie={movie}
-                  disabled={disabled}
-                  onAction={onAction}
-                />
-              ))}
-            </AnimatePresence>
+            {/* Track */}
+            <div
+              ref={trackRef}
+              className="hide-scrollbar"
+              style={{
+                display: "flex",
+                flexWrap: "nowrap",
+                gap: "14px",
+                padding: "0 0 4px",
+                transform: `translateX(${translateX}px)`,
+                transition: "transform 0.38s cubic-bezier(0.4, 0, 0.2, 1)",
+                willChange: "transform",
+                minWidth: "min-content",
+              }}
+            >
+              <AnimatePresence initial={false}>
+                {stack.movies.map((movie, index) => (
+                  <PosterCard
+                    key={recommendationId(movie)}
+                    movie={movie}
+                    disabled={disabled}
+                    onAction={onAction}
+                    priority={index === 0}
+                  />
+                ))}
+              </AnimatePresence>
+            </div>
           </div>
         </div>
       )}
@@ -621,10 +875,12 @@ function PosterCard({
   movie,
   disabled,
   onAction,
+  priority = false,
 }: {
   movie: Recommendation;
   disabled: boolean;
   onAction: (movie: Recommendation, action: RecommendationAction) => void;
+  priority?: boolean;
 }) {
   const poster = usePoster(movie.poster_path, recommendationId(movie), "w500");
   const [showActions, setShowActions] = useState(false);
@@ -647,6 +903,7 @@ function PosterCard({
       initial={{ opacity: 0, scale: 0.97 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.15 } }}
+      className="poster-card"
       style={{
         width: "min(44vw, 180px)",
         minWidth: "140px",
@@ -664,6 +921,8 @@ function PosterCard({
           overflow: "hidden",
           background: "var(--color-surface)",
           cursor: "pointer",
+          border: "1px solid transparent",
+          transition: "border-color 0.22s ease",
         }}
       >
         <Image
@@ -673,6 +932,7 @@ function PosterCard({
           sizes="(max-width: 640px) 44vw, 180px"
           style={{ objectFit: "cover" }}
           unoptimized
+          priority={priority}
         />
 
         {/* Action overlay */}
@@ -682,12 +942,12 @@ function PosterCard({
             position: "absolute",
             inset: 0,
             display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
+            flexWrap: "wrap",
+            alignContent: "center",
             justifyContent: "center",
-            gap: "10px",
-            background: "rgba(0, 0, 0, 0.72)",
-            padding: "16px",
+            gap: "8px",
+            background: "rgba(0, 0, 0, 0.78)",
+            padding: "12px",
             ...(showActions ? { opacity: 1 } : {}),
           }}
         >
@@ -701,20 +961,18 @@ function PosterCard({
                 onAction(movie, btn.action);
               }}
               disabled={disabled}
+              className="action-btn"
               style={{
-                width: "100%",
-                padding: "14px 0",
-                borderRadius: "10px",
-                border: "1px solid rgba(255, 255, 255, 0.15)",
-                background: "rgba(255, 255, 255, 0.08)",
+                width: "calc(50% - 4px)",
                 color: btn.color,
-                fontSize: "15px",
-                fontWeight: 600,
-                cursor: disabled ? "not-allowed" : "pointer",
                 opacity: disabled ? 0.4 : 1,
+                cursor: disabled ? "not-allowed" : "pointer",
               }}
             >
-              {btn.label}
+              <span style={{ fontSize: "18px", lineHeight: 1 }}>{btn.icon}</span>
+              <span style={{ fontSize: "11px", fontWeight: 600, letterSpacing: "0.02em" }}>
+                {btn.label}
+              </span>
             </button>
           ))}
         </div>

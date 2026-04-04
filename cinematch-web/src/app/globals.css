@@ -226,3 +226,56 @@ input[type="number"]::-webkit-outer-spin-button,
 input[type="number"]::-webkit-inner-spin-button {
   -webkit-appearance: none;
 }
+
+/* ─── Carousel Scrims ───────────────────────────── */
+.carousel-scrim {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 40px;
+  z-index: 10;
+  pointer-events: none;
+}
+.carousel-scrim.left {
+  left: 0;
+  background: linear-gradient(to right, var(--color-bg) 30%, transparent);
+}
+.carousel-scrim.right {
+  right: 0;
+  background: linear-gradient(to left, var(--color-bg) 30%, transparent);
+}
+
+/* ─── Poster Card Hover ─────────────────────────── */
+.poster-card {
+  transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.22s ease;
+}
+.poster-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 18px 44px -10px rgba(0, 0, 0, 0.65);
+}
+.poster-card:hover .poster-container {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+/* ─── Action Button Hover ───────────────────────── */
+.action-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 10px 4px;
+}
+.action-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+  transform: scale(1.04);
+}
+.action-btn:active {
+  transform: scale(0.96);
+}
