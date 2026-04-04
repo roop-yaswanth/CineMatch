@@ -425,7 +425,6 @@ export default function RecommendationsView({
                     marginBottom: "8px",
                   }}
                 >
-                  Recommendation stacks
                 </p>
                 <h2
                   style={{
@@ -436,7 +435,7 @@ export default function RecommendationsView({
                     color: "var(--color-text-primary)",
                   }}
                 >
-                  Your picks, arranged like a cinema shelf.
+                  For you
                 </h2>
                 <p
                   style={{
@@ -447,7 +446,6 @@ export default function RecommendationsView({
                     maxWidth: "760px",
                   }}
                 >
-                  Browse the three stacks, react directly on the poster, or open any row for a continuous album view.
                 </p>
                 {status && (
                   <p
