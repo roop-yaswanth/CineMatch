@@ -152,7 +152,10 @@ export default function RecommendationsView({
       try {
         const result: RecommendationPage = await apiGenerateRecommendations(
           session.session_id,
-          nextPreferences
+          {
+            ...nextPreferences,
+            languages: [...new Set([...nextPreferences.languages, "en"])],
+          }
         );
         setMovies(result.movies || []);
         setStatus(cleanStatus(result.status || ""));

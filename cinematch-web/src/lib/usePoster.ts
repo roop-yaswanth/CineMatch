@@ -33,7 +33,7 @@ export function usePoster(
   }, [posterPath, tmdbId]);
 
   const resolvedPath =
-    posterPath ?? (fallbackPoster.tmdbId === tmdbId ? fallbackPoster.path : null);
+    posterPath || (fallbackPoster.tmdbId === tmdbId ? fallbackPoster.path : null);
 
   return posterUrl(resolvedPath, size);
 }
