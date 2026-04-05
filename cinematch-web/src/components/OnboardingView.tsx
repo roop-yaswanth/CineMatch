@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useEffectEvent } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import MovieCard from "@/components/MovieCard";
 import PreferencesModal from "@/components/PreferencesModal";
@@ -107,22 +107,6 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
     }
   }, []);
 
-  const handleKeyboard = useEffectEvent((e: KeyboardEvent) => {
-    if (!state?.movie || loading) return;
-    if (e.key === "l" || e.key === "L") handleRate("like");
-    else if (e.key === "o" || e.key === "O") handleRate("okay");
-    else if (e.key === "d" || e.key === "D") handleRate("dislike");
-    else if (e.key === "s" || e.key === "S") handleRate("not_watched");
-    else if (e.key === "ArrowLeft") handleRate("dislike");
-    else if (e.key === "ArrowRight") handleRate("like");
-    else if (e.key === "ArrowUp") handleRate("not_watched");
-    else if (e.key === "ArrowDown") handleRate("okay");
-  });
-
-  useEffect(() => {
-    window.addEventListener("keydown", handleKeyboard);
-    return () => window.removeEventListener("keydown", handleKeyboard);
-  }, []);
 
   const handleBuildSlate = useCallback(async () => {
     setLoading(true);
@@ -168,6 +152,22 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
     },
     [state, session.session_id, loading, onComplete, ratingDirection]
   );
+
+  useEffect(() => {
+    const handleKeyboard = (e: KeyboardEvent) => {
+      if (!state?.movie || loading) return;
+      if (e.key === "l" || e.key === "L") handleRate("like");
+      else if (e.key === "o" || e.key === "O") handleRate("okay");
+      else if (e.key === "d" || e.key === "D") handleRate("dislike");
+      else if (e.key === "s" || e.key === "S") handleRate("not_watched");
+      else if (e.key === "ArrowLeft") handleRate("dislike");
+      else if (e.key === "ArrowRight") handleRate("like");
+      else if (e.key === "ArrowUp") handleRate("not_watched");
+      else if (e.key === "ArrowDown") handleRate("okay");
+    };
+    window.addEventListener("keydown", handleKeyboard);
+    return () => window.removeEventListener("keydown", handleKeyboard);
+  }, [state?.movie, loading, handleRate]);
 
   const handleDragEnd = (_event: unknown, info: { offset: { x: number; y: number } }) => {
     if (!state?.movie || loading) return;
