@@ -12,6 +12,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import Image from "next/image";
 import HistoryDrawer from "@/components/HistoryDrawer";
 import PreferencesModal from "@/components/PreferencesModal";
+import MobileMenu from "@/components/MobileMenu";
 import {
   apiGenerateRecommendations,
   apiRecommendationAction,
@@ -275,60 +276,26 @@ export default function RecommendationsView({
             justifyContent: "space-between",
           }}
         >
-          <button
-            onClick={onLogout}
-            style={{
-              fontSize: "13px",
-              color: "var(--color-text-muted)",
-              cursor: "pointer",
-              padding: "6px 14px",
-              background: "none",
-              border: "none",
-            }}
-          >
-            Sign out
-          </button>
+          <div style={{ width: "40px" }} /> {/* Spacer to balance menu */}
 
           <h1
             style={{
-              fontSize: "15px",
+              fontSize: "18px",
               fontWeight: 600,
               letterSpacing: "-0.02em",
               color: "var(--color-text-primary)",
               margin: 0,
+              textAlign: "center",
             }}
           >
             CineMatch
           </h1>
 
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <button
-              onClick={() => setShowHistory(true)}
-              style={{
-                fontSize: "13px",
-                color: "var(--color-text-muted)",
-                cursor: "pointer",
-                padding: "6px 14px",
-                background: "none",
-                border: "none",
-              }}
-            >
-              History
-            </button>
-            <button
-              onClick={() => setShowPrefs(true)}
-              style={{
-                fontSize: "13px",
-                color: "var(--color-text-muted)",
-                cursor: "pointer",
-                padding: "6px 14px",
-                background: "none",
-                border: "none",
-              }}
-            >
-              Preferences
-            </button>
-          </div>
+          <MobileMenu 
+            onLogout={onLogout} 
+            onPreferences={() => setShowPrefs(true)} 
+            onHistory={() => setShowHistory(true)} 
+          />
         </div>
       </header>
 

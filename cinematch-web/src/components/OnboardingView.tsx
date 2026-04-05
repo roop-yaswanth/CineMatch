@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import MovieCard from "@/components/MovieCard";
 import PreferencesModal from "@/components/PreferencesModal";
+import MobileMenu from "@/components/MobileMenu";
 import {
   apiBuildSlate,
   apiRateOnboarding,
@@ -92,6 +93,7 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
     preferencesFromProfile(session.profile)
   );
   const [lastSwipe, setLastSwipe] = useState<SwipeDirection>("right");
+  const [optimisticRemoved, setOptimisticRemoved] = useState(false);
 
   const ratingDirection = useCallback((rating: string): SwipeDirection => {
     switch (rating) {
@@ -132,6 +134,7 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
     async (rating: string) => {
       if (!state?.movie || loading) return;
       setLastSwipe(ratingDirection(rating));
+      setOptimisticRemoved(true); // Trigger instantaneous exit
       setLoading(true);
       try {
         const result = await apiRateOnboarding(
@@ -148,6 +151,7 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
         console.error("Rating failed:", err);
       } finally {
         setLoading(false);
+        setOptimisticRemoved(false); // Reset to allow next card
       }
     },
     [state, session.session_id, loading, onComplete, ratingDirection]
@@ -320,19 +324,16 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
         display: "flex", alignItems: "center", justifyContent: "space-between",
         flexShrink: 0,
       }}>
-        <button onClick={onLogout} className="glass-pill"
-          style={{ fontSize: "12px", color: "var(--color-text-muted)", cursor: "pointer", padding: "5px 12px" }}>
-          Sign out
-        </button>
+        <div style={{ width: "40px" }} /> {/* Spacer */}
         {state && (
-          <div style={{ fontSize: "11px", color: "var(--color-text-muted)", fontWeight: 300 }}>
-            {state.session.onboarding_index + 1} / {state.session.onboarding_total}
+          <div style={{ fontSize: "11px", color: "var(--color-text-muted)", fontWeight: 500, letterSpacing: "0.05em", textTransform: "uppercase" }}>
+            Step {state.session.onboarding_index + 1} of {state.session.onboarding_total}
           </div>
         )}
-        <button onClick={() => setShowPrefs(true)} className="glass-pill"
-          style={{ fontSize: "12px", color: "var(--color-text-muted)", cursor: "pointer", padding: "5px 12px" }}>
-          Preferences
-        </button>
+        <MobileMenu 
+          onLogout={onLogout} 
+          onPreferences={() => setShowPrefs(true)} 
+        />
       </div>
 
       {/* Progress bar */}
@@ -356,7 +357,7 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
       {/* Movie card — fills remaining space */}
       <div style={{ width: "100%", maxWidth: "420px", flex: 1, display: "flex", alignItems: "center", justifyContent: "center", minHeight: 0, overflow: "hidden", margin: "4px 0" }}>
         <AnimatePresence initial={false} custom={lastSwipe} mode="wait">
-          {state?.movie ? (
+          {(!optimisticRemoved && state?.movie) ? (
             <motion.div
               key={state.movie.id}
               custom={lastSwipe}
@@ -371,7 +372,18 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
             >
               <MovieCard movie={state.movie} priority />
             </motion.div>
-          ) : !loading && (
+          ) : (loading || optimisticRemoved) ? (
+            <motion.div key="loading" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} style={{ textAlign: "center", width: "100%", padding: "40px 0" }}>
+              <div style={{ fontSize: "64px", animation: "bounce 1s infinite alternate" }}>🍿</div>
+              <p style={{ marginTop: "16px", fontSize: "14px", color: "var(--color-text-primary)", fontWeight: 500 }}>Curating your next pick...</p>
+              <style>{`
+                @keyframes bounce {
+                  from { transform: translateY(0); }
+                  to { transform: translateY(-16px); }
+                }
+              `}</style>
+            </motion.div>
+          ) : (
             <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }}
               style={{ textAlign: "center", width: "100%", padding: "40px 0" }}>
               <p style={{ fontSize: "13px", color: "var(--color-text-muted)" }}>No more movies in this slate.</p>
