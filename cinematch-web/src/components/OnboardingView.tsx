@@ -384,7 +384,7 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
               custom={lastSwipe}
               variants={cardVariants}
               initial="enter" animate="center" exit="exit"
-              style={{ width: "clamp(240px, 78vw, 380px)", maxWidth: "100%", cursor: "grab", touchAction: "none" }}
+              style={{ width: "clamp(240px, 78vw, 360px)", maxWidth: "100%", cursor: "grab", touchAction: "none" }}
               drag
               dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
               dragElastic={0.65}
