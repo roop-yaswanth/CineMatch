@@ -393,7 +393,7 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
                     backdropFilter: "blur(6px)",
                     WebkitBackdropFilter: "blur(6px)",
                     borderRadius: "var(--radius-poster)",
-                    pointerEvents: "none",
+                    pointerEvents: "auto",
                     padding: "20px",
                   }}
                 >
@@ -411,7 +411,7 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
                   </p>
 
                   {/* 4-direction guide */}
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px 24px", width: "100%", maxWidth: "240px" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px 24px", width: "100%", maxWidth: "240px", marginBottom: "32px" }}>
                     {/* Right = Like */}
                     <motion.div
                       initial={{ opacity: 0, x: -10 }}
@@ -456,6 +456,32 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
                       <span style={{ color: "var(--color-skip)", fontSize: "13px", fontWeight: 600 }}>Skip</span>
                     </motion.div>
                   </div>
+
+                  {/* Okay button */}
+                  <motion.button
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 2.2 }}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setHasInteracted(true);
+                    }}
+                    style={{
+                      background: "white",
+                      color: "black",
+                      border: "none",
+                      padding: "10px 24px",
+                      borderRadius: "var(--radius-pill)",
+                      fontSize: "14px",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      boxShadow: "0 4px 12px rgba(0,0,0,0.2)"
+                    }}
+                  >
+                    Okay, Got it!
+                  </motion.button>
                 </motion.div>
               )}
 

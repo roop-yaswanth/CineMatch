@@ -144,11 +144,14 @@ button, a, input {
 
 .poster-container .action-overlay {
   opacity: 0;
+  pointer-events: none;
   transition: opacity 0.2s ease;
 }
 
-.poster-container:hover .action-overlay {
+.poster-container:hover .action-overlay,
+.poster-container .action-overlay.active {
   opacity: 1;
+  pointer-events: auto;
 }
 
 /* ─── Section Headers ───────────────────────────── */

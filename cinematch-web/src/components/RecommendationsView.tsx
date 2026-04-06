@@ -1043,7 +1043,7 @@ function PosterCard({
 
         {/* Action overlay */}
         <div
-          className="action-overlay"
+          className={`action-overlay ${showActions ? "active" : ""}`}
           style={{
             position: "absolute",
             inset: 0,
@@ -1054,7 +1054,6 @@ function PosterCard({
             gap: "8px",
             background: "rgba(0, 0, 0, 0.78)",
             padding: "12px",
-            ...(showActions ? { opacity: 1 } : {}),
           }}
         >
           {CARD_ACTIONS.map((btn) => (
