@@ -489,37 +489,61 @@ export default function RecommendationsView({
         )}
       </AnimatePresence>
 
-      
       <AnimatePresence>
         {showUpdateToast && (
           <motion.div
-            initial={{ opacity: 0, y: -20, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -20, scale: 0.95 }}
-            transition={{ type: "spring", damping: 20, stiffness: 300 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
             style={{
               position: "fixed",
-              top: "24px",
-              left: "50%",
-              transform: "translateX(-50%)",
+              inset: 0,
               zIndex: 9999,
-              background: "rgba(30, 30, 30, 0.75)",
-              backdropFilter: "blur(12px)",
-              WebkitBackdropFilter: "blur(12px)",
-              padding: "12px 24px",
-              borderRadius: "var(--radius-pill)",
-              color: "white",
-              fontSize: "13px",
-              fontWeight: 500,
-              boxShadow: "0 8px 32px rgba(0,0,0,0.3)",
               display: "flex",
+              flexDirection: "column",
               alignItems: "center",
-              gap: "8px",
+              justifyContent: "center",
+              background: "rgba(0, 0, 0, 0.6)",
+              backdropFilter: "blur(16px)",
+              WebkitBackdropFilter: "blur(16px)",
             }}
           >
-            <div style={{ width: "16px", height: "16px", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "white", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
-            Updating Taste Profile...
-            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+            <motion.div
+              animate={{ y: [0, -18, 0] }}
+              transition={{ repeat: Infinity, duration: 0.7, ease: "easeInOut" }}
+              style={{ fontSize: "72px" }}
+            >
+              🍿
+            </motion.div>
+            <motion.p
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3, type: "spring", stiffness: 200, damping: 20 }}
+              style={{
+                marginTop: "20px",
+                color: "white",
+                fontSize: "18px",
+                fontWeight: 600,
+                letterSpacing: "-0.02em",
+                textShadow: "0 2px 12px rgba(0,0,0,0.5)",
+              }}
+            >
+              Updating Taste Profile...
+            </motion.p>
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.6 }}
+              transition={{ delay: 0.6 }}
+              style={{
+                marginTop: "8px",
+                color: "white",
+                fontSize: "13px",
+                fontWeight: 400,
+              }}
+            >
+              Rebuilding recommendations from your feedback
+            </motion.p>
           </motion.div>
         )}
       </AnimatePresence>
