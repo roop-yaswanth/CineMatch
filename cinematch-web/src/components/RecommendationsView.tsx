@@ -224,8 +224,6 @@ export default function RecommendationsView({
 
   const handleAction = useCallback(
     async (movie: Recommendation, action: RecommendationAction) => {
-      if (actionInFlight) return;
-
       // Update action counters
       actionCountRef.current.total++;
       if (action === "like" || action === "okay") actionCountRef.current.positive++;
@@ -235,7 +233,8 @@ export default function RecommendationsView({
       const shouldAutoRerun = negative >= 10 || total >= 10 || positive >= 10;
 
       const tmdbId = recommendationId(movie);
-      setActionInFlight(true);
+
+      // ── Optimistic UI: instantly remove the movie ──
       setMovies((prev) =>
         prev.filter((m) => recommendationId(m) !== tmdbId)
       );
@@ -244,40 +243,46 @@ export default function RecommendationsView({
       if (shouldAutoRerun) {
         actionCountRef.current = { positive: 0, negative: 0, total: 0 };
         setShowUpdateToast(true);
+        // Fire the action + rebuild in parallel: action endpoint now auto-reruns
         try {
-          await apiRecommendationAction(session.session_id, tmdbId, action);
+          const result = await apiRecommendationAction(session.session_id, tmdbId, action);
+          let newMovies = result.movies || [];
+          newMovies = applyFilters(newMovies, preferences);
+          await prefetchPosters(newMovies);
+          setMovies(newMovies);
+          setStatus(cleanStatus(result.status || ""));
+          onSessionUpdate(result.session);
         } catch (err) {
-          console.error("Recommendation action failed:", err);
+          console.error("Recommendation action (rerun) failed:", err);
+          // Fallback: call generate to get a fresh pool
+          await generate(preferences);
         }
-        setActionInFlight(false);
-        // CRITICAL: call generate() to trigger a full backend rebuild
-        await generate(preferences);
-        setTimeout(() => setShowUpdateToast(false), 2500);
+        setTimeout(() => setShowUpdateToast(false), 1500);
         return;
       }
 
-      // Normal action: send to backend, then apply filters to the returned pool
-      try {
-        const result = await apiRecommendationAction(
-          session.session_id,
-          tmdbId,
-          action
-        );
-        let newMovies = result.movies || [];
-        // Re-apply genre + classics filters to the returned pool
-        newMovies = applyFilters(newMovies, preferences);
-        await prefetchPosters(newMovies);
-        setMovies(newMovies);
-        setStatus(cleanStatus(result.status || ""));
-        onSessionUpdate(result.session);
-      } catch (err) {
-        console.error("Recommendation action failed:", err);
-        void generate(preferences);
-      } finally {
-        setActionInFlight(false);
-      }
+      // ── Normal action: fire-and-forget, don't block the UI ──
+      // The backend call runs in the background; user can keep clicking immediately
+      apiRecommendationAction(session.session_id, tmdbId, action)
+        .then((result) => {
+          // Silently sync the pool from the backend response
+          let newMovies = result.movies || [];
+          newMovies = applyFilters(newMovies, preferences);
+          setMovies((current) => {
+            // Only update if backend returned more movies than we currently have
+            // (avoids overwriting user's fast optimistic removals)
+            if (newMovies.length > current.length) {
+              return newMovies;
+            }
+            return current;
+          });
+          onSessionUpdate(result.session);
+        })
+        .catch((err) => {
+          console.error("Recommendation action failed:", err);
+        });
     },
-    [actionInFlight, applyFilters, generate, onSessionUpdate, preferences, session.session_id]
+    [applyFilters, generate, onSessionUpdate, preferences, session.session_id]
   );
 
   const handlePreferenceUpdate = useCallback(
@@ -468,7 +473,7 @@ export default function RecommendationsView({
               <StackRow
                 key={stack.id}
                 stack={stack}
-                disabled={loading || actionInFlight}
+                disabled={loading}
                 onAction={handleAction}
                 onOpenDetail={() => setActiveStack(stack.id)}
               />
@@ -484,7 +489,7 @@ export default function RecommendationsView({
             stack={stacks.find((s) => s.id === activeStack)!}
             onBack={() => setActiveStack(null)}
             onAction={handleAction}
-            disabled={loading || actionInFlight}
+            disabled={loading}
           />
         )}
       </AnimatePresence>
