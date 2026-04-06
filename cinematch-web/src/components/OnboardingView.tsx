@@ -82,6 +82,21 @@ const GENRE_LIST = [
   "Thriller", "Mystery",
 ];
 
+const LOADING_VARIANTS = [
+  { emoji: "🍿", text: "Curating your next pick..." },
+  { emoji: "🎞️", text: "Scanning the film archives..." },
+  { emoji: "📽️", text: "Projecting something special..." },
+  { emoji: "🎬", text: "Lights, camera, action!" },
+  { emoji: "🎭", text: "Setting the scene..." },
+  { emoji: "🔍", text: "Searching the cinematic galaxy..." },
+  { emoji: "✨", text: "Adding some movie magic..." },
+  { emoji: "🎞️", text: "Splicing the reels..." },
+  { emoji: "🌟", text: "Finding stars for you..." },
+  { emoji: "⚡", text: "Powering up recommendations..." },
+  { emoji: "🎟️", text: "Getting your front row seat..." },
+  { emoji: "🎥", text: "Rolling the cameras..." },
+];
+
 export default function OnboardingView({ session, onComplete, onLogout, forcePreferences }: Props) {
   const [state, setState] = useState<OnboardingState | null>(null);
   const [loading, setLoading] = useState(false);
@@ -95,6 +110,7 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
   const [lastSwipe, setLastSwipe] = useState<SwipeDirection>("right");
   const [optimisticRemoved, setOptimisticRemoved] = useState(false);
   const [hasInteracted, setHasInteracted] = useState(false);
+  const [loadingVariantIdx, setLoadingVariantIdx] = useState(0);
 
   const ratingDirection = useCallback((rating: string): SwipeDirection => {
     switch (rating) {
@@ -138,6 +154,9 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
       setOptimisticRemoved(true); // Trigger instantaneous exit
       setHasInteracted(true);
       setLoading(true);
+
+      // Pick a random loading variant
+      setLoadingVariantIdx(Math.floor(Math.random() * LOADING_VARIANTS.length));
       try {
         const result = await apiRateOnboarding(
           session.session_id,
@@ -332,9 +351,9 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
             Step {state.session.onboarding_index + 1} of {state.session.onboarding_total}
           </div>
         )}
-        <MobileMenu 
-          onLogout={onLogout} 
-          onPreferences={() => setShowPrefs(true)} 
+        <MobileMenu
+          onLogout={onLogout}
+          onPreferences={() => setShowPrefs(true)}
         />
       </div>
 
@@ -365,16 +384,16 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
               custom={lastSwipe}
               variants={cardVariants}
               initial="enter" animate="center" exit="exit"
-              style={{ width: "clamp(280px, 78vw, 380px)", maxWidth: "100%", cursor: "grab", touchAction: "none" }}
+              style={{ width: "clamp(240px, 78vw, 380px)", maxWidth: "100%", cursor: "grab", touchAction: "none" }}
               drag
               dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
               dragElastic={0.65}
               onDragEnd={handleDragEnd}
               whileDrag={{ scale: 1.02, rotate: 1.5, cursor: "grabbing" }}
             >
-              
+
               <MovieCard movie={state.movie} priority />
-              
+
               {!hasInteracted && (
                 <motion.div
                   initial={{ opacity: 0 }}
@@ -403,11 +422,10 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
                     transition={{ repeat: Infinity, duration: 2.5, ease: "easeInOut" }}
                     style={{ fontSize: "48px", marginBottom: "16px" }}
                   >
-                    👆
                   </motion.div>
 
                   <p style={{ color: "white", fontWeight: 700, fontSize: "18px", textShadow: "0 2px 12px rgba(0,0,0,0.6)", letterSpacing: "-0.02em", marginBottom: "20px" }}>
-                    Swipe to Rate
+                    Swipe/Click to Rate
                   </p>
 
                   {/* 4-direction guide */}
@@ -488,8 +506,12 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
             </motion.div>
           ) : (loading || optimisticRemoved) ? (
             <motion.div key="loading" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} style={{ textAlign: "center", width: "100%", padding: "40px 0" }}>
-              <div style={{ fontSize: "64px", animation: "bounce 1s infinite alternate" }}>🍿</div>
-              <p style={{ marginTop: "16px", fontSize: "14px", color: "var(--color-text-primary)", fontWeight: 500 }}>Curating your next pick...</p>
+              <div style={{ fontSize: "64px", animation: "bounce 1s infinite alternate" }}>
+                {LOADING_VARIANTS[loadingVariantIdx].emoji}
+              </div>
+              <p style={{ marginTop: "16px", fontSize: "14px", color: "var(--color-text-primary)", fontWeight: 500 }}>
+                {LOADING_VARIANTS[loadingVariantIdx].text}
+              </p>
               <style>{`
                 @keyframes bounce {
                   from { transform: translateY(0); }
@@ -567,8 +589,10 @@ const sectionLabelStyle: React.CSSProperties = {
 function PrefPill({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
   return (
     <button onClick={onClick} className={active ? "glass-pill-active" : "glass-pill"}
-      style={{ padding: "6px 14px", fontSize: "12px", fontWeight: 500,
-        color: active ? "var(--color-text-primary)" : "var(--color-text-muted)", cursor: "pointer" }}>
+      style={{
+        padding: "6px 14px", fontSize: "12px", fontWeight: 500,
+        color: active ? "var(--color-text-primary)" : "var(--color-text-muted)", cursor: "pointer"
+      }}>
       {label}
     </button>
   );
