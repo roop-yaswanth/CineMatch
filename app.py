@@ -1,5 +1,4 @@
 # CineMatch API Server — HuggingFace Spaces entry point
-# Auto-generated from src/ui/api_server.ipynb
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -2944,5 +2943,7 @@ else:
     print(f"  Use this as NEXT_PUBLIC_API_URL in your .env.local")
     print(f"──────────────────────────────────────────\n")
     thread.start()
+
+
 
 
