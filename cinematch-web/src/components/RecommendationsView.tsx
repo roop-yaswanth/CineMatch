@@ -16,6 +16,7 @@ import MobileMenu from "@/components/MobileMenu";
 import {
   apiGenerateRecommendations,
   apiRecommendationAction,
+  LANGUAGE_LABELS,
   languageLabel,
   prefetchPosters,
   preferencesFromProfile,
@@ -59,6 +60,13 @@ const CARD_ACTIONS: Array<{
 
 function cleanStatus(status: string): string {
   return /recommendations remaining/i.test(status) ? "" : status;
+}
+
+// All known language codes that are NOT in the user's selected set.
+// Used for the second "Global Cinema" API request.
+function globalCinemaLanguages(selected: string[]): string[] {
+  const selectedSet = new Set(selected.map((l) => l.toLowerCase()));
+  return Object.keys(LANGUAGE_LABELS).filter((l) => !selectedSet.has(l));
 }
 
 function partitionIntoStacks(
@@ -182,26 +190,44 @@ export default function RecommendationsView({
   );
 
   // ── silentRefresh ──────────────────────────────────────────────────────────
-  // Replenishes the pool silently (no spinner, no popcorn) when movies < 30.
-  // Calls the full backend rebuild (generate_cold_start_recommendations) so
-  // results are always embedding-based and fresh.
+  // Fires two parallel requests:
+  //   1. User's selected languages → best movies for Top Picks + Regional Favorites
+  //   2. All OTHER world languages → feeds the Global Cinema section
+  // Results are merged (selected-lang movies first) then partitioned into stacks.
   const silentRefreshInFlight = useRef(false);
   const silentRefresh = useCallback(async (prefs: RecommendationPreferences) => {
     if (silentRefreshInFlight.current) return;
     silentRefreshInFlight.current = true;
     try {
-      const result: RecommendationPage = await apiGenerateRecommendations(
-        session.session_id,
-        { ...prefs, languages: [...new Set([...prefs.languages, "en"])] }
-      );
-      const freshMovies = (result.movies || []).filter(
-        (m) => !seenIdsRef.current.has(recommendationId(m))
-      );
-      const filtered = applyFilters(freshMovies, prefs);
+      const userLangs = [...new Set([...prefs.languages, "en"])];
+      const otherLangs = globalCinemaLanguages(userLangs);
+
+      const [primaryResult, globalResult] = await Promise.allSettled([
+        apiGenerateRecommendations(session.session_id, { ...prefs, languages: userLangs }),
+        apiGenerateRecommendations(session.session_id, { ...prefs, languages: otherLangs }),
+      ]);
+
+      const primaryMovies = primaryResult.status === "fulfilled" ? (primaryResult.value.movies || []) : [];
+      const globalMovies = globalResult.status === "fulfilled" ? (globalResult.value.movies || []) : [];
+      const session_ = primaryResult.status === "fulfilled" ? primaryResult.value.session
+        : globalResult.status === "fulfilled" ? globalResult.value.session : null;
+
+      // Merge: user-lang movies first, then global — dedup by ID
+      const seenMerge = new Set<number>();
+      const merged: Recommendation[] = [];
+      for (const m of [...primaryMovies, ...globalMovies]) {
+        const id = recommendationId(m);
+        if (!seenIdsRef.current.has(id) && !seenMerge.has(id)) {
+          seenMerge.add(id);
+          merged.push(m);
+        }
+      }
+
+      const filtered = applyFilters(merged, prefs);
       if (filtered.length > 0) {
         await prefetchPosters(filtered);
         setMovies(filtered);
-        onSessionUpdate(result.session);
+        if (session_) onSessionUpdate(session_);
       }
     } catch (err) {
       console.error("[silentRefresh] Failed:", err);
@@ -211,6 +237,7 @@ export default function RecommendationsView({
   }, [applyFilters, onSessionUpdate, session.session_id]);
 
   // ── generate (full/manual refresh) ────────────────────────────────────────
+  // Same dual-request strategy as silentRefresh.
   const generate = useCallback(
     async (nextPreferences: RecommendationPreferences = preferences) => {
       setLoading(true);
@@ -220,16 +247,40 @@ export default function RecommendationsView({
       seenIdsRef.current = new Set();
       actionCountRef.current = { positive: 0, negative: 0, total: 0 };
       try {
-        const result: RecommendationPage = await apiGenerateRecommendations(
-          session.session_id,
-          { ...nextPreferences, languages: [...new Set([...nextPreferences.languages, "en"])] }
-        );
-        let newMovies = result.movies || [];
-        newMovies = applyFilters(newMovies, nextPreferences);
+        const userLangs = [...new Set([...nextPreferences.languages, "en"])];
+        const otherLangs = globalCinemaLanguages(userLangs);
+
+        const [primaryResult, globalResult] = await Promise.allSettled([
+          apiGenerateRecommendations(session.session_id, { ...nextPreferences, languages: userLangs }),
+          apiGenerateRecommendations(session.session_id, { ...nextPreferences, languages: otherLangs }),
+        ]);
+
+        const primaryMovies = primaryResult.status === "fulfilled" ? (primaryResult.value.movies || []) : [];
+        const globalMovies = globalResult.status === "fulfilled" ? (globalResult.value.movies || []) : [];
+        const sessionResult = primaryResult.status === "fulfilled" ? primaryResult.value.session
+          : globalResult.status === "fulfilled" ? globalResult.value.session : null;
+        const statusMsg = primaryResult.status === "fulfilled" ? (primaryResult.value.status || "") : "";
+
+        // Merge: user-lang movies first, then global — dedup by ID
+        const seenMerge = new Set<number>();
+        const merged: Recommendation[] = [];
+        for (const m of [...primaryMovies, ...globalMovies]) {
+          const id = recommendationId(m);
+          if (!seenMerge.has(id)) {
+            seenMerge.add(id);
+            merged.push(m);
+          }
+        }
+
+        const newMovies = applyFilters(merged, nextPreferences);
         await prefetchPosters(newMovies);
         setMovies(newMovies);
-        setStatus(cleanStatus(result.status || ""));
-        onSessionUpdate(result.session);
+        setStatus(cleanStatus(statusMsg));
+        if (sessionResult) onSessionUpdate(sessionResult);
+
+        if (primaryResult.status === "rejected" && globalResult.status === "rejected") {
+          setStatus("Failed to load recommendations. Try refreshing.");
+        }
       } catch (err) {
         setStatus("Failed to load recommendations. Try refreshing.");
         console.error(err);
