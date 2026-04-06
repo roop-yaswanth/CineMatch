@@ -94,6 +94,7 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
   );
   const [lastSwipe, setLastSwipe] = useState<SwipeDirection>("right");
   const [optimisticRemoved, setOptimisticRemoved] = useState(false);
+  const [hasInteracted, setHasInteracted] = useState(false);
 
   const ratingDirection = useCallback((rating: string): SwipeDirection => {
     switch (rating) {
@@ -135,6 +136,7 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
       if (!state?.movie || loading) return;
       setLastSwipe(ratingDirection(rating));
       setOptimisticRemoved(true); // Trigger instantaneous exit
+      setHasInteracted(true);
       setLoading(true);
       try {
         const result = await apiRateOnboarding(
@@ -370,7 +372,93 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
               onDragEnd={handleDragEnd}
               whileDrag={{ scale: 1.02, rotate: 1.5, cursor: "grabbing" }}
             >
+              
               <MovieCard movie={state.movie} priority />
+              
+              {!hasInteracted && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ delay: 0.8, duration: 0.6 }}
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    zIndex: 20,
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    background: "rgba(0,0,0,0.65)",
+                    backdropFilter: "blur(6px)",
+                    WebkitBackdropFilter: "blur(6px)",
+                    borderRadius: "var(--radius-poster)",
+                    pointerEvents: "none",
+                    padding: "20px",
+                  }}
+                >
+                  {/* Central hand animation */}
+                  <motion.div
+                    animate={{ x: [-24, 24, -24], y: [6, -6, 6] }}
+                    transition={{ repeat: Infinity, duration: 2.5, ease: "easeInOut" }}
+                    style={{ fontSize: "48px", marginBottom: "16px" }}
+                  >
+                    👆
+                  </motion.div>
+
+                  <p style={{ color: "white", fontWeight: 700, fontSize: "18px", textShadow: "0 2px 12px rgba(0,0,0,0.6)", letterSpacing: "-0.02em", marginBottom: "20px" }}>
+                    Swipe to Rate
+                  </p>
+
+                  {/* 4-direction guide */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px 24px", width: "100%", maxWidth: "240px" }}>
+                    {/* Right = Like */}
+                    <motion.div
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 1.2, type: "spring", stiffness: 200, damping: 20 }}
+                      style={{ display: "flex", alignItems: "center", gap: "8px" }}
+                    >
+                      <span style={{ fontSize: "22px" }}>👉</span>
+                      <span style={{ color: "var(--color-like)", fontSize: "13px", fontWeight: 600 }}>Like</span>
+                    </motion.div>
+
+                    {/* Left = Dislike */}
+                    <motion.div
+                      initial={{ opacity: 0, x: 10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 1.4, type: "spring", stiffness: 200, damping: 20 }}
+                      style={{ display: "flex", alignItems: "center", gap: "8px" }}
+                    >
+                      <span style={{ fontSize: "22px" }}>👈</span>
+                      <span style={{ color: "var(--color-dislike)", fontSize: "13px", fontWeight: 600 }}>Dislike</span>
+                    </motion.div>
+
+                    {/* Up = Okay */}
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 1.6, type: "spring", stiffness: 200, damping: 20 }}
+                      style={{ display: "flex", alignItems: "center", gap: "8px" }}
+                    >
+                      <span style={{ fontSize: "22px" }}>👆</span>
+                      <span style={{ color: "var(--color-okay)", fontSize: "13px", fontWeight: 600 }}>Okay</span>
+                    </motion.div>
+
+                    {/* Down = Skip */}
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 1.8, type: "spring", stiffness: 200, damping: 20 }}
+                      style={{ display: "flex", alignItems: "center", gap: "8px" }}
+                    >
+                      <span style={{ fontSize: "22px" }}>👇</span>
+                      <span style={{ color: "var(--color-skip)", fontSize: "13px", fontWeight: 600 }}>Skip</span>
+                    </motion.div>
+                  </div>
+                </motion.div>
+              )}
+
             </motion.div>
           ) : (loading || optimisticRemoved) ? (
             <motion.div key="loading" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} style={{ textAlign: "center", width: "100%", padding: "40px 0" }}>

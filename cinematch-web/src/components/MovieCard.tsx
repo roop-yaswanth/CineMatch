@@ -33,6 +33,8 @@ export default function MovieCard({ movie, priority = false, className = "", com
   return (
     <motion.div
       layout
+      whileHover={{ scale: 1.03, y: -4 }}
+      transition={{ type: "spring", stiffness: 300, damping: 20 }}
       className={`relative flex flex-col items-center no-select ${className}`}
     >
       {/* Poster */}

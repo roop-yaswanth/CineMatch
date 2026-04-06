@@ -135,6 +135,7 @@ export default function RecommendationsView({
   const [showHistory, setShowHistory] = useState(false);
   const [showPrefs, setShowPrefs] = useState(false);
   const [actionInFlight, setActionInFlight] = useState(false);
+  const [showUpdateToast, setShowUpdateToast] = useState(false);
   const [activeStack, setActiveStack] = useState<StackId | null>(null);
   const [preferences, setPreferences] = useState<RecommendationPreferences>(
     () => preferencesFromProfile(session.profile)
@@ -143,8 +144,43 @@ export default function RecommendationsView({
   // Action counter for auto-rerun (mirrors Gradio trigger logic)
   const actionCountRef = useRef({ positive: 0, negative: 0, total: 0 });
 
+  // Apply frontend filters (genre + classics) to any movie list
+  const applyFilters = useCallback((movieList: Recommendation[], prefs: RecommendationPreferences): Recommendation[] => {
+    let filtered = movieList;
+
+    // Genre filter
+    if (prefs.genres && prefs.genres.length > 0) {
+      const selectedGenresLower = prefs.genres.map((g: string) => g.toLowerCase());
+      const genreFiltered = filtered.filter((m: any) => {
+        const pg = (m.primary_genre || "").toLowerCase();
+        const gs = (m.genres || []).map((g: string) => g.toLowerCase());
+        return selectedGenresLower.includes(pg) || gs.some((g: string) => selectedGenresLower.includes(g));
+      });
+      if (genreFiltered.length > 0) {
+        filtered = genreFiltered;
+      }
+    }
+
+    // Classics filter — hide pre-2000 movies when include_classics is off
+    if (!prefs.include_classics) {
+      const modernFiltered = filtered.filter((m: any) => {
+        const year = typeof m.year === "number" ? m.year : parseInt(m.year, 10);
+        return isNaN(year) || year >= 2000;
+      });
+      if (modernFiltered.length > 0) {
+        filtered = modernFiltered;
+      }
+    }
+
+    return filtered;
+  }, []);
+
   const stacks = useMemo(
-    () => partitionIntoStacks(movies, preferences),
+    () => {
+      const raw = partitionIntoStacks(movies, preferences);
+      // Cap each stack at 50 movies
+      return raw.map(s => ({ ...s, movies: s.movies.slice(0, 50) }));
+    },
     [movies, preferences]
   );
 
@@ -161,7 +197,11 @@ export default function RecommendationsView({
             languages: [...new Set([...nextPreferences.languages, "en"])],
           }
         );
-        const newMovies = result.movies || [];
+        let newMovies = result.movies || [];
+
+        // Apply frontend genre + classics filters
+        newMovies = applyFilters(newMovies, nextPreferences);
+
         await prefetchPosters(newMovies);
         setMovies(newMovies);
         setStatus(cleanStatus(result.status || ""));
@@ -173,7 +213,7 @@ export default function RecommendationsView({
         setLoading(false);
       }
     },
-    [onSessionUpdate, preferences, session.session_id]
+    [applyFilters, onSessionUpdate, preferences, session.session_id]
   );
 
   useEffect(() => {
@@ -200,26 +240,32 @@ export default function RecommendationsView({
         prev.filter((m) => recommendationId(m) !== tmdbId)
       );
 
-      // Auto-rerun if threshold hit — skip normal action result handling
+      // Auto-rerun: rebuild the ENTIRE recommendation pool from backend
       if (shouldAutoRerun) {
         actionCountRef.current = { positive: 0, negative: 0, total: 0 };
+        setShowUpdateToast(true);
         try {
           await apiRecommendationAction(session.session_id, tmdbId, action);
         } catch (err) {
           console.error("Recommendation action failed:", err);
         }
         setActionInFlight(false);
-        void generate(preferences);
+        // CRITICAL: call generate() to trigger a full backend rebuild
+        await generate(preferences);
+        setTimeout(() => setShowUpdateToast(false), 2500);
         return;
       }
 
+      // Normal action: send to backend, then apply filters to the returned pool
       try {
         const result = await apiRecommendationAction(
           session.session_id,
           tmdbId,
           action
         );
-        const newMovies = result.movies || [];
+        let newMovies = result.movies || [];
+        // Re-apply genre + classics filters to the returned pool
+        newMovies = applyFilters(newMovies, preferences);
         await prefetchPosters(newMovies);
         setMovies(newMovies);
         setStatus(cleanStatus(result.status || ""));
@@ -231,7 +277,7 @@ export default function RecommendationsView({
         setActionInFlight(false);
       }
     },
-    [actionInFlight, generate, onSessionUpdate, preferences, session.session_id]
+    [actionInFlight, applyFilters, generate, onSessionUpdate, preferences, session.session_id]
   );
 
   const handlePreferenceUpdate = useCallback(
@@ -443,6 +489,41 @@ export default function RecommendationsView({
         )}
       </AnimatePresence>
 
+      
+      <AnimatePresence>
+        {showUpdateToast && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.95 }}
+            transition={{ type: "spring", damping: 20, stiffness: 300 }}
+            style={{
+              position: "fixed",
+              top: "24px",
+              left: "50%",
+              transform: "translateX(-50%)",
+              zIndex: 9999,
+              background: "rgba(30, 30, 30, 0.75)",
+              backdropFilter: "blur(12px)",
+              WebkitBackdropFilter: "blur(12px)",
+              padding: "12px 24px",
+              borderRadius: "var(--radius-pill)",
+              color: "white",
+              fontSize: "13px",
+              fontWeight: 500,
+              boxShadow: "0 8px 32px rgba(0,0,0,0.3)",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+            }}
+          >
+            <div style={{ width: "16px", height: "16px", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "white", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
+            Updating Taste Profile...
+            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {showHistory && (
         <HistoryDrawer
           sessionId={session.session_id}
@@ -507,17 +588,20 @@ function StackDetailView({
           onClick={onBack}
           style={{
             fontSize: "13px",
-            color: "var(--color-text-muted)",
+            fontWeight: 500,
+            color: "var(--color-text-primary)",
             cursor: "pointer",
-            background: "none",
-            border: "none",
+            background: "var(--color-surface)",
+            border: "1px solid var(--color-border-subtle)",
+            borderRadius: "var(--radius-pill)",
             display: "flex",
             alignItems: "center",
             gap: "6px",
-            padding: "6px 0",
+            padding: "6px 14px",
+            boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
           }}
         >
-          ← Back
+          <span style={{ fontSize: "16px", transform: "translateY(-1px)" }}>←</span> Back
         </button>
         <div>
           <h2
@@ -614,10 +698,8 @@ function StackRow({
     return () => ro.disconnect();
   }, [recalc, stack.movies.length]);
 
-  // Reset to page 0 on new movie list
-  useEffect(() => {
-    setPage(0);
-  }, [stack.movies.length]);
+  // Only reset if movies completely swap (mount) rather than length change
+  // effectively stopping the annoying jump-to-start when liking a movie
 
   const canGoLeft = page > 0;
   const canGoRight = page < totalPages - 1;
