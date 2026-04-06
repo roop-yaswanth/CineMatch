@@ -134,7 +134,6 @@ export default function RecommendationsView({
   const [initialLoad, setInitialLoad] = useState(true);
   const [showHistory, setShowHistory] = useState(false);
   const [showPrefs, setShowPrefs] = useState(false);
-  const [actionInFlight, setActionInFlight] = useState(false);
   const [showUpdateToast, setShowUpdateToast] = useState(false);
   const [activeStack, setActiveStack] = useState<StackId | null>(null);
   const [preferences, setPreferences] = useState<RecommendationPreferences>(
@@ -144,11 +143,18 @@ export default function RecommendationsView({
   // Action counter for auto-rerun (mirrors Gradio trigger logic)
   const actionCountRef = useRef({ positive: 0, negative: 0, total: 0 });
 
+  // ── seenIdsRef: every movie ID the user has ever reacted to ──
+  // Filters ALL backend responses so clicked movies never reappear,
+  // even from stale fire-and-forget responses or rebuilt pools.
+  const seenIdsRef = useRef<Set<number>>(new Set());
+
+  // Below this many remaining movies, silently fetch a fresh pool
+  const LOW_POOL_THRESHOLD = 30;
+
   // Apply frontend filters (genre + classics) to any movie list
   const applyFilters = useCallback((movieList: Recommendation[], prefs: RecommendationPreferences): Recommendation[] => {
     let filtered = movieList;
 
-    // Genre filter
     if (prefs.genres && prefs.genres.length > 0) {
       const selectedGenresLower = prefs.genres.map((g: string) => g.toLowerCase());
       const genreFiltered = filtered.filter((m: any) => {
@@ -156,20 +162,15 @@ export default function RecommendationsView({
         const gs = (m.genres || []).map((g: string) => g.toLowerCase());
         return selectedGenresLower.includes(pg) || gs.some((g: string) => selectedGenresLower.includes(g));
       });
-      if (genreFiltered.length > 0) {
-        filtered = genreFiltered;
-      }
+      if (genreFiltered.length > 0) filtered = genreFiltered;
     }
 
-    // Classics filter — hide pre-2000 movies when include_classics is off
     if (!prefs.include_classics) {
       const modernFiltered = filtered.filter((m: any) => {
         const year = typeof m.year === "number" ? m.year : parseInt(m.year, 10);
         return isNaN(year) || year >= 2000;
       });
-      if (modernFiltered.length > 0) {
-        filtered = modernFiltered;
-      }
+      if (modernFiltered.length > 0) filtered = modernFiltered;
     }
 
     return filtered;
@@ -178,30 +179,56 @@ export default function RecommendationsView({
   const stacks = useMemo(
     () => {
       const raw = partitionIntoStacks(movies, preferences);
-      // Cap each stack at 50 movies
       return raw.map(s => ({ ...s, movies: s.movies.slice(0, 50) }));
     },
     [movies, preferences]
   );
 
+  // ── silentRefresh ──────────────────────────────────────────────────────────
+  // Replenishes the pool silently (no spinner, no popcorn) when movies < 30.
+  // Calls the full backend rebuild (generate_cold_start_recommendations) so
+  // results are always embedding-based and fresh.
+  const silentRefreshInFlight = useRef(false);
+  const silentRefresh = useCallback(async (prefs: RecommendationPreferences) => {
+    if (silentRefreshInFlight.current) return;
+    silentRefreshInFlight.current = true;
+    try {
+      const result: RecommendationPage = await apiGenerateRecommendations(
+        session.session_id,
+        { ...prefs, languages: [...new Set([...prefs.languages, "en"])] }
+      );
+      const freshMovies = (result.movies || []).filter(
+        (m) => !seenIdsRef.current.has(recommendationId(m))
+      );
+      const filtered = applyFilters(freshMovies, prefs);
+      if (filtered.length > 0) {
+        await prefetchPosters(filtered);
+        setMovies(filtered);
+        onSessionUpdate(result.session);
+      }
+    } catch (err) {
+      console.error("[silentRefresh] Failed:", err);
+    } finally {
+      silentRefreshInFlight.current = false;
+    }
+  }, [applyFilters, onSessionUpdate, session.session_id]);
+
+  // ── generate (full/manual refresh) ────────────────────────────────────────
   const generate = useCallback(
     async (nextPreferences: RecommendationPreferences = preferences) => {
       setLoading(true);
       setMovies([]);
       setStatus("");
+      // Full reset: clear seen history so a fresh pool is unfiltered
+      seenIdsRef.current = new Set();
+      actionCountRef.current = { positive: 0, negative: 0, total: 0 };
       try {
         const result: RecommendationPage = await apiGenerateRecommendations(
           session.session_id,
-          {
-            ...nextPreferences,
-            languages: [...new Set([...nextPreferences.languages, "en"])],
-          }
+          { ...nextPreferences, languages: [...new Set([...nextPreferences.languages, "en"])] }
         );
         let newMovies = result.movies || [];
-
-        // Apply frontend genre + classics filters
         newMovies = applyFilters(newMovies, nextPreferences);
-
         await prefetchPosters(newMovies);
         setMovies(newMovies);
         setStatus(cleanStatus(result.status || ""));
@@ -224,7 +251,15 @@ export default function RecommendationsView({
 
   const handleAction = useCallback(
     async (movie: Recommendation, action: RecommendationAction) => {
-      // Update action counters
+      const tmdbId = recommendationId(movie);
+
+      // ── 1. Mark as seen FIRST — prevents any backend response from showing it again ──
+      seenIdsRef.current.add(tmdbId);
+
+      // ── 2. Instant optimistic removal ──
+      setMovies((prev) => prev.filter((m) => recommendationId(m) !== tmdbId));
+
+      // ── 3. Update action counters ──
       actionCountRef.current.total++;
       if (action === "like" || action === "okay") actionCountRef.current.positive++;
       if (action === "dislike") actionCountRef.current.negative++;
@@ -232,57 +267,50 @@ export default function RecommendationsView({
       const { positive, negative, total } = actionCountRef.current;
       const shouldAutoRerun = negative >= 10 || total >= 10 || positive >= 10;
 
-      const tmdbId = recommendationId(movie);
-
-      // ── Optimistic UI: instantly remove the movie ──
-      setMovies((prev) =>
-        prev.filter((m) => recommendationId(m) !== tmdbId)
-      );
-
-      // Auto-rerun: rebuild the ENTIRE recommendation pool from backend
+      // ── 4. Taste Profile Update (every 10 actions) ─────────────────────────
+      // Show popcorn overlay, wait for backend rebuild, then update UI.
       if (shouldAutoRerun) {
         actionCountRef.current = { positive: 0, negative: 0, total: 0 };
         setShowUpdateToast(true);
-        // Fire the action + rebuild in parallel: action endpoint now auto-reruns
         try {
           const result = await apiRecommendationAction(session.session_id, tmdbId, action);
-          let newMovies = result.movies || [];
-          newMovies = applyFilters(newMovies, preferences);
-          await prefetchPosters(newMovies);
-          setMovies(newMovies);
+          // Filter rebuilt pool through ALL seen IDs — already-rated movies never reappear
+          const freshMovies = (result.movies || []).filter(
+            (m) => !seenIdsRef.current.has(recommendationId(m))
+          );
+          const filtered = applyFilters(freshMovies, preferences);
+          await prefetchPosters(filtered);
+          setMovies(filtered);
           setStatus(cleanStatus(result.status || ""));
           onSessionUpdate(result.session);
         } catch (err) {
-          console.error("Recommendation action (rerun) failed:", err);
-          // Fallback: call generate to get a fresh pool
+          console.error("Taste profile update failed:", err);
           await generate(preferences);
         }
         setTimeout(() => setShowUpdateToast(false), 1500);
         return;
       }
 
-      // ── Normal action: fire-and-forget, don't block the UI ──
-      // The backend call runs in the background; user can keep clicking immediately
+      // ── 5. Normal action: fire-and-forget ──────────────────────────────────
+      // Always filter the backend response through seenIds so fast-clicked
+      // movies are NEVER re-inserted by a stale response.
       apiRecommendationAction(session.session_id, tmdbId, action)
         .then((result) => {
-          // Silently sync the pool from the backend response
-          let newMovies = result.movies || [];
-          newMovies = applyFilters(newMovies, preferences);
-          setMovies((current) => {
-            // Only update if backend returned more movies than we currently have
-            // (avoids overwriting user's fast optimistic removals)
-            if (newMovies.length > current.length) {
-              return newMovies;
-            }
-            return current;
-          });
+          const backendMovies = (result.movies || []).filter(
+            (m) => !seenIdsRef.current.has(recommendationId(m))
+          );
+          const filtered = applyFilters(backendMovies, preferences);
+          setMovies(filtered);
           onSessionUpdate(result.session);
+
+          // ── 6. 30-movie minimum: silently replenish if pool is thin ──
+          if (filtered.length < LOW_POOL_THRESHOLD) {
+            void silentRefresh(preferences);
+          }
         })
-        .catch((err) => {
-          console.error("Recommendation action failed:", err);
-        });
+        .catch((err) => console.error("Recommendation action failed:", err));
     },
-    [applyFilters, generate, onSessionUpdate, preferences, session.session_id]
+    [applyFilters, generate, onSessionUpdate, preferences, session.session_id, silentRefresh]
   );
 
   const handlePreferenceUpdate = useCallback(
