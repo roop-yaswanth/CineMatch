@@ -1,1 +1,36 @@
-<svg fill="none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1155 1000"><path d="m577.3 0 577.4 1000H0z" fill="#fff"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#1C1C22" />
+      <stop offset="100%" stop-color="#0A0A0C" />
+    </linearGradient>
+    
+    <linearGradient id="brand" x1="0" y1="512" x2="512" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#E50914" /> <stop offset="50%" stop-color="#FF4136" /> <stop offset="100%" stop-color="#FF851B" /> </linearGradient>
+
+    <filter id="softGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="12" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <rect width="512" height="512" rx="115" fill="url(#bg)" />
+  
+  <rect width="510" height="510" x="1" y="1" rx="114" stroke="#ffffff" stroke-opacity="0.08" stroke-width="2" />
+
+  <path d="M 340 176 
+           A 130 130 0 1 0 340 336" 
+        fill="none" 
+        stroke="url(#brand)" 
+        stroke-width="44" 
+        stroke-linecap="round" 
+        filter="url(#softGlow)" />
+
+  <path d="M 230 170 
+           L 390 256 
+           L 230 342 Z" 
+        fill="#ffffff" 
+        stroke="#ffffff" 
+        stroke-width="12" 
+        stroke-linejoin="round" />
+</svg>

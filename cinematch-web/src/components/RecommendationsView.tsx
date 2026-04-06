@@ -51,11 +51,11 @@ const CARD_ACTIONS: Array<{
   icon: string;
   color: string;
 }> = [
-  { action: "like",    label: "Like",    icon: "♥", color: "var(--color-like)"    },
-  { action: "okay",    label: "Okay",    icon: "✓", color: "var(--color-okay)"    },
-  { action: "dislike", label: "Dislike", icon: "✕", color: "var(--color-dislike)" },
-  { action: "remove",  label: "Skip",    icon: "→", color: "var(--color-skip)"    },
-];
+    { action: "like", label: "Like", icon: "♥", color: "var(--color-like)" },
+    { action: "okay", label: "Okay", icon: "✓", color: "var(--color-okay)" },
+    { action: "dislike", label: "Dislike", icon: "✕", color: "var(--color-dislike)" },
+    { action: "remove", label: "Skip", icon: "→", color: "var(--color-skip)" },
+  ];
 
 function cleanStatus(status: string): string {
   return /recommendations remaining/i.test(status) ? "" : status;
@@ -367,10 +367,10 @@ export default function RecommendationsView({
             CineMatch
           </h1>
 
-          <MobileMenu 
-            onLogout={onLogout} 
-            onPreferences={() => setShowPrefs(true)} 
-            onHistory={() => setShowHistory(true)} 
+          <MobileMenu
+            onLogout={onLogout}
+            onPreferences={() => setShowPrefs(true)}
+            onHistory={() => setShowHistory(true)}
           />
         </div>
       </header>
@@ -989,7 +989,9 @@ function PosterCard({
   const [showActions, setShowActions] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
-  // Click outside to dismiss action overlay on mobile
+  const overlayJustShownRef = useRef(false);
+
+  // Dismiss overlay when tapping/clicking outside this card
   useEffect(() => {
     if (!showActions) return;
     const handler = (e: MouseEvent | TouchEvent) => {
@@ -998,12 +1000,33 @@ function PosterCard({
       }
     };
     document.addEventListener("mousedown", handler);
-    document.addEventListener("touchstart", handler);
+    document.addEventListener("touchstart", handler, { passive: true });
     return () => {
       document.removeEventListener("mousedown", handler);
       document.removeEventListener("touchstart", handler);
     };
   }, [showActions]);
+
+  // Touch handler — preventDefault() suppresses the synthetic "click" event
+  // that browsers fire ~0–300 ms after touchend, which would otherwise hit
+  // a now-visible action button at the same screen coordinates.
+  const handleContainerTouchEnd = (e: React.TouchEvent) => {
+    e.preventDefault();
+    if (!showActions) {
+      overlayJustShownRef.current = true;
+      setShowActions(true);
+      setTimeout(() => {
+        overlayJustShownRef.current = false;
+      }, 400);
+    } else {
+      setShowActions(false);
+    }
+  };
+
+  // Mouse-only click toggle (touch path is fully handled by onTouchEnd above)
+  const handleContainerClick = () => {
+    setShowActions((v) => !v);
+  };
 
   const lang = movie.original_language
     ? languageLabel(movie.original_language)
@@ -1021,9 +1044,14 @@ function PosterCard({
     <motion.article
       ref={cardRef}
       layout
-      initial={{ opacity: 0, scale: 0.97 }}
+      initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.15 } }}
+      exit={{ opacity: 0, scale: 0.88, transition: { duration: 0.25, ease: "easeIn" } }}
+      transition={{
+        layout: { type: "spring", stiffness: 400, damping: 36 },
+        opacity: { duration: 0.2 },
+        scale: { duration: 0.2 },
+      }}
       className="poster-card"
       style={{
         width: "min(36vw, 150px)",
@@ -1034,7 +1062,8 @@ function PosterCard({
       {/* Poster with action overlay */}
       <div
         className="poster-container"
-        onClick={() => setShowActions((v) => !v)}
+        onTouchEnd={handleContainerTouchEnd}
+        onClick={handleContainerClick}
         style={{
           position: "relative",
           aspectRatio: "2 / 3",
@@ -1067,13 +1096,24 @@ function PosterCard({
             alignContent: "center",
             justifyContent: "center",
             gap: "8px",
-            background: "rgba(0, 0, 0, 0.78)",
+            background: "linear-gradient(160deg, rgba(10,10,18,0.72) 0%, rgba(0,0,0,0.92) 100%)",
+            backdropFilter: "blur(6px)",
+            WebkitBackdropFilter: "blur(6px)",
             padding: "12px",
           }}
         >
           {CARD_ACTIONS.map((btn) => (
             <button
               key={btn.action}
+              // Touch: preventDefault kills ghost-click; guard prevents
+              // firing on the same tap that opened the overlay.
+              onTouchEnd={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (disabled || overlayJustShownRef.current) return;
+                setShowActions(false);
+                onAction(movie, btn.action);
+              }}
               onClick={(e) => {
                 e.stopPropagation();
                 if (disabled) return;

@@ -1,5 +1,5 @@
 /* ─── CineMatch API Client ─────────────────────────────────────
- *  Talks to the FastAPI backend running on Colab via the
+ *  Talks to the FastAPI backend running on Cloud via the
  *  Next.js proxy (/api/* → backend). This avoids CORS entirely
  *  because the browser only ever talks to localhost.
  * ──────────────────────────────────────────────────────────── */
