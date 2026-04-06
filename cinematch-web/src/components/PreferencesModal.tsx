@@ -48,9 +48,8 @@ const GENRES = [
 ];
 
 const INDEXES = [
-  { value: "tmdb_bge_m3", label: "BGE-M3" },
+  { value: "tmdb_bge", label: "BGE-M3" },
   { value: "tmdb_qwen", label: "Qwen" },
-  { value: "tmdb_gte", label: "GTE" },
 ];
 
 export default function PreferencesModal({ preferences, onUpdate, onClose }: Props) {

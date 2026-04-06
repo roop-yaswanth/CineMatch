@@ -203,7 +203,7 @@ export function preferencesFromProfile(
         ? profile.preferred_languages
         : ["en"],
     genres: profile?.preferred_genres ?? [],
-    semantic_index: "tmdb_bge_m3",
+    semantic_index: "tmdb_bge",
     include_classics: profile?.include_classics ?? false,
     age_group: profile?.age_group ?? "18-24",
     region: profile?.region ?? "USA",
