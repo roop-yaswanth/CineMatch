@@ -95,8 +95,8 @@ function partitionIntoStacks(
   const result: Stack[] = [
     {
       id: "hollywood",
-      label: "Hollywood / English",
-      subtitle: "English-language recommendations from the active pool.",
+      label: "Top Picks",
+      subtitle: "Handpicked from your taste profile.",
       movies: hollywood,
     },
   ];
@@ -105,17 +105,17 @@ function partitionIntoStacks(
     result.push({
       id: "matched",
       label: matchedLabel
-        ? `Matched Non-English · ${matchedLabel}`
-        : "Matched Non-English",
-      subtitle: "Non-English picks matching your selected languages.",
+        ? `Regional Favorites · ${matchedLabel}`
+        : "Regional Favorites",
+      subtitle: "Best from your preferred languages.",
       movies: matched,
     });
   }
 
   result.push({
     id: "other",
-    label: "Other-Language Discovery",
-    subtitle: "Profile-matched finds outside your selected languages.",
+    label: "Global Cinema",
+    subtitle: "Hidden gems across cultures — curated by plot similarity.",
     movies: other,
   });
 
@@ -149,7 +149,7 @@ export default function RecommendationsView({
   const seenIdsRef = useRef<Set<number>>(new Set());
 
   // Below this many remaining movies, silently fetch a fresh pool
-  const LOW_POOL_THRESHOLD = 30;
+  const LOW_POOL_THRESHOLD = 50;
 
   // Apply frontend filters (genre + classics) to any movie list
   const applyFilters = useCallback((movieList: Recommendation[], prefs: RecommendationPreferences): Recommendation[] => {
@@ -177,10 +177,7 @@ export default function RecommendationsView({
   }, []);
 
   const stacks = useMemo(
-    () => {
-      const raw = partitionIntoStacks(movies, preferences);
-      return raw.map(s => ({ ...s, movies: s.movies.slice(0, 50) }));
-    },
+    () => partitionIntoStacks(movies, preferences),
     [movies, preferences]
   );
 
@@ -379,7 +376,7 @@ export default function RecommendationsView({
       </header>
 
       {/* Content */}
-      <div style={{ flex: 1, width: "100%", padding: "24px 0 48px" }}>
+      <div className="app-container" style={{ flex: 1, width: "100%", padding: "24px 0 48px" }}>
         {/* Title bar */}
         <div
           style={{
@@ -990,6 +987,23 @@ function PosterCard({
 }) {
   const poster = usePoster(movie.poster_path, recommendationId(movie), "w500");
   const [showActions, setShowActions] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  // Click outside to dismiss action overlay on mobile
+  useEffect(() => {
+    if (!showActions) return;
+    const handler = (e: MouseEvent | TouchEvent) => {
+      if (cardRef.current && !cardRef.current.contains(e.target as Node)) {
+        setShowActions(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    document.addEventListener("touchstart", handler);
+    return () => {
+      document.removeEventListener("mousedown", handler);
+      document.removeEventListener("touchstart", handler);
+    };
+  }, [showActions]);
 
   const lang = movie.original_language
     ? languageLabel(movie.original_language)
@@ -1005,6 +1019,7 @@ function PosterCard({
 
   return (
     <motion.article
+      ref={cardRef}
       layout
       initial={{ opacity: 0, scale: 0.97 }}
       animate={{ opacity: 1, scale: 1 }}

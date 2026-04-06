@@ -20,6 +20,7 @@
   --color-dislike: #f87171;
   --color-skip: #a1a1aa;
   --radius-card: 14px;
+  --radius-lg: 14px;
   --radius-pill: 9999px;
   --radius-modal: 20px;
   --radius-poster: 12px;
@@ -281,4 +282,42 @@ input[type="number"]::-webkit-inner-spin-button {
 }
 .action-btn:active {
   transform: scale(0.96);
+}
+
+/* ─── Safe Area Insets (notched devices) ────────── */
+body {
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+/* ─── Desktop Container ────────────────────────── */
+.app-container {
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* ─── Responsive Poster Cards ──────────────────── */
+@media (min-width: 768px) {
+  .poster-card {
+    width: min(30vw, 200px) !important;
+    min-width: 160px !important;
+  }
+}
+@media (min-width: 1024px) {
+  .poster-card {
+    width: min(22vw, 220px) !important;
+    min-width: 180px !important;
+  }
+}
+
+/* ─── Touch: prevent sticky hover on action overlay ── */
+@media (hover: none) {
+  .poster-container:hover .action-overlay {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .poster-container .action-overlay.active {
+    opacity: 1;
+    pointer-events: auto;
+  }
 }

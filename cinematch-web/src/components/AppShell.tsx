@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import LoginScreen from "@/components/LoginScreen";
 import OnboardingView from "@/components/OnboardingView";
@@ -76,6 +76,33 @@ export default function AppShell() {
     setPhase("login");
   }, []);
 
+  // ── 30-minute inactivity timeout ──────────────────────────────────────
+  const INACTIVITY_MS = 30 * 60 * 1000;
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [showTimeoutToast, setShowTimeoutToast] = useState(false);
+
+  const resetInactivityTimer = useCallback(() => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => {
+      setShowTimeoutToast(true);
+      setTimeout(() => {
+        setShowTimeoutToast(false);
+        handleLogout();
+      }, 3000);
+    }, INACTIVITY_MS);
+  }, [handleLogout]);
+
+  useEffect(() => {
+    const events = ["mousedown", "touchstart", "keydown", "scroll"];
+    const handler = () => resetInactivityTimer();
+    events.forEach((e) => window.addEventListener(e, handler, { passive: true }));
+    resetInactivityTimer();
+    return () => {
+      events.forEach((e) => window.removeEventListener(e, handler));
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, [resetInactivityTimer]);
+
   return (
     <main className="relative min-h-dvh">
       <AnimatePresence mode="wait">
@@ -124,6 +151,35 @@ export default function AppShell() {
               onBackToOnboarding={handleBackToOnboarding}
               onLogout={handleLogout}
             />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Inactivity timeout toast */}
+      <AnimatePresence>
+        {showTimeoutToast && (
+          <motion.div
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 40 }}
+            style={{
+              position: "fixed",
+              bottom: "40px",
+              left: "50%",
+              transform: "translateX(-50%)",
+              zIndex: 9999,
+              background: "rgba(16, 16, 20, 0.95)",
+              border: "1px solid var(--color-border)",
+              borderRadius: "var(--radius-pill)",
+              padding: "14px 28px",
+              color: "var(--color-text-primary)",
+              fontSize: "14px",
+              fontWeight: 500,
+              boxShadow: "0 12px 40px rgba(0,0,0,0.5)",
+              whiteSpace: "nowrap",
+            }}
+          >
+            Session expired due to inactivity
           </motion.div>
         )}
       </AnimatePresence>

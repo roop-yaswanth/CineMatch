@@ -4,23 +4,53 @@
  *  because the browser only ever talks to localhost.
  * ──────────────────────────────────────────────────────────── */
 
-// Always relative — requests are proxied by next.config.ts rewrites
 const API_BASE = "";
+const REQUEST_TIMEOUT_MS = 30_000;
+const MAX_RETRIES = 2;
 
 async function request<T>(
   path: string,
   options?: RequestInit
 ): Promise<T> {
   const url = `${API_BASE}${path}`;
-  const res = await fetch(url, {
-    headers: { "Content-Type": "application/json" },
-    ...options,
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`API ${res.status}: ${text}`);
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+    try {
+      const res = await fetch(url, {
+        headers: { "Content-Type": "application/json" },
+        ...options,
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      // Retry on transient server errors
+      if ((res.status === 502 || res.status === 503 || res.status === 504) && attempt < MAX_RETRIES) {
+        await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+        continue;
+      }
+
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`API ${res.status}: ${text}`);
+      }
+      return res.json();
+    } catch (err) {
+      clearTimeout(timeoutId);
+      if (err instanceof DOMException && err.name === "AbortError") {
+        if (attempt < MAX_RETRIES) {
+          await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+          continue;
+        }
+        throw new Error("Request timed out. Please try again.");
+      }
+      throw err;
+    }
   }
-  return res.json();
+
+  throw new Error("Request failed after retries.");
 }
 
 /* ─── Types ─────────────────────────────────────────────────── */
