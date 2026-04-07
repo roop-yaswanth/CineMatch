@@ -204,7 +204,7 @@ export default function RecommendationsView({
 
       const [primaryResult, globalResult] = await Promise.allSettled([
         apiGenerateRecommendations(session.session_id, { ...prefs, languages: userLangs }),
-        apiGenerateRecommendations(session.session_id, { ...prefs, languages: otherLangs }),
+        apiGenerateRecommendations(session.session_id, { ...prefs, languages: otherLangs, update_profile: false }),
       ]);
 
       const primaryMovies = primaryResult.status === "fulfilled" ? (primaryResult.value.movies || []) : [];
@@ -252,7 +252,7 @@ export default function RecommendationsView({
 
         const [primaryResult, globalResult] = await Promise.allSettled([
           apiGenerateRecommendations(session.session_id, { ...nextPreferences, languages: userLangs }),
-          apiGenerateRecommendations(session.session_id, { ...nextPreferences, languages: otherLangs }),
+          apiGenerateRecommendations(session.session_id, { ...nextPreferences, languages: otherLangs, update_profile: false }),
         ]);
 
         const primaryMovies = primaryResult.status === "fulfilled" ? (primaryResult.value.movies || []) : [];

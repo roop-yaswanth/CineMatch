@@ -274,6 +274,7 @@ export async function apiGenerateRecommendations(
     genres?: string[];
     include_classics?: boolean;
     semantic_index?: string;
+    update_profile?: boolean;
   }
 ): Promise<RecommendationPage> {
   return request<RecommendationPage>("/api/recommendations", {
