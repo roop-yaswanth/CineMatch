@@ -310,7 +310,6 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
   return (
     <div className="onboarding-rating-layout" style={{
       display: "flex", flexDirection: "column", alignItems: "center",
-      justifyContent: "space-between",
       height: "100dvh", padding: "6px 16px 6px",
       fontFamily: "var(--font-sans)", width: "100%", overflow: "hidden",
     }}>

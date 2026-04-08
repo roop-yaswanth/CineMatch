@@ -1,7 +1,4 @@
 /* ─── CineMatch API Client ─────────────────────────────────────
- *  Talks to the FastAPI backend running on Cloud via the
- *  Next.js proxy (/api/* → backend). This avoids CORS entirely
- *  because the browser only ever talks to localhost.
  * ──────────────────────────────────────────────────────────── */
 
 const API_BASE = "";
@@ -299,16 +296,6 @@ export async function apiGenerateRecommendations(
   });
 }
 
-/**
- * Multi-bucket recommender — returns pre-partitioned buckets:
- *   buckets.english   → English movies (always 50)
- *   buckets.regional  → { [lang]: movies } for each selected non-English language
- *   buckets.global    → IMDb ≥7 movies from non-selected languages
- *
- * Allocation rules (per_bucket_k = 50 by default):
- *   selected=[en, te] → english=50, regional.te=50, global=50
- *   selected=[te, hi] → english=50, regional.te=25, regional.hi=25, global=50
- */
 export async function apiMultiRecommendations(
   sessionId: string,
   preferences: {

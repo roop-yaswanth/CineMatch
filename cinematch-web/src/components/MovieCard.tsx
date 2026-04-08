@@ -17,7 +17,7 @@ interface Props {
   priority?: boolean;
   className?: string;
   compact?: boolean;
-  overlay?: boolean;  // NEW: show info as overlay on poster
+  overlay?: boolean;
 }
 
 export default function MovieCard({ movie, priority = false, className = "", compact = false, overlay = false }: Props) {

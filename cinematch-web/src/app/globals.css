@@ -447,23 +447,33 @@ body {
   }
 }
 
+/* Onboarding layout — base (mobile) */
+.onboarding-rating-layout {
+  justify-content: space-between;
+}
+
+body:has(.onboarding-rating-layout) {
+  overflow: hidden;
+}
+
 /* Onboarding desktop spacing tune */
 @media (min-width: 1024px) {
   .onboarding-rating-layout {
-    justify-content: flex-start !important;
-    gap: 4px;
-    padding-top: 10px !important;
-    padding-bottom: 8px !important;
+    justify-content: flex-start;
+    gap: 12px;
+    padding-top: 20px;
+    padding-bottom: 20px;
+    /* zoom: 0.9; */
   }
 
   .onboarding-card-zone {
-    flex: 1 1 auto !important;
+    flex: 0 0 auto !important;
     min-height: 0 !important;
     max-width: 500px !important;
   }
 
   .onboarding-card-shell {
-    width: clamp(240px, 30vh, 360px) !important;
+    width: clamp(280px, 36vh, 300px) !important;
   }
 
   .onboarding-actions {
