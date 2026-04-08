@@ -283,31 +283,6 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
               </div>
             </div>
 
-            {/* Genres */}
-            <div>
-              <label style={sectionLabelStyle}>Genres (optional)</label>
-              <div style={{ marginTop: "8px", display: "flex", flexWrap: "wrap", gap: "6px" }}>
-                {GENRE_LIST.map((genre) => {
-                  const isSelected = preferences.genres.includes(genre);
-                  return (
-                    <PrefPill key={genre} label={genre} active={isSelected}
-                      onClick={() => setPreferences((p) => ({
-                        ...p, genres: isSelected ? p.genres.filter((g) => g !== genre) : [...p.genres, genre],
-                      }))}
-                    />
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Include Classics toggle */}
-            <div>
-              <PrefPill
-                label="Include Pre-2000 Classics"
-                active={preferences.include_classics}
-                onClick={() => setPreferences((p) => ({ ...p, include_classics: !p.include_classics }))}
-              />
-            </div>
           </div>
 
           <motion.button
@@ -575,7 +550,7 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
 
       {showPrefs && (
         <PreferencesModal preferences={preferences} onUpdate={setPreferences}
-          onClose={() => setShowPrefs(false)} />
+          onClose={() => setShowPrefs(false)} mode="onboarding" />
       )}
     </div>
   );

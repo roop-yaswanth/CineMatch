@@ -128,6 +128,22 @@ export interface RecommendationPage {
   total_pool_size: number;
 }
 
+/** Response shape for /api/recommendations/multi */
+export interface MultiBucketResponse {
+  session: UserSession;
+  buckets: {
+    english: Recommendation[];
+    /** lang code → movies (e.g. { te: [...], hi: [...] }) */
+    regional: Record<string, Recommendation[]>;
+    global: Recommendation[];
+  };
+  total_pool_size: number;
+  status: string;
+  errors?: Record<string, string> | null;
+}
+
+
+
 export interface RecommendationPreferences {
   languages: string[];
   genres: string[];
@@ -283,6 +299,36 @@ export async function apiGenerateRecommendations(
   });
 }
 
+/**
+ * Multi-bucket recommender — returns pre-partitioned buckets:
+ *   buckets.english   → English movies (always 50)
+ *   buckets.regional  → { [lang]: movies } for each selected non-English language
+ *   buckets.global    → IMDb ≥7 movies from non-selected languages
+ *
+ * Allocation rules (per_bucket_k = 50 by default):
+ *   selected=[en, te] → english=50, regional.te=50, global=50
+ *   selected=[te, hi] → english=50, regional.te=25, regional.hi=25, global=50
+ */
+export async function apiMultiRecommendations(
+  sessionId: string,
+  preferences: {
+    languages: string[];
+    genres: string[];
+    age_group: string;
+    region: string;
+    include_classics: boolean;
+    semantic_index: string;
+    per_bucket_k?: number;
+  }
+): Promise<MultiBucketResponse> {
+  return request<MultiBucketResponse>("/api/recommendations/multi", {
+    method: "POST",
+    body: JSON.stringify({ session_id: sessionId, ...preferences }),
+  });
+}
+
+
+
 export async function apiRecommendationAction(
   sessionId: string,
   tmdbId: number,
@@ -302,6 +348,32 @@ export async function apiGetHistory(
   sessionId: string
 ): Promise<HistoryItem[]> {
   return request<HistoryItem[]>(`/api/history?session_id=${sessionId}`);
+}
+
+export interface SearchResult {
+  tmdb_id: number;
+  title: string;
+  year?: number;
+  original_language: string;
+  poster_path?: string;
+  imdb_rating?: number;
+  imdb_votes?: number;
+  genres: string[];
+  overview?: string;
+}
+
+export interface SearchResponse {
+  results: SearchResult[];
+  total: number;
+}
+
+export async function apiSearchMovies(
+  query: string,
+  limit: number = 20
+): Promise<SearchResponse> {
+  return request<SearchResponse>(
+    `/api/search?q=${encodeURIComponent(query)}&limit=${limit}`
+  );
 }
 
 export async function apiUpdatePreferences(

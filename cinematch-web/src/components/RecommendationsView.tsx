@@ -15,17 +15,20 @@ import HistoryDrawer from "@/components/HistoryDrawer";
 import PreferencesModal from "@/components/PreferencesModal";
 import MobileMenu from "@/components/MobileMenu";
 import {
-  apiGenerateRecommendations,
+  apiMultiRecommendations,
   apiRecommendationAction,
+  apiSearchMovies,
   LANGUAGE_LABELS,
   languageLabel,
+  posterUrl,
   prefetchPosters,
   preferencesFromProfile,
   recommendationId,
   regionLanguages,
+  type MultiBucketResponse,
   type Recommendation,
-  type RecommendationPage,
   type RecommendationPreferences,
+  type SearchResult,
   type UserSession,
 } from "@/lib/api";
 import { usePoster } from "@/lib/usePoster";
@@ -98,73 +101,93 @@ const CARD_ACTIONS: Array<{
   },
 ];
 
-// All known language codes that are NOT in the user's selected set.
-// Used for the second "Global Cinema" API request.
-function globalCinemaLanguages(selected: string[]): string[] {
-  const selectedSet = new Set(selected.map((l) => l.toLowerCase()));
-  return Object.keys(LANGUAGE_LABELS).filter((l) => !selectedSet.has(l));
-}
-
-function partitionIntoStacks(
-  movies: Recommendation[],
+/**
+ * Converts the pre-partitioned /api/recommendations/multi response into Stacks.
+ * The backend already separated movies by language bucket, so we just map them.
+ */
+function partitionFromBuckets(
+  resp: MultiBucketResponse,
   preferences: RecommendationPreferences
-): Stack[] {
-  const selectedNonEnglish = preferences.languages.filter(
-    (l) => l && l !== "en"
+): { stacks: Stack[]; allMovies: Recommendation[] } {
+  const { english, regional, global: globalMovies } = resp.buckets;
+
+  // Collect all regional movies (interleaved across languages for fairness)
+  const regionalEntries = Object.entries(regional).filter(
+    ([key]) => key !== "_merged"  // Skip internal merge key
   );
-  const hasNonEnglish = selectedNonEnglish.length > 0;
+  const hasRegional = regionalEntries.some(([, arr]) => arr.length > 0);
 
-  const matchedLabel =
-    selectedNonEnglish.map((l) => languageLabel(l)).join(", ") ||
-    regionLanguages(preferences.region)
-      .filter((l) => l && l !== "en")
-      .map((l) => languageLabel(l))
-      .join(", ");
-
-  const hollywood: Recommendation[] = [];
-  const matched: Recommendation[] = [];
-  const other: Recommendation[] = [];
-
-  for (const movie of movies) {
-    const lang = (movie.original_language || "").toLowerCase();
-    if (lang === "en") {
-      hollywood.push(movie);
-    } else if (hasNonEnglish && selectedNonEnglish.includes(lang)) {
-      matched.push(movie);
-    } else {
-      other.push(movie);
+  // Interleave regional languages so they mix evenly in the stack
+  const regionalMerged: Recommendation[] = [];
+  if (hasRegional) {
+    const buckets = regionalEntries.map(([, arr]) => [...arr]);
+    const cursors = buckets.map(() => 0);
+    let added = true;
+    while (added) {
+      added = false;
+      for (let i = 0; i < buckets.length; i++) {
+        if (cursors[i] < buckets[i].length) {
+          regionalMerged.push(buckets[i][cursors[i]]);
+          cursors[i]++;
+          added = true;
+        }
+      }
     }
   }
 
-  const result: Stack[] = [
-    {
-      id: "hollywood",
-      label: "Top Picks",
-      subtitle: "Handpicked from your taste profile.",
-      movies: hollywood,
-    },
-  ];
+  // Build label from actual language codes, not internal keys
+  // Use selected languages from preferences for accurate labeling
+  const selectedNonEnglish = (preferences.languages || [])
+    .filter((l) => l && l.toLowerCase() !== "en");
+  
+  const matchedLabel = selectedNonEnglish.length > 0
+    ? selectedNonEnglish.map((lang) => languageLabel(lang)).join(", ")
+    : regionalEntries.map(([lang]) => languageLabel(lang)).join(", ");
 
-  if (hasNonEnglish) {
+  const result: Stack[] = [];
+
+  // Regional language stack FIRST (if user selected non-English languages)
+  if (hasRegional || (regional._merged && regional._merged.length > 0)) {
+    const movies = hasRegional ? regionalMerged : (regional._merged || []);
     result.push({
       id: "matched",
-      label: matchedLabel
-        ? `Regional Favorites · ${matchedLabel}`
-        : "Regional Favorites",
+      label: matchedLabel ? `${matchedLabel} Cinema` : "Regional Favorites",
       subtitle: "Best from your preferred languages.",
-      movies: matched,
+      movies,
     });
   }
 
+  // Hollywood SECOND
+  result.push({
+    id: "hollywood",
+    label: "Hollywood",
+    subtitle: "Handpicked from your taste profile.",
+    movies: english || [],
+  });
+
+  // Global Cinema THIRD (IMDb ≥ 7.0, non-selected languages)
   result.push({
     id: "other",
     label: "Global Cinema",
     subtitle: "Hidden gems across cultures — curated by plot similarity.",
-    movies: other,
+    movies: globalMovies || [],
   });
 
-  return result;
+  const allMovies = [
+    ...(hasRegional ? regionalMerged : (regional._merged || [])),
+    ...(english || []),
+    ...(globalMovies || []),
+  ];
+
+  return { stacks: result, allMovies };
 }
+// ── Cache + display sizing constants ──────────────────────────────────────
+const BUCKET_DISPLAY  = 50;   // max shown per stack at any time
+const BUCKET_FETCH    = 100;  // movies fetched per bucket from backend
+const CACHE_REFETCH_THRESHOLD = 20; // trigger a silent API refetch when a stack's display falls below this AND cache is empty
+
+type StackCache = Record<StackId, Recommendation[]>;
+const EMPTY_CACHE = (): StackCache => ({ hollywood: [], matched: [], other: [] });
 
 export default function RecommendationsView({
   session,
@@ -172,6 +195,7 @@ export default function RecommendationsView({
   onBackToOnboarding,
   onLogout,
 }: Props) {
+  const [stacks, setStacks] = useState<Stack[]>([]);
   const [movies, setMovies] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState(false);
   const [initialLoad, setInitialLoad] = useState(true);
@@ -183,138 +207,226 @@ export default function RecommendationsView({
     () => preferencesFromProfile(session.profile)
   );
 
+  // Search state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   // Action counter for auto-rerun (mirrors Gradio trigger logic)
   const actionCountRef = useRef({ positive: 0, negative: 0, total: 0 });
 
-  // ── seenIdsRef: every movie ID the user has ever reacted to ──
-  // Filters ALL backend responses so clicked movies never reappear,
-  // even from stale fire-and-forget responses or rebuilt pools.
+  // Every movie ID the user has acted on — prevents re-showing after refresh
   const seenIdsRef = useRef<Set<number>>(new Set());
 
-  // Below this many remaining movies, silently fetch a fresh pool
-  const LOW_POOL_THRESHOLD = 50;
+  // ── Bucket cache ───────────────────────────────────────────────────────────
+  // Stores the "reserve" movies (indices 50-100) that are not yet displayed.
+  // When a displayed movie is acted on the stack is immediately topped back up
+  // from here — no API call needed until the cache itself runs dry.
+  const bucketCacheRef = useRef<StackCache>(EMPTY_CACHE());
 
-  // Apply frontend filters (genre + classics) to any movie list
-  const applyFilters = useCallback((movieList: Recommendation[], prefs: RecommendationPreferences): Recommendation[] => {
-    let filtered = movieList;
-
-    if (prefs.genres && prefs.genres.length > 0) {
-      const selectedGenresLower = prefs.genres.map((g: string) => g.toLowerCase());
-      const genreFiltered = filtered.filter((m: any) => {
-        const pg = (m.primary_genre || "").toLowerCase();
-        const gs = (m.genres || []).map((g: string) => g.toLowerCase());
-        return selectedGenresLower.includes(pg) || gs.some((g: string) => selectedGenresLower.includes(g));
-      });
-      if (genreFiltered.length > 0) filtered = genreFiltered;
+  // Search handler with debounce
+  const handleSearch = useCallback(async (query: string) => {
+    setSearchQuery(query);
+    
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
     }
-
-    if (!prefs.include_classics) {
-      const modernFiltered = filtered.filter((m: any) => {
-        const year = typeof m.year === "number" ? m.year : parseInt(m.year, 10);
-        return isNaN(year) || year >= 2000;
-      });
-      if (modernFiltered.length > 0) filtered = modernFiltered;
+    
+    if (!query.trim() || query.trim().length < 2) {
+      setSearchResults([]);
+      setShowSearch(false);
+      return;
     }
-
-    return filtered;
+    
+    searchTimeoutRef.current = setTimeout(async () => {
+      setSearchLoading(true);
+      setShowSearch(true);
+      try {
+        const resp = await apiSearchMovies(query.trim(), 15);
+        setSearchResults(resp.results);
+      } catch (err) {
+        console.error("Search error:", err);
+        setSearchResults([]);
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 300); // 300ms debounce
   }, []);
 
-  const stacks = useMemo(
-    () => partitionIntoStacks(movies, preferences),
-    [movies, preferences]
+  // Apply frontend classics filter (genres are handled by backend, not here)
+  const applyFilters = useCallback((arr: Recommendation[], prefs: RecommendationPreferences): Recommendation[] => {
+    if (!prefs.include_classics) {
+      const modern = arr.filter((m: any) => {
+        const y = typeof m.year === "number" ? m.year : parseInt(m.year, 10);
+        return isNaN(y) || y >= 2000;
+      });
+      if (modern.length > 0) return modern;
+    }
+    return arr;
+  }, []);
+
+  // ── applyBucketResponse ────────────────────────────────────────────────────
+  // Converts the raw API response (100 per bucket) into:
+  //   • display stacks  (first BUCKET_DISPLAY movies per stack)
+  //   • bucketCacheRef  (remainder → used to silently top up stacks)
+  const applyBucketResponse = useCallback(
+    (resp: MultiBucketResponse, prefs: RecommendationPreferences) => {
+      const filterBucket = (arr: Recommendation[]) =>
+        applyFilters(
+          arr.filter((m) => !seenIdsRef.current.has(recommendationId(m))),
+          prefs
+        );
+
+      const fEn  = filterBucket(resp.buckets.english || []);
+      const fGlob = filterBucket(resp.buckets.global   || []);
+
+      // Interleave regional languages, then filter
+      const regionalEntries = Object.entries(resp.buckets.regional || {});
+      const regionalMergedRaw: Recommendation[] = [];
+      if (regionalEntries.length > 0) {
+        const buckets = regionalEntries.map(([, arr]) => [...(arr || [])]);
+        const cursors = buckets.map(() => 0);
+        let added = true;
+        while (added) {
+          added = false;
+          for (let i = 0; i < buckets.length; i++) {
+            if (cursors[i] < buckets[i].length) {
+              regionalMergedRaw.push(buckets[i][cursors[i]++]);
+              added = true;
+            }
+          }
+        }
+      }
+      const fReg = filterBucket(regionalMergedRaw);
+
+      // Split each into display slice and cache reserve
+      const displayEn  = fEn.slice(0,  BUCKET_DISPLAY);
+      const displayReg = fReg.slice(0, BUCKET_DISPLAY);
+      const displayGlob = fGlob.slice(0,BUCKET_DISPLAY);
+
+      bucketCacheRef.current = {
+        hollywood: fEn.slice(BUCKET_DISPLAY),
+        matched:   fReg.slice(BUCKET_DISPLAY),
+        other:     fGlob.slice(BUCKET_DISPLAY),
+      };
+
+      // Build display resp (only first 50 per bucket for partitionFromBuckets)
+      const displayResp: MultiBucketResponse = {
+        ...resp,
+        buckets: {
+          english:  displayEn,
+          regional: regionalEntries.length > 0 ? { _merged: displayReg } : {},
+          global:   displayGlob,
+        },
+      };
+
+      const { stacks: newStacks, allMovies } = partitionFromBuckets(displayResp, prefs);
+      setStacks(newStacks);
+      setMovies(allMovies);
+    },
+    [applyFilters]
   );
 
+  // ── replenishFromCache ─────────────────────────────────────────────────────
+  // After a movie is removed from a stack, pull from the cache reserve to keep
+  // the stack at BUCKET_DISPLAY. Returns true if any movies were added.
+  const replenishFromCache = useCallback((stackId: StackId): boolean => {
+    const cache = bucketCacheRef.current[stackId];
+    if (!cache || cache.length === 0) return false;
+
+    let addedAny = false;
+    setStacks((prev) =>
+      prev.map((s) => {
+        if (s.id !== stackId) return s;
+        const needed = BUCKET_DISPLAY - s.movies.length;
+        if (needed <= 0) return s;
+        // Take from cache (mutating the ref)
+        const toAdd = cache.splice(0, needed);
+        bucketCacheRef.current[stackId] = cache;
+        addedAny = true;
+        return { ...s, movies: [...s.movies, ...toAdd] };
+      })
+    );
+    return addedAny;
+  }, []);
+
   // ── silentRefresh ──────────────────────────────────────────────────────────
-  // Fires two parallel requests:
-  //   1. User's selected languages → best movies for Top Picks + Regional Favorites
-  //   2. All OTHER world languages → feeds the Global Cinema section
-  // Results are merged (selected-lang movies first) then partitioned into stacks.
+  // Fires ONLY when: cache for a stack is exhausted AND display < CACHE_REFETCH_THRESHOLD.
   const silentRefreshInFlight = useRef(false);
   const silentRefresh = useCallback(async (prefs: RecommendationPreferences) => {
     if (silentRefreshInFlight.current) return;
     silentRefreshInFlight.current = true;
     try {
-      const userLangs = [...new Set([...prefs.languages, "en"])];
-      const otherLangs = globalCinemaLanguages(userLangs);
+      const resp = await apiMultiRecommendations(session.session_id, {
+        languages:        prefs.languages,
+        genres:           prefs.genres,
+        age_group:        prefs.age_group,
+        region:           prefs.region,
+        include_classics: prefs.include_classics,
+        semantic_index:   prefs.semantic_index,
+        per_bucket_k:     BUCKET_FETCH,
+      });
 
-      const [primaryResult, globalResult] = await Promise.allSettled([
-        apiGenerateRecommendations(session.session_id, { ...prefs, languages: userLangs }),
-        apiGenerateRecommendations(session.session_id, { ...prefs, languages: otherLangs, update_profile: false }),
-      ]);
-
-      const primaryMovies = primaryResult.status === "fulfilled" ? (primaryResult.value.movies || []) : [];
-      const globalMovies = globalResult.status === "fulfilled" ? (globalResult.value.movies || []) : [];
-      const session_ = primaryResult.status === "fulfilled" ? primaryResult.value.session
-        : globalResult.status === "fulfilled" ? globalResult.value.session : null;
-
-      // Merge: user-lang movies first, then global — dedup by ID
-      const seenMerge = new Set<number>();
-      const merged: Recommendation[] = [];
-      for (const m of [...primaryMovies, ...globalMovies]) {
-        const id = recommendationId(m);
-        if (!seenIdsRef.current.has(id) && !seenMerge.has(id)) {
-          seenMerge.add(id);
-          merged.push(m);
-        }
+      const totalMovies = [
+        ...(resp.buckets.english || []),
+        ...Object.values(resp.buckets.regional || {}).flat(),
+        ...(resp.buckets.global || []),
+      ];
+      const hasUnseen = totalMovies.some(
+        (m) => !seenIdsRef.current.has(recommendationId(m))
+      );
+      if (!hasUnseen && totalMovies.length > 0) {
+        seenIdsRef.current = new Set();
+        actionCountRef.current = { positive: 0, negative: 0, total: 0 };
       }
 
-      const filtered = applyFilters(merged, prefs);
-      if (filtered.length > 0) {
-        await prefetchPosters(filtered);
-        setMovies(filtered);
-        if (session_) onSessionUpdate(session_);
-      }
+      await prefetchPosters(totalMovies);
+      applyBucketResponse(resp, prefs);
+      if (resp.session) onSessionUpdate(resp.session);
     } catch (err) {
       console.error("[silentRefresh] Failed:", err);
     } finally {
       silentRefreshInFlight.current = false;
     }
-  }, [applyFilters, onSessionUpdate, session.session_id]);
+  }, [applyBucketResponse, onSessionUpdate, session.session_id]);
 
   // ── generate (full/manual refresh) ────────────────────────────────────────
-  // Same dual-request strategy as silentRefresh.
   const generate = useCallback(
     async (nextPreferences: RecommendationPreferences = preferences) => {
       setLoading(true);
+      setStacks([]);
       setMovies([]);
-      // Full reset: clear seen history so a fresh pool is unfiltered
+      bucketCacheRef.current = EMPTY_CACHE();
       seenIdsRef.current = new Set();
       actionCountRef.current = { positive: 0, negative: 0, total: 0 };
       try {
-        const userLangs = [...new Set([...nextPreferences.languages, "en"])];
-        const otherLangs = globalCinemaLanguages(userLangs);
+        const resp = await apiMultiRecommendations(session.session_id, {
+          languages:        nextPreferences.languages,
+          genres:           nextPreferences.genres,
+          age_group:        nextPreferences.age_group,
+          region:           nextPreferences.region,
+          include_classics: nextPreferences.include_classics,
+          semantic_index:   nextPreferences.semantic_index,
+          per_bucket_k:     BUCKET_FETCH,
+        });
 
-        const [primaryResult, globalResult] = await Promise.allSettled([
-          apiGenerateRecommendations(session.session_id, { ...nextPreferences, languages: userLangs }),
-          apiGenerateRecommendations(session.session_id, { ...nextPreferences, languages: otherLangs, update_profile: false }),
-        ]);
-
-        const primaryMovies = primaryResult.status === "fulfilled" ? (primaryResult.value.movies || []) : [];
-        const globalMovies = globalResult.status === "fulfilled" ? (globalResult.value.movies || []) : [];
-        const sessionResult = primaryResult.status === "fulfilled" ? primaryResult.value.session
-          : globalResult.status === "fulfilled" ? globalResult.value.session : null;
-        // Merge: user-lang movies first, then global — dedup by ID
-        const seenMerge = new Set<number>();
-        const merged: Recommendation[] = [];
-        for (const m of [...primaryMovies, ...globalMovies]) {
-          const id = recommendationId(m);
-          if (!seenMerge.has(id)) {
-            seenMerge.add(id);
-            merged.push(m);
-          }
-        }
-
-        const newMovies = applyFilters(merged, nextPreferences);
-        await prefetchPosters(newMovies);
-        setMovies(newMovies);
-        if (sessionResult) onSessionUpdate(sessionResult);
+        const allMovies = [
+          ...(resp.buckets.english || []),
+          ...Object.values(resp.buckets.regional || {}).flat(),
+          ...(resp.buckets.global || []),
+        ];
+        await prefetchPosters(allMovies);
+        applyBucketResponse(resp, nextPreferences);
+        if (resp.session) onSessionUpdate(resp.session);
       } catch (err) {
         console.error(err);
       } finally {
         setLoading(false);
       }
     },
-    [applyFilters, onSessionUpdate, preferences, session.session_id]
+    [applyBucketResponse, onSessionUpdate, preferences, session.session_id]
   );
 
   useEffect(() => {
@@ -327,13 +439,28 @@ export default function RecommendationsView({
     async (movie: Recommendation, action: RecommendationAction) => {
       const tmdbId = recommendationId(movie);
 
-      // ── 1. Mark as seen FIRST — prevents any backend response from showing it again ──
+      // 1. Mark as seen
       seenIdsRef.current.add(tmdbId);
 
-      // ── 2. Instant optimistic removal ──
+      // 2. Optimistic removal from stacks + cache replenish
       setMovies((prev) => prev.filter((m) => recommendationId(m) !== tmdbId));
+      let targetStackId: StackId | null = null;
 
-      // ── 3. Update action counters ──
+      setStacks((prev) =>
+        prev.map((s) => {
+          const inThis = s.movies.some((m) => recommendationId(m) === tmdbId);
+          if (!inThis) return s;
+          targetStackId = s.id as StackId;
+          const remaining = s.movies.filter((m) => recommendationId(m) !== tmdbId);
+          // Pull from cache immediately
+          const cache = bucketCacheRef.current[s.id as StackId];
+          const needed = BUCKET_DISPLAY - remaining.length;
+          const toAdd  = needed > 0 && cache && cache.length > 0 ? cache.splice(0, needed) : [];
+          return { ...s, movies: [...remaining, ...toAdd] };
+        })
+      );
+
+      // 3. Update action counters
       actionCountRef.current.total++;
       if (action === "like" || action === "okay") actionCountRef.current.positive++;
       if (action === "dislike") actionCountRef.current.negative++;
@@ -341,21 +468,13 @@ export default function RecommendationsView({
       const { positive, negative, total } = actionCountRef.current;
       const shouldAutoRerun = negative >= 10 || total >= 10 || positive >= 10;
 
-      // ── 4. Taste Profile Update (every 10 actions) ─────────────────────────
-      // Show popcorn overlay, wait for backend rebuild, then update UI.
+      // 4. Taste Profile Update
       if (shouldAutoRerun) {
         actionCountRef.current = { positive: 0, negative: 0, total: 0 };
         setShowUpdateToast(true);
         try {
-          const result = await apiRecommendationAction(session.session_id, tmdbId, action);
-          // Filter rebuilt pool through ALL seen IDs — already-rated movies never reappear
-          const freshMovies = (result.movies || []).filter(
-            (m) => !seenIdsRef.current.has(recommendationId(m))
-          );
-          const filtered = applyFilters(freshMovies, preferences);
-          await prefetchPosters(filtered);
-          setMovies(filtered);
-          onSessionUpdate(result.session);
+          await apiRecommendationAction(session.session_id, tmdbId, action);
+          await generate(preferences);
         } catch (err) {
           console.error("Taste profile update failed:", err);
           await generate(preferences);
@@ -364,26 +483,26 @@ export default function RecommendationsView({
         return;
       }
 
-      // ── 5. Normal action: fire-and-forget ──────────────────────────────────
-      // Always filter the backend response through seenIds so fast-clicked
-      // movies are NEVER re-inserted by a stale response.
+      // 5. Fire-and-forget backend update
       apiRecommendationAction(session.session_id, tmdbId, action)
         .then((result) => {
-          const backendMovies = (result.movies || []).filter(
-            (m) => !seenIdsRef.current.has(recommendationId(m))
-          );
-          const filtered = applyFilters(backendMovies, preferences);
-          setMovies(filtered);
           onSessionUpdate(result.session);
-
-          // ── 6. 30-movie minimum: silently replenish if pool is thin ──
-          if (filtered.length < LOW_POOL_THRESHOLD) {
-            void silentRefresh(preferences);
+          
+          // 6. If target stack cache is empty AND displayed count is thin → silent re-fetch
+          if (targetStackId) {
+             const cacheRemaining = bucketCacheRef.current[targetStackId]?.length || 0;
+             setStacks(currentStacks => {
+                const s = currentStacks.find(st => st.id === targetStackId);
+                if (s && s.movies.length < CACHE_REFETCH_THRESHOLD && cacheRemaining === 0) {
+                    void silentRefresh(preferences);
+                }
+                return currentStacks;
+             });
           }
         })
         .catch((err) => console.error("Recommendation action failed:", err));
     },
-    [applyFilters, generate, onSessionUpdate, preferences, session.session_id, silentRefresh]
+    [generate, onSessionUpdate, preferences, session.session_id, silentRefresh]
   );
 
   const handlePreferenceUpdate = useCallback(
@@ -453,6 +572,153 @@ export default function RecommendationsView({
             onRefresh={() => void generate(preferences)}
             onReset={onBackToOnboarding}
           />
+        </div>
+        
+        {/* Search Bar */}
+        <div style={{ padding: "0 20px 12px", position: "relative" }}>
+          <div style={{ position: "relative" }}>
+            <input
+              type="text"
+              placeholder="Search movies..."
+              value={searchQuery}
+              onChange={(e) => handleSearch(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "10px 16px 10px 40px",
+                borderRadius: "12px",
+                border: "1px solid var(--color-border-subtle)",
+                background: "var(--color-surface)",
+                color: "var(--color-text-primary)",
+                fontSize: "16px",  // 16px prevents iOS zoom on focus
+                outline: "none",
+              }}
+            />
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="var(--color-text-muted)"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)" }}
+            >
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            {searchQuery && (
+              <button
+                onClick={() => {
+                  setSearchQuery("");
+                  setSearchResults([]);
+                  setShowSearch(false);
+                }}
+                style={{
+                  position: "absolute",
+                  right: "12px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  padding: "4px",
+                  color: "var(--color-text-muted)",
+                }}
+              >
+                ✕
+              </button>
+            )}
+          </div>
+          
+          {/* Search Results Dropdown */}
+          {showSearch && (
+            <div
+              style={{
+                position: "absolute",
+                top: "100%",
+                left: "20px",
+                right: "20px",
+                background: "var(--color-surface)",
+                border: "1px solid var(--color-border-subtle)",
+                borderRadius: "12px",
+                maxHeight: "400px",
+                overflowY: "auto",
+                zIndex: 50,
+                boxShadow: "0 8px 32px rgba(0,0,0,0.3)",
+              }}
+            >
+              {searchLoading ? (
+                <div style={{ padding: "20px", textAlign: "center", color: "var(--color-text-muted)" }}>
+                  Searching...
+                </div>
+              ) : searchResults.length === 0 ? (
+                <div style={{ padding: "20px", textAlign: "center", color: "var(--color-text-muted)" }}>
+                  No movies found
+                </div>
+              ) : (
+                searchResults.map((movie) => (
+                  <div
+                    key={movie.tmdb_id}
+                    style={{
+                      display: "flex",
+                      gap: "12px",
+                      padding: "12px 16px",
+                      borderBottom: "1px solid var(--color-border-subtle)",
+                      cursor: "pointer",
+                    }}
+                    onClick={() => {
+                      // Could navigate to movie detail or add to recommendations
+                      setShowSearch(false);
+                      setSearchQuery("");
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: "48px",
+                        height: "72px",
+                        borderRadius: "6px",
+                        overflow: "hidden",
+                        flexShrink: 0,
+                        background: "var(--color-bg)",
+                      }}
+                    >
+                      {movie.poster_path && (
+                        <Image
+                          src={posterUrl(movie.poster_path, "w92")}
+                          alt={movie.title}
+                          width={48}
+                          height={72}
+                          style={{ objectFit: "cover" }}
+                          unoptimized
+                        />
+                      )}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 600, color: "var(--color-text-primary)", fontSize: "14px" }}>
+                        {movie.title}
+                      </div>
+                      <div style={{ fontSize: "12px", color: "var(--color-text-muted)", marginTop: "2px" }}>
+                        {movie.year && <span>{movie.year}</span>}
+                        {movie.year && movie.original_language && <span> · </span>}
+                        {movie.original_language && <span>{languageLabel(movie.original_language)}</span>}
+                      </div>
+                      {movie.imdb_rating && (
+                        <div style={{ fontSize: "11px", color: "#fbbf24", marginTop: "4px" }}>
+                          IMDb {movie.imdb_rating.toFixed(1)} ({movie.imdb_votes?.toLocaleString()} votes)
+                        </div>
+                      )}
+                      {movie.genres && movie.genres.length > 0 && (
+                        <div style={{ fontSize: "11px", color: "var(--color-text-muted)", marginTop: "2px" }}>
+                          {movie.genres.join(", ")}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
         </div>
       </header>
 
@@ -626,6 +892,7 @@ export default function RecommendationsView({
           preferences={preferences}
           onUpdate={handlePreferenceUpdate}
           onClose={() => setShowPrefs(false)}
+          mode="recommendations"
         />
       )}
     </div>
@@ -718,9 +985,9 @@ function StackDetailView({
         className="stack-detail-grid"
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))",
-          gap: "20px",
-          padding: "20px 24px 40px",
+          gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
+          gap: "16px",
+          padding: "16px 16px 40px",
         }}
       >
         <AnimatePresence initial={false}>
@@ -805,40 +1072,54 @@ function StackRow({
           justifyContent: "space-between",
         }}
       >
-        <div>
-          <button
-            className="stack-name-btn"
-            onClick={onOpenDetail}
-            style={{ background: "none", border: "none", padding: "10px 20px 10px 0", margin: "-70px 0 -50px 0", cursor: "pointer", textAlign: "left" }}
+        <button
+          className="stack-name-btn"
+          onClick={onOpenDetail}
+          style={{ background: "none", border: "none", padding: "10px 8px 10px 0", cursor: "pointer", textAlign: "left" }}
+        >
+          <h3
+            style={{
+              fontSize: "11px",
+              fontWeight: 600,
+              letterSpacing: "0.07em",
+              textTransform: "uppercase",
+              color: "var(--color-text-secondary)",
+              margin: 0,
+              display: "flex",
+              alignItems: "center",
+              gap: "4px",
+            }}
           >
-            <h3
-              style={{
-                fontSize: "11px",
-                fontWeight: 600,
-                letterSpacing: "0.07em",
-                textTransform: "uppercase",
-                color: "var(--color-text-secondary)",
-                margin: 0,
-                display: "flex",
-                alignItems: "center",
-                gap: "4px",
-              }}
+            {stack.label}
+            <svg
+              className="chevron-icon"
+              width="10"
+              height="10"
+              viewBox="0 0 14 14"
+              fill="none"
+              aria-hidden="true"
             >
-              {stack.label}
-              <svg
-                className="chevron-icon"
-                width="10"
-                height="10"
-                viewBox="0 0 14 14"
-                fill="none"
-                aria-hidden="true"
-              >
-                <path d="M5 3L9 7L5 11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </h3>
-          </button>
-        </div>
+              <path d="M5 3L9 7L5 11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </h3>
+        </button>
 
+        <button
+          onClick={onOpenDetail}
+          style={{
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            fontSize: "11px",
+            fontWeight: 500,
+            color: "var(--color-text-muted)",
+            padding: "6px 0",
+            letterSpacing: "0.02em",
+            flexShrink: 0,
+          }}
+        >
+          View All
+        </button>
       </div>
 
       {/* Empty state */}
@@ -1020,6 +1301,29 @@ function PosterCard({
           priority={priority}
         />
 
+        {/* Rating badge top-right */}
+        {imdb && (
+          <div
+            className={`rating-badge ${showActions ? "hidden-by-actions" : ""}`}
+            style={{
+              position: "absolute",
+              top: "6px",
+              right: "6px",
+              padding: "3px 6px",
+              borderRadius: "6px",
+              background: "rgba(0,0,0,0.75)",
+              backdropFilter: "blur(4px)",
+              WebkitBackdropFilter: "blur(4px)",
+              fontSize: "10px",
+              fontWeight: 600,
+              color: "#fbbf24",
+              pointerEvents: "none",
+            }}
+          >
+            {imdb}
+          </div>
+        )}
+
         {/* Persistent bottom info overlay */}
         <div
           className={`poster-bottom-info ${showActions ? "hidden-by-actions" : ""}`}
@@ -1031,7 +1335,7 @@ function PosterCard({
             background: showFullInfo
               ? "linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.7) 50%, transparent 100%)"
               : "linear-gradient(to top, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.5) 55%, transparent 100%)",
-            padding: showFullInfo ? "52px 10px 10px" : "28px 8px 8px",
+            padding: showFullInfo ? "52px 10px 10px" : "40px 8px 8px",
             pointerEvents: "none",
           }}
         >
@@ -1075,9 +1379,9 @@ function PosterCard({
               )}
             </>
           ) : (
-            movie.year && (
-              <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.55)", margin: "2px 0 0" }}>
-                {movie.year}
+            (movie.year || lang || imdb) && (
+              <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.55)", margin: "2px 0 0", lineHeight: 1.3 }}>
+                {[movie.year, lang, imdb].filter(Boolean).join(" · ")}
               </p>
             )
           )}

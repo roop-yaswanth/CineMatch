@@ -20,6 +20,8 @@ interface Props {
   preferences: Preferences;
   onUpdate: (prefs: Preferences) => void;
   onClose: () => void;
+  /** "recommendations" = Language + Genre only; "onboarding" = Region + Age + Language only */
+  mode?: "recommendations" | "onboarding";
 }
 
 const LANGUAGES = [
@@ -47,12 +49,8 @@ const GENRES = [
   "Romance", "Science Fiction", "Thriller", "War", "Western",
 ];
 
-const INDEXES = [
-  { value: "tmdb_bge", label: "BGE-M3" },
-  { value: "tmdb_qwen", label: "Qwen" },
-];
 
-export default function PreferencesModal({ preferences, onUpdate, onClose }: Props) {
+export default function PreferencesModal({ preferences, onUpdate, onClose, mode }: Props) {
   const [localPrefs, setLocalPrefs] = useState<Preferences>(preferences);
 
   const toggle = (field: "languages" | "genres", value: string) => {
@@ -119,35 +117,39 @@ export default function PreferencesModal({ preferences, onUpdate, onClose }: Pro
           </button>
         </div>
 
-        {/* Region */}
-        <Section title="Region">
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-            {REGION_OPTIONS.map((region) => (
-              <GlassPill
-                key={region}
-                label={region}
-                active={localPrefs.region === region}
-                onClick={() => setLocalPrefs({ ...localPrefs, region })}
-              />
-            ))}
-          </div>
-        </Section>
+        {/* Region — shown in onboarding mode or default (not recommendations) */}
+        {mode !== "recommendations" && (
+          <Section title="Your Region">
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+              {REGION_OPTIONS.map((region) => (
+                <GlassPill
+                  key={region}
+                  label={region}
+                  active={localPrefs.region === region}
+                  onClick={() => setLocalPrefs({ ...localPrefs, region })}
+                />
+              ))}
+            </div>
+          </Section>
+        )}
 
-        {/* Age Group */}
-        <Section title="Age Group">
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-            {AGE_GROUP_OPTIONS.map((age) => (
-              <GlassPill
-                key={age}
-                label={age}
-                active={localPrefs.age_group === age}
-                onClick={() => setLocalPrefs({ ...localPrefs, age_group: age })}
-              />
-            ))}
-          </div>
-        </Section>
+        {/* Age Group — shown in onboarding mode or default (not recommendations) */}
+        {mode !== "recommendations" && (
+          <Section title="Age Group">
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+              {AGE_GROUP_OPTIONS.map((age) => (
+                <GlassPill
+                  key={age}
+                  label={age}
+                  active={localPrefs.age_group === age}
+                  onClick={() => setLocalPrefs({ ...localPrefs, age_group: age })}
+                />
+              ))}
+            </div>
+          </Section>
+        )}
 
-        {/* Languages */}
+        {/* Languages — always shown */}
         <Section title="Languages">
           <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
             {LANGUAGES.map(({ code, label }) => (
@@ -161,54 +163,35 @@ export default function PreferencesModal({ preferences, onUpdate, onClose }: Pro
           </div>
         </Section>
 
-        {/* Genres */}
-        <Section title="Genres">
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-            {GENRES.map((genre) => (
-              <GlassPill
-                key={genre}
-                label={genre}
-                active={localPrefs.genres.includes(genre)}
-                onClick={() => toggle("genres", genre)}
-              />
-            ))}
-          </div>
-          <p style={{ marginTop: "10px", fontSize: "11px", color: "var(--color-text-muted)" }}>
-            Leave empty for all genres.
-          </p>
-        </Section>
-
-        {/* Semantic Index & Options */}
-        <div style={{ display: "flex", gap: "20px", flexWrap: "wrap", marginBottom: "24px" }}>
-          <div style={{ flex: 1, minWidth: "150px" }}>
-            <label style={{ display: "block", fontSize: "11px", color: "var(--color-text-secondary)", fontWeight: 500, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: "10px" }}>
-              Search Index
-            </label>
+        {/* Genres — shown in recommendations mode or default (not onboarding) */}
+        {mode !== "onboarding" && (
+          <Section title="Genres">
             <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-              {INDEXES.map(({ value, label }) => (
+              {GENRES.map((genre) => (
                 <GlassPill
-                  key={value}
-                  label={label}
-                  active={localPrefs.semantic_index === value}
-                  onClick={() =>
-                    setLocalPrefs({ ...localPrefs, semantic_index: value })
-                  }
+                  key={genre}
+                  label={genre}
+                  active={localPrefs.genres.includes(genre)}
+                  onClick={() => toggle("genres", genre)}
                 />
               ))}
             </div>
-          </div>
+            <p style={{ marginTop: "10px", fontSize: "11px", color: "var(--color-text-muted)" }}>
+              Leave empty for all genres.
+            </p>
+          </Section>
+        )}
 
-          <div>
-            <label style={{ display: "block", fontSize: "11px", color: "var(--color-text-secondary)", fontWeight: 500, letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: "10px" }}>
-              Options
-            </label>
+        {/* Classics toggle — shown in recommendations mode or default (not onboarding) */}
+        {mode !== "onboarding" && (
+          <div style={{ marginBottom: "24px" }}>
             <GlassPill
               label="Pre-2000 Classics"
               active={localPrefs.include_classics}
               onClick={() => setLocalPrefs({ ...localPrefs, include_classics: !localPrefs.include_classics })}
             />
           </div>
-        </div>
+        )}
 
         {/* Apply */}
         <motion.button

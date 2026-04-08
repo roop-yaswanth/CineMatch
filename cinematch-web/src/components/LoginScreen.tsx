@@ -199,21 +199,6 @@ export default function LoginScreen({ onLogin }: Props) {
         </motion.button>
       </motion.form>
 
-      {/* Footer hint */}
-      <motion.p
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.6, duration: 0.6 }}
-        style={{
-          position: "absolute",
-          bottom: "8vh",
-          fontSize: "clamp(0.85rem, 1.5vw, 1rem)",
-          color: "var(--color-text-muted)",
-          fontWeight: 300,
-        }}
-      >
-        No password needed.
-      </motion.p>
     </div>
   );
 }
