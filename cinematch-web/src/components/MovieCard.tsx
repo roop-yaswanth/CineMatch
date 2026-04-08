@@ -18,9 +18,10 @@ interface Props {
   className?: string;
   compact?: boolean;
   overlay?: boolean;
+  noLayout?: boolean;
 }
 
-export default function MovieCard({ movie, priority = false, className = "", compact = false, overlay = false }: Props) {
+export default function MovieCard({ movie, priority = false, className = "", compact = false, overlay = false, noLayout = false }: Props) {
   const poster = usePoster(movie.poster_path, recommendationId(movie), "w780");
   const year = movie.year || "";
   const lang = movie.original_language ? languageLabel(movie.original_language) : "";
@@ -35,7 +36,7 @@ export default function MovieCard({ movie, priority = false, className = "", com
   if (overlay) {
     return (
       <motion.div
-        layout
+        layout={!noLayout}
         whileHover={{ scale: 1.03, y: -4 }}
         transition={{ type: "spring", stiffness: 300, damping: 20 }}
         className={`relative flex flex-col items-center no-select ${className}`}
@@ -97,7 +98,7 @@ export default function MovieCard({ movie, priority = false, className = "", com
   // Default mode: info below poster
   return (
     <motion.div
-      layout
+      layout={!noLayout}
       whileHover={{ scale: 1.03, y: -4 }}
       transition={{ type: "spring", stiffness: 300, damping: 20 }}
       className={`relative flex flex-col items-center no-select ${className}`}

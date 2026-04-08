@@ -130,13 +130,19 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
   const handleBuildSlate = useCallback(async () => {
     setLoading(true);
     try {
+      const { regionLanguages } = await import("@/lib/api");
+      const regionDefaults = regionLanguages(preferences.region);
+      const userLangs = preferences.languages;
+      const regionMatchesFully = regionDefaults.every((l) => userLangs.includes(l));
+      const effectiveRegion = regionMatchesFully ? preferences.region : "Other";
+
       const result = await apiBuildSlate(session.session_id, {
-        languages: preferences.languages,
+        languages: userLangs,
         genres: preferences.genres,
         semantic_index: preferences.semantic_index,
         include_classics: preferences.include_classics,
         age_group: preferences.age_group,
-        region: preferences.region,
+        region: effectiveRegion,
       });
       setState(result);
       setBuildingSlate(false);
@@ -349,163 +355,181 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
         </div>
       )}
 
-      {/* Movie card — fills remaining space */}
-      <div className="onboarding-card-zone" style={{ width: "100%", maxWidth: "420px", flex: 1, display: "flex", alignItems: "center", justifyContent: "center", minHeight: 0, overflow: "hidden", margin: "0", padding: "0" }}>
-        <AnimatePresence initial={false} custom={lastSwipe} mode="wait">
-          {(!optimisticRemoved && state?.movie) ? (
-            <motion.div
-              className="onboarding-card-shell"
-              key={state.movie.id}
-              custom={lastSwipe}
-              variants={cardVariants}
-              initial="enter" animate="center" exit="exit"
-              style={{ width: "clamp(220px, 70vw, 320px)", maxWidth: "100%", cursor: "grab", touchAction: "none" }}
-              drag
-              dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
-              dragElastic={0.65}
-              onDragEnd={handleDragEnd}
-              whileDrag={{ scale: 1.02, rotate: 1.5, cursor: "grabbing" }}
-            >
+      {/* Movie card — stable-height zone to prevent layout shift during transitions */}
+      <div
+        className="onboarding-card-zone"
+        style={{
+          width: "100%",
+          maxWidth: "420px",
+          flex: 1,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          minHeight: 0,
+          overflow: "hidden",
+          margin: "0",
+          padding: "0",
+          position: "relative",
+          isolation: "isolate",
+        }}
+      >
+        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+          <AnimatePresence initial={false} custom={lastSwipe} mode="wait">
+            {(!optimisticRemoved && state?.movie) ? (
+              <motion.div
+                className="onboarding-card-shell"
+                key={state.movie.id}
+                custom={lastSwipe}
+                variants={cardVariants}
+                initial="enter" animate="center" exit="exit"
+                style={{ width: "clamp(220px, 70vw, 320px)", maxWidth: "100%", cursor: "grab", touchAction: "none" }}
+                drag
+                dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
+                dragElastic={0.65}
+                onDragEnd={handleDragEnd}
+                whileDrag={{ scale: 1.02, rotate: 1.5, cursor: "grabbing" }}
+              >
 
-              <MovieCard movie={state.movie} priority />
+                <MovieCard movie={state.movie} priority noLayout />
 
-              {!hasInteracted && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ delay: 0.8, duration: 0.6 }}
-                  style={{
-                    position: "absolute",
-                    inset: 0,
-                    zIndex: 20,
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    background: "rgba(0,0,0,0.65)",
-                    backdropFilter: "blur(6px)",
-                    WebkitBackdropFilter: "blur(6px)",
-                    borderRadius: "var(--radius-poster)",
-                    pointerEvents: "auto",
-                    padding: "20px",
-                  }}
-                >
-                  {/* Central hand animation */}
+                {!hasInteracted && (
                   <motion.div
-                    animate={{ x: [-24, 24, -24], y: [6, -6, 6] }}
-                    transition={{ repeat: Infinity, duration: 2.5, ease: "easeInOut" }}
-                    style={{ fontSize: "48px", marginBottom: "16px" }}
-                  >
-                  </motion.div>
-
-                  <p style={{ color: "white", fontWeight: 700, fontSize: "18px", textShadow: "0 2px 12px rgba(0,0,0,0.6)", letterSpacing: "-0.02em", marginBottom: "20px" }}>
-                    Swipe/Click to Rate
-                  </p>
-
-                  {/* 4-direction guide */}
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px 24px", width: "100%", maxWidth: "240px", marginBottom: "32px" }}>
-                    {/* Right = Like */}
-                    <motion.div
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 1.2, type: "spring", stiffness: 200, damping: 20 }}
-                      style={{ display: "flex", alignItems: "center", gap: "8px" }}
-                    >
-                      <span style={{ fontSize: "22px" }}>👉</span>
-                      <span style={{ color: "var(--color-like)", fontSize: "13px", fontWeight: 600 }}>Like</span>
-                    </motion.div>
-
-                    {/* Left = Dislike */}
-                    <motion.div
-                      initial={{ opacity: 0, x: 10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 1.4, type: "spring", stiffness: 200, damping: 20 }}
-                      style={{ display: "flex", alignItems: "center", gap: "8px" }}
-                    >
-                      <span style={{ fontSize: "22px" }}>👈</span>
-                      <span style={{ color: "var(--color-dislike)", fontSize: "13px", fontWeight: 600 }}>Dislike</span>
-                    </motion.div>
-
-                    {/* Up = Okay */}
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 1.6, type: "spring", stiffness: 200, damping: 20 }}
-                      style={{ display: "flex", alignItems: "center", gap: "8px" }}
-                    >
-                      <span style={{ fontSize: "22px" }}>👆</span>
-                      <span style={{ color: "var(--color-okay)", fontSize: "13px", fontWeight: 600 }}>Okay</span>
-                    </motion.div>
-
-                    {/* Down = Skip */}
-                    <motion.div
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 1.8, type: "spring", stiffness: 200, damping: 20 }}
-                      style={{ display: "flex", alignItems: "center", gap: "8px" }}
-                    >
-                      <span style={{ fontSize: "22px" }}>👇</span>
-                      <span style={{ color: "var(--color-skip)", fontSize: "13px", fontWeight: 600 }}>Skip</span>
-                    </motion.div>
-                  </div>
-
-                  {/* Okay button */}
-                  <motion.button
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: 2.2 }}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setHasInteracted(true);
-                    }}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ delay: 0.8, duration: 0.6 }}
                     style={{
-                      background: "white",
-                      color: "black",
-                      border: "none",
-                      padding: "10px 24px",
-                      borderRadius: "var(--radius-pill)",
-                      fontSize: "14px",
-                      fontWeight: 600,
-                      cursor: "pointer",
-                      boxShadow: "0 4px 12px rgba(0,0,0,0.2)"
+                      position: "absolute",
+                      inset: 0,
+                      zIndex: 20,
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      background: "rgba(0,0,0,0.65)",
+                      backdropFilter: "blur(6px)",
+                      WebkitBackdropFilter: "blur(6px)",
+                      borderRadius: "var(--radius-poster)",
+                      pointerEvents: "auto",
+                      padding: "20px",
                     }}
                   >
-                    Okay, Got it!
-                  </motion.button>
-                </motion.div>
-              )}
+                    {/* Central hand animation */}
+                    <motion.div
+                      animate={{ x: [-24, 24, -24], y: [6, -6, 6] }}
+                      transition={{ repeat: Infinity, duration: 2.5, ease: "easeInOut" }}
+                      style={{ fontSize: "48px", marginBottom: "16px" }}
+                    >
+                    </motion.div>
 
-            </motion.div>
-          ) : (loading || optimisticRemoved) ? (
-            <motion.div key="loading" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} style={{ textAlign: "center", width: "100%", padding: "40px 0" }}>
-              <div style={{ fontSize: "64px", animation: "bounce 1s infinite alternate" }}>
-                {LOADING_VARIANTS[loadingVariantIdx].emoji}
-              </div>
-              <p style={{ marginTop: "16px", fontSize: "14px", color: "var(--color-text-primary)", fontWeight: 500 }}>
-                {LOADING_VARIANTS[loadingVariantIdx].text}
-              </p>
-              <style>{`
-                @keyframes bounce {
-                  from { transform: translateY(0); }
-                  to { transform: translateY(-16px); }
-                }
-              `}</style>
-            </motion.div>
-          ) : (
-            <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-              style={{ textAlign: "center", width: "100%", padding: "40px 0" }}>
-              <p style={{ fontSize: "13px", color: "var(--color-text-muted)" }}>No more movies in this slate.</p>
-              <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-                onClick={() => setBuildingSlate(true)} className="glass-button"
-                style={{ marginTop: "16px", padding: "10px 24px", borderRadius: "var(--radius-pill)", fontSize: "12px", fontWeight: 500, color: "var(--color-text-primary)", cursor: "pointer" }}>
-                Rebuild slate
-              </motion.button>
-            </motion.div>
-          )}
-        </AnimatePresence>
+                    <p style={{ color: "white", fontWeight: 700, fontSize: "18px", textShadow: "0 2px 12px rgba(0,0,0,0.6)", letterSpacing: "-0.02em", marginBottom: "20px" }}>
+                      Swipe/Click to Rate
+                    </p>
+
+                    {/* 4-direction guide */}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px 24px", width: "100%", maxWidth: "240px", marginBottom: "32px" }}>
+                      {/* Right = Like */}
+                      <motion.div
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 1.2, type: "spring", stiffness: 200, damping: 20 }}
+                        style={{ display: "flex", alignItems: "center", gap: "8px" }}
+                      >
+                        <span style={{ fontSize: "22px" }}>👉</span>
+                        <span style={{ color: "var(--color-like)", fontSize: "13px", fontWeight: 600 }}>Like</span>
+                      </motion.div>
+
+                      {/* Left = Dislike */}
+                      <motion.div
+                        initial={{ opacity: 0, x: 10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 1.4, type: "spring", stiffness: 200, damping: 20 }}
+                        style={{ display: "flex", alignItems: "center", gap: "8px" }}
+                      >
+                        <span style={{ fontSize: "22px" }}>👈</span>
+                        <span style={{ color: "var(--color-dislike)", fontSize: "13px", fontWeight: 600 }}>Dislike</span>
+                      </motion.div>
+
+                      {/* Up = Okay */}
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 1.6, type: "spring", stiffness: 200, damping: 20 }}
+                        style={{ display: "flex", alignItems: "center", gap: "8px" }}
+                      >
+                        <span style={{ fontSize: "22px" }}>👆</span>
+                        <span style={{ color: "var(--color-okay)", fontSize: "13px", fontWeight: 600 }}>Okay</span>
+                      </motion.div>
+
+                      {/* Down = Skip */}
+                      <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 1.8, type: "spring", stiffness: 200, damping: 20 }}
+                        style={{ display: "flex", alignItems: "center", gap: "8px" }}
+                      >
+                        <span style={{ fontSize: "22px" }}>👇</span>
+                        <span style={{ color: "var(--color-skip)", fontSize: "13px", fontWeight: 600 }}>Skip</span>
+                      </motion.div>
+                    </div>
+
+                    {/* Okay button */}
+                    <motion.button
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: 2.2 }}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setHasInteracted(true);
+                      }}
+                      style={{
+                        background: "white",
+                        color: "black",
+                        border: "none",
+                        padding: "10px 24px",
+                        borderRadius: "var(--radius-pill)",
+                        fontSize: "14px",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        boxShadow: "0 4px 12px rgba(0,0,0,0.2)"
+                      }}
+                    >
+                      Okay, Got it!
+                    </motion.button>
+                  </motion.div>
+                )}
+
+              </motion.div>
+            ) : (loading || optimisticRemoved) ? (
+              <motion.div key="loading" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} style={{ textAlign: "center", width: "100%", padding: "40px 0" }}>
+                <div style={{ fontSize: "64px", animation: "bounce 1s infinite alternate" }}>
+                  {LOADING_VARIANTS[loadingVariantIdx].emoji}
+                </div>
+                <p style={{ marginTop: "16px", fontSize: "14px", color: "var(--color-text-primary)", fontWeight: 500 }}>
+                  {LOADING_VARIANTS[loadingVariantIdx].text}
+                </p>
+                <style>{`
+                  @keyframes bounce {
+                    from { transform: translateY(0); }
+                    to { transform: translateY(-16px); }
+                  }
+                `}</style>
+              </motion.div>
+            ) : (
+              <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                style={{ textAlign: "center", width: "100%", padding: "40px 0" }}>
+                <p style={{ fontSize: "13px", color: "var(--color-text-muted)" }}>No more movies in this slate.</p>
+                <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+                  onClick={() => setBuildingSlate(true)} className="glass-button"
+                  style={{ marginTop: "16px", padding: "10px 24px", borderRadius: "var(--radius-pill)", fontSize: "12px", fontWeight: 500, color: "var(--color-text-primary)", cursor: "pointer" }}>
+                  Rebuild slate
+                </motion.button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
 
       {/* Action buttons — fixed at bottom */}

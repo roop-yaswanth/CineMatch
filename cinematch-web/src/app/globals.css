@@ -463,17 +463,17 @@ body:has(.onboarding-rating-layout) {
     gap: 12px;
     padding-top: 20px;
     padding-bottom: 20px;
-    /* zoom: 0.9; */
   }
 
   .onboarding-card-zone {
     flex: 0 0 auto !important;
+    height: clamp(380px, 55vh, 520px) !important;
     min-height: 0 !important;
     max-width: 500px !important;
   }
 
   .onboarding-card-shell {
-    width: clamp(280px, 36vh, 300px) !important;
+    width: clamp(240px, 30vh, 290px) !important;
   }
 
   .onboarding-actions {
