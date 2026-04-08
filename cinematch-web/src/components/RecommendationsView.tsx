@@ -7,6 +7,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type ReactNode,
 } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import Image from "next/image";
@@ -49,18 +50,53 @@ interface Stack {
 const CARD_ACTIONS: Array<{
   action: RecommendationAction;
   label: string;
-  icon: string;
+  icon: ReactNode;
   color: string;
 }> = [
-    { action: "like", label: "Like", icon: "♥", color: "var(--color-like)" },
-    { action: "okay", label: "Okay", icon: "✓", color: "var(--color-okay)" },
-    { action: "dislike", label: "Dislike", icon: "✕", color: "var(--color-dislike)" },
-    { action: "remove", label: "Skip", icon: "→", color: "var(--color-skip)" },
-  ];
-
-function cleanStatus(status: string): string {
-  return /recommendations remaining/i.test(status) ? "" : status;
-}
+  {
+    action: "like",
+    label: "Like",
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+      </svg>
+    ),
+    color: "var(--color-like)",
+  },
+  {
+    action: "okay",
+    label: "Okay",
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z" />
+        <path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" />
+      </svg>
+    ),
+    color: "var(--color-okay)",
+  },
+  {
+    action: "dislike",
+    label: "Dislike",
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10z" />
+        <path d="M17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17" />
+      </svg>
+    ),
+    color: "var(--color-dislike)",
+  },
+  {
+    action: "remove",
+    label: "Skip",
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <polygon points="5 4 15 12 5 20 5 4" fill="currentColor" stroke="none" />
+        <line x1="19" y1="5" x2="19" y2="19" />
+      </svg>
+    ),
+    color: "var(--color-skip)",
+  },
+];
 
 // All known language codes that are NOT in the user's selected set.
 // Used for the second "Global Cinema" API request.
@@ -137,7 +173,6 @@ export default function RecommendationsView({
   onLogout,
 }: Props) {
   const [movies, setMovies] = useState<Recommendation[]>([]);
-  const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(false);
   const [initialLoad, setInitialLoad] = useState(true);
   const [showHistory, setShowHistory] = useState(false);
@@ -242,7 +277,6 @@ export default function RecommendationsView({
     async (nextPreferences: RecommendationPreferences = preferences) => {
       setLoading(true);
       setMovies([]);
-      setStatus("");
       // Full reset: clear seen history so a fresh pool is unfiltered
       seenIdsRef.current = new Set();
       actionCountRef.current = { positive: 0, negative: 0, total: 0 };
@@ -259,8 +293,6 @@ export default function RecommendationsView({
         const globalMovies = globalResult.status === "fulfilled" ? (globalResult.value.movies || []) : [];
         const sessionResult = primaryResult.status === "fulfilled" ? primaryResult.value.session
           : globalResult.status === "fulfilled" ? globalResult.value.session : null;
-        const statusMsg = primaryResult.status === "fulfilled" ? (primaryResult.value.status || "") : "";
-
         // Merge: user-lang movies first, then global — dedup by ID
         const seenMerge = new Set<number>();
         const merged: Recommendation[] = [];
@@ -275,14 +307,8 @@ export default function RecommendationsView({
         const newMovies = applyFilters(merged, nextPreferences);
         await prefetchPosters(newMovies);
         setMovies(newMovies);
-        setStatus(cleanStatus(statusMsg));
         if (sessionResult) onSessionUpdate(sessionResult);
-
-        if (primaryResult.status === "rejected" && globalResult.status === "rejected") {
-          setStatus("Failed to load recommendations. Try refreshing.");
-        }
       } catch (err) {
-        setStatus("Failed to load recommendations. Try refreshing.");
         console.error(err);
       } finally {
         setLoading(false);
@@ -329,7 +355,6 @@ export default function RecommendationsView({
           const filtered = applyFilters(freshMovies, preferences);
           await prefetchPosters(filtered);
           setMovies(filtered);
-          setStatus(cleanStatus(result.status || ""));
           onSessionUpdate(result.session);
         } catch (err) {
           console.error("Taste profile update failed:", err);
@@ -407,10 +432,13 @@ export default function RecommendationsView({
 
           <h1
             style={{
-              fontSize: "18px",
-              fontWeight: 600,
-              letterSpacing: "-0.02em",
-              color: "var(--color-text-primary)",
+              fontSize: "20px",
+              fontWeight: 700,
+              letterSpacing: "-0.03em",
+              background: "linear-gradient(135deg, #ffffff 30%, #a78bfa 100%)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              backgroundClip: "text",
               margin: 0,
               textAlign: "center",
             }}
@@ -422,6 +450,8 @@ export default function RecommendationsView({
             onLogout={onLogout}
             onPreferences={() => setShowPrefs(true)}
             onHistory={() => setShowHistory(true)}
+            onRefresh={() => void generate(preferences)}
+            onReset={onBackToOnboarding}
           />
         </div>
       </header>
@@ -443,67 +473,22 @@ export default function RecommendationsView({
           <div>
             <h2
               style={{
-                fontSize: "clamp(1.6rem, 3.2vw, 2.5rem)",
-                fontWeight: 300,
-                letterSpacing: "-0.05em",
+                fontSize: "clamp(1.8rem, 4vw, 2.8rem)",
+                fontWeight: 700,
+                letterSpacing: "-0.04em",
                 margin: 0,
                 color: "var(--color-text-primary)",
               }}
             >
-              For you
+              For You
             </h2>
-            {status && (
-              <p
-                style={{
-                  marginTop: "6px",
-                  fontSize: "12px",
-                  color: "var(--color-text-muted)",
-                }}
-              >
-                {status}
-              </p>
-            )}
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <button
-              onClick={onBackToOnboarding}
-              style={{
-                padding: "8px 16px",
-                fontSize: "13px",
-                fontWeight: 500,
-                color: "var(--color-text-muted)",
-                cursor: "pointer",
-                background: "none",
-                border: "1px solid var(--color-border)",
-                borderRadius: "var(--radius-pill)",
-              }}
-            >
-              Re-onboard
-            </button>
-            <button
-              onClick={() => void generate(preferences)}
-              disabled={loading}
-              style={{
-                padding: "8px 20px",
-                borderRadius: "var(--radius-pill)",
-                fontSize: "13px",
-                fontWeight: 500,
-                background: "var(--color-text-primary)",
-                color: "var(--color-bg)",
-                border: "none",
-                opacity: loading ? 0.4 : 1,
-                cursor: loading ? "not-allowed" : "pointer",
-              }}
-            >
-              {loading ? "Refreshing..." : "Refresh"}
-            </button>
-          </div>
         </div>
 
         {/* Loading skeleton */}
         {loading && movies.length === 0 && (
-          <div style={{ display: "grid", gap: "36px", padding: "0 20px" }}>
+          <div style={{ display: "grid", gap: "48px", padding: "0 20px" }}>
             {[0, 1, 2].map((i) => (
               <div key={i}>
                 <div
@@ -544,7 +529,7 @@ export default function RecommendationsView({
 
         {/* Stacks */}
         {!loading && (
-          <div style={{ display: "grid", gap: "36px" }}>
+          <div style={{ display: "grid", gap: "48px" }}>
             {stacks.map((stack) => (
               <StackRow
                 key={stack.id}
@@ -683,7 +668,7 @@ function StackDetailView({
           zIndex: 10,
           background: "var(--color-bg)",
           borderBottom: "1px solid var(--color-border-subtle)",
-          padding: "12px 20px",
+          padding: "12px 16px",
           display: "flex",
           alignItems: "center",
           gap: "16px",
@@ -721,28 +706,32 @@ function StackDetailView({
             {stack.label}
           </h2>
           <p style={{ fontSize: "12px", color: "var(--color-text-muted)", marginTop: "2px" }}>
-            {stack.movies.length} movie{stack.movies.length !== 1 ? "s" : ""}
+            {stack.movies.length > 50
+              ? `Top 50 of ${stack.movies.length} movies`
+              : `${stack.movies.length} movie${stack.movies.length !== 1 ? "s" : ""}`}
           </p>
         </div>
       </div>
 
       {/* Grid */}
       <div
+        className="stack-detail-grid"
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))",
           gap: "20px",
-          padding: "20px 16px",
+          padding: "20px 24px 40px",
         }}
       >
         <AnimatePresence initial={false}>
-          {stack.movies.map((movie, index) => (
+          {stack.movies.slice(0, 50).map((movie, index) => (
             <PosterCard
               key={recommendationId(movie)}
               movie={movie}
               disabled={disabled}
               onAction={onAction}
               priority={index < 4}
+              showFullInfo
             />
           ))}
         </AnimatePresence>
@@ -758,10 +747,6 @@ function StackDetailView({
 
 /* ─── Stack Row — Paged Carousel ───────────────── */
 
-function clamp(v: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, v));
-}
-
 function StackRow({
   stack,
   disabled,
@@ -773,59 +758,40 @@ function StackRow({
   onAction: (movie: Recommendation, action: RecommendationAction) => void;
   onOpenDetail: () => void;
 }) {
-  const viewportRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
-  const [page, setPage] = useState(0);
-  const [pageWidth, setPageWidth] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
-  const touchStartX = useRef<number | null>(null);
+  const [scrollInfo, setScrollInfo] = useState({ canLeft: false, canRight: false });
 
-  // Recalculate page dimensions
-  const recalc = useCallback(() => {
-    const vp = viewportRef.current;
-    const tr = trackRef.current;
-    if (!vp || !tr) return;
-    const vpW = vp.clientWidth;
-    const trackW = tr.scrollWidth;
-    const pw = vpW - 20; // 20px peek affordance on right edge
-    if (pw <= 0) return;
-    setPageWidth(pw);
-    setTotalPages(Math.max(1, Math.ceil(trackW / pw)));
-    setPage((p) => clamp(p, 0, Math.max(0, Math.ceil(trackW / pw) - 1)));
+  const updateScroll = useCallback(() => {
+    const t = trackRef.current;
+    if (!t) return;
+    const { scrollLeft, scrollWidth, clientWidth } = t;
+    setScrollInfo({
+      canLeft: scrollLeft > 2,
+      canRight: scrollLeft < scrollWidth - clientWidth - 2,
+    });
   }, []);
 
   useEffect(() => {
-    recalc();
-    const vp = viewportRef.current;
-    if (!vp) return;
-    const ro = new ResizeObserver(recalc);
-    ro.observe(vp);
-    return () => ro.disconnect();
-  }, [recalc, stack.movies.length]);
+    const t = trackRef.current;
+    if (!t) return;
+    t.addEventListener("scroll", updateScroll, { passive: true });
+    const ro = new ResizeObserver(updateScroll);
+    ro.observe(t);
+    updateScroll();
+    return () => {
+      t.removeEventListener("scroll", updateScroll);
+      ro.disconnect();
+    };
+  }, [updateScroll, stack.movies.length]);
 
-  // Only reset if movies completely swap (mount) rather than length change
-  // effectively stopping the annoying jump-to-start when liking a movie
-
-  const canGoLeft = page > 0;
-  const canGoRight = page < totalPages - 1;
-
-  const goLeft = () => setPage((p) => clamp(p - 1, 0, totalPages - 1));
-  const goRight = () => setPage((p) => clamp(p + 1, 0, totalPages - 1));
-
-  const onTouchStart = (e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX;
-  };
-  const onTouchEnd = (e: React.TouchEvent) => {
-    if (touchStartX.current === null) return;
-    const delta = touchStartX.current - e.changedTouches[0].clientX;
-    if (Math.abs(delta) > 40) {
-      if (delta > 0) goRight();
-      else goLeft();
-    }
-    touchStartX.current = null;
+  const scrollBy = (dir: "left" | "right") => {
+    const t = trackRef.current;
+    if (!t) return;
+    const amount = t.clientWidth * 0.82;
+    t.scrollBy({ left: dir === "right" ? amount : -amount, behavior: "smooth" });
   };
 
-  const translateX = -(page * pageWidth);
+  const { canLeft, canRight } = scrollInfo;
 
   return (
     <section style={{ width: "100%", overflow: "hidden" }}>
@@ -841,181 +807,87 @@ function StackRow({
       >
         <div>
           <button
+            className="stack-name-btn"
             onClick={onOpenDetail}
-            style={{
-              background: "none",
-              border: "none",
-              padding: 0,
-              cursor: "pointer",
-              textAlign: "left",
-            }}
+            style={{ background: "none", border: "none", padding: "10px 20px 10px 0", margin: "-70px 0 -50px 0", cursor: "pointer", textAlign: "left" }}
           >
             <h3
               style={{
-                fontSize: "17px",
+                fontSize: "11px",
                 fontWeight: 600,
-                letterSpacing: "-0.02em",
-                color: "var(--color-text-primary)",
+                letterSpacing: "0.07em",
+                textTransform: "uppercase",
+                color: "var(--color-text-secondary)",
                 margin: 0,
                 display: "flex",
                 alignItems: "center",
-                gap: "6px",
+                gap: "4px",
               }}
             >
               {stack.label}
-              <span style={{ fontSize: "13px", color: "var(--color-text-muted)", fontWeight: 400 }}>
-                →
-              </span>
+              <svg
+                className="chevron-icon"
+                width="10"
+                height="10"
+                viewBox="0 0 14 14"
+                fill="none"
+                aria-hidden="true"
+              >
+                <path d="M5 3L9 7L5 11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
             </h3>
           </button>
-          <p
-            style={{
-              fontSize: "12px",
-              color: "var(--color-text-muted)",
-              marginTop: "3px",
-            }}
-          >
-            {stack.subtitle}
-          </p>
         </div>
 
-        {/* Page indicator */}
-        {totalPages > 1 && (
-          <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
-            {Array.from({ length: Math.min(totalPages, 6) }).map((_, i) => (
-              <div
-                key={i}
-                style={{
-                  width: i === page ? "16px" : "6px",
-                  height: "6px",
-                  borderRadius: "999px",
-                  background: i === page ? "var(--color-text-primary)" : "var(--color-border)",
-                  transition: "all 0.2s ease",
-                }}
-              />
-            ))}
-          </div>
-        )}
       </div>
 
       {/* Empty state */}
       {stack.movies.length === 0 && (
-        <div
-          style={{
-            padding: "32px 20px",
-            textAlign: "center",
-            color: "var(--color-text-muted)",
-            fontSize: "13px",
-          }}
-        >
+        <div style={{ padding: "32px 20px", textAlign: "center", color: "var(--color-text-muted)", fontSize: "13px" }}>
           No movies in this category yet.
         </div>
       )}
 
       {/* Carousel */}
       {stack.movies.length > 0 && (
-        <div style={{ padding: "0 20px", width: "100%", boxSizing: "border-box" }}>
-          <div
-            ref={viewportRef}
-            style={{
-              position: "relative",
-              overflow: "hidden",
-              width: "100%",
-            }}
-            onTouchStart={onTouchStart}
-            onTouchEnd={onTouchEnd}
+        <div style={{ position: "relative" }}>
+          {/* Edge scrims */}
+          {canLeft && <div className="carousel-scrim left" />}
+          {canRight && <div className="carousel-scrim right" />}
+
+          {/* Desktop-only left chevron — hidden on touch via CSS */}
+          <button
+            className="carousel-btn carousel-btn-left"
+            onClick={() => scrollBy("left")}
+            aria-label="Previous"
+            style={{ opacity: canLeft ? 1 : 0, pointerEvents: canLeft ? "auto" : "none" }}
           >
-            {/* Edge scrims */}
-            {canGoLeft && <div className="carousel-scrim left" />}
-            {canGoRight && <div className="carousel-scrim right" />}
+            ‹
+          </button>
 
-            {/* Left chevron */}
-            <button
-              onClick={goLeft}
-              aria-label="Previous"
-              style={{
-                position: "absolute",
-                left: "0",
-                top: "50%",
-                transform: "translateY(-60%)", // shift up a bit (above info text)
-                zIndex: 20,
-                width: 44,
-                height: 44,
-                borderRadius: "50%",
-                background: "rgba(0, 0, 0, 0.75)",
-                border: "1px solid rgba(255, 255, 255, 0.18)",
-                color: "#fff",
-                fontSize: "22px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                opacity: canGoLeft ? 1 : 0,
-                pointerEvents: canGoLeft ? "auto" : "none",
-                transition: "opacity 0.2s",
-                lineHeight: 1,
-              }}
-            >
-              ‹
-            </button>
+          {/* Desktop-only right chevron */}
+          <button
+            className="carousel-btn carousel-btn-right"
+            onClick={() => scrollBy("right")}
+            aria-label="Next"
+            style={{ opacity: canRight ? 1 : 0, pointerEvents: canRight ? "auto" : "none" }}
+          >
+            ›
+          </button>
 
-            {/* Right chevron */}
-            <button
-              onClick={goRight}
-              aria-label="Next"
-              style={{
-                position: "absolute",
-                right: "0",
-                top: "50%",
-                transform: "translateY(-60%)",
-                zIndex: 20,
-                width: 44,
-                height: 44,
-                borderRadius: "50%",
-                background: "rgba(0, 0, 0, 0.75)",
-                border: "1px solid rgba(255, 255, 255, 0.18)",
-                color: "#fff",
-                fontSize: "22px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                opacity: canGoRight ? 1 : 0,
-                pointerEvents: canGoRight ? "auto" : "none",
-                transition: "opacity 0.2s",
-                lineHeight: 1,
-              }}
-            >
-              ›
-            </button>
-
-            {/* Track */}
-            <div
-              ref={trackRef}
-              className="hide-scrollbar"
-              style={{
-                display: "flex",
-                flexWrap: "nowrap",
-                gap: "14px",
-                padding: "0 0 4px",
-                transform: `translateX(${translateX}px)`,
-                transition: "transform 0.38s cubic-bezier(0.4, 0, 0.2, 1)",
-                willChange: "transform",
-                minWidth: "min-content",
-              }}
-            >
-              <AnimatePresence initial={false}>
-                {stack.movies.map((movie, index) => (
-                  <PosterCard
-                    key={recommendationId(movie)}
-                    movie={movie}
-                    disabled={disabled}
-                    onAction={onAction}
-                    priority={index === 0}
-                  />
-                ))}
-              </AnimatePresence>
-            </div>
+          {/* Native-scroll track */}
+          <div ref={trackRef} className="hide-scrollbar carousel-track">
+            <AnimatePresence initial={false}>
+              {stack.movies.map((movie, index) => (
+                <PosterCard
+                  key={recommendationId(movie)}
+                  movie={movie}
+                  disabled={disabled}
+                  onAction={onAction}
+                  priority={index === 0}
+                />
+              ))}
+            </AnimatePresence>
           </div>
         </div>
       )}
@@ -1030,15 +902,18 @@ function PosterCard({
   disabled,
   onAction,
   priority = false,
+  showFullInfo = false,
 }: {
   movie: Recommendation;
   disabled: boolean;
   onAction: (movie: Recommendation, action: RecommendationAction) => void;
   priority?: boolean;
+  showFullInfo?: boolean;
 }) {
   const poster = usePoster(movie.poster_path, recommendationId(movie), "w500");
   const [showActions, setShowActions] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
+  const touchStartXRef = useRef<number | null>(null);
 
   const overlayJustShownRef = useRef(false);
 
@@ -1058,10 +933,17 @@ function PosterCard({
     };
   }, [showActions]);
 
-  // Touch handler — preventDefault() suppresses the synthetic "click" event
-  // that browsers fire ~0–300 ms after touchend, which would otherwise hit
-  // a now-visible action button at the same screen coordinates.
+  // Touch handler — suppresses ghost click after touchend.
+  // Local swipe guard: if horizontal movement > 10px, treat as carousel scroll, not tap.
+  const handleContainerTouchStart = (e: React.TouchEvent) => {
+    touchStartXRef.current = e.touches[0].clientX;
+  };
   const handleContainerTouchEnd = (e: React.TouchEvent) => {
+    const dx = touchStartXRef.current !== null
+      ? Math.abs(e.changedTouches[0].clientX - touchStartXRef.current)
+      : 0;
+    touchStartXRef.current = null;
+    if (dx > 10) return; // swipe gesture, not a tap
     e.preventDefault();
     if (!showActions) {
       overlayJustShownRef.current = true;
@@ -1105,14 +987,16 @@ function PosterCard({
       }}
       className="poster-card"
       style={{
-        width: "min(36vw, 150px)",
-        minWidth: "120px",
+        width: "min(42vw, 165px)",
+        minWidth: "130px",
         flexShrink: 0,
+        scrollSnapAlign: "start",
       }}
     >
-      {/* Poster with action overlay */}
+      {/* Poster with overlays */}
       <div
         className="poster-container"
+        onTouchStart={handleContainerTouchStart}
         onTouchEnd={handleContainerTouchEnd}
         onClick={handleContainerClick}
         style={{
@@ -1130,11 +1014,74 @@ function PosterCard({
           src={poster}
           alt={movie.title}
           fill
-          sizes="(max-width: 640px) 44vw, 180px"
+          sizes="(max-width: 640px) 48vw, 180px"
           style={{ objectFit: "cover" }}
           unoptimized
           priority={priority}
         />
+
+        {/* Persistent bottom info overlay */}
+        <div
+          className={`poster-bottom-info ${showActions ? "hidden-by-actions" : ""}`}
+          style={{
+            position: "absolute",
+            bottom: 0,
+            left: 0,
+            right: 0,
+            background: showFullInfo
+              ? "linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.7) 50%, transparent 100%)"
+              : "linear-gradient(to top, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.5) 55%, transparent 100%)",
+            padding: showFullInfo ? "52px 10px 10px" : "28px 8px 8px",
+            pointerEvents: "none",
+          }}
+        >
+          <p
+            style={{
+              fontSize: showFullInfo ? "13px" : "11px",
+              fontWeight: 600,
+              color: "#fff",
+              margin: 0,
+              lineHeight: 1.3,
+              display: "-webkit-box",
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden",
+            }}
+          >
+            {movie.title}
+          </p>
+          {showFullInfo ? (
+            <>
+              {/* Year · Language · IMDb */}
+              <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.65)", margin: "4px 0 0", lineHeight: 1.3 }}>
+                {[
+                  movie.year,
+                  lang || null,
+                  imdb || null,
+                ].filter(Boolean).join(" · ")}
+              </p>
+              {/* Genre */}
+              {genres && (
+                <p style={{
+                  fontSize: "10px",
+                  color: "rgba(255,255,255,0.45)",
+                  margin: "2px 0 0",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}>
+                  {genres}
+                </p>
+              )}
+            </>
+          ) : (
+            movie.year && (
+              <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.55)", margin: "2px 0 0" }}>
+                {movie.year}
+              </p>
+            )
+          )}
+        </div>
 
         {/* Action overlay */}
         <div
@@ -1180,58 +1127,15 @@ function PosterCard({
                 cursor: disabled ? "not-allowed" : "pointer",
               }}
             >
-              <span style={{ fontSize: "18px", lineHeight: 1 }}>{btn.icon}</span>
-              <span style={{ fontSize: "11px", fontWeight: 600, letterSpacing: "0.02em" }}>
+              <span style={{ display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}>
+                {btn.icon}
+              </span>
+              <span style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>
                 {btn.label}
               </span>
             </button>
           ))}
         </div>
-      </div>
-
-      {/* Movie info below poster */}
-      <div style={{ padding: "8px 2px 0" }}>
-        <h4
-          style={{
-            fontSize: "14px",
-            fontWeight: 600,
-            letterSpacing: "-0.01em",
-            color: "var(--color-text-primary)",
-            margin: 0,
-            lineHeight: 1.25,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {movie.title}
-        </h4>
-        {meta && (
-          <p
-            style={{
-              marginTop: "4px",
-              fontSize: "12px",
-              color: "var(--color-text-muted)",
-              lineHeight: 1.3,
-            }}
-          >
-            {meta}
-          </p>
-        )}
-        {genres && (
-          <p
-            style={{
-              marginTop: "2px",
-              fontSize: "11px",
-              color: "var(--color-text-muted)",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {genres}
-          </p>
-        )}
       </div>
     </motion.article>
   );

@@ -260,6 +260,53 @@ input[type="number"]::-webkit-inner-spin-button {
   -webkit-appearance: none;
 }
 
+/* ─── Carousel Track (native scroll) ───────────── */
+.carousel-track {
+  display: flex;
+  gap: 14px;
+  overflow-x: scroll;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scroll-padding-left: 20px;
+  padding: 0 20px 8px;
+  overscroll-behavior-x: contain;
+}
+
+/* ─── Carousel Desktop Buttons ──────────────────── */
+.carousel-btn {
+  position: absolute;
+  top: 45%;
+  transform: translateY(-50%);
+  z-index: 20;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #fff;
+  font-size: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: opacity 0.2s ease, background 0.15s ease;
+  line-height: 1;
+}
+
+.carousel-btn:hover {
+  background: rgba(0, 0, 0, 0.95);
+}
+
+.carousel-btn-left { left: 6px; }
+.carousel-btn-right { right: 6px; }
+
+/* Hide carousel navigation arrows on touch/mobile */
+@media (hover: none) {
+  .carousel-btn {
+    display: none !important;
+  }
+}
+
 /* ─── Carousel Scrims ───────────────────────────── */
 .carousel-scrim {
   position: absolute;
@@ -286,9 +333,33 @@ input[type="number"]::-webkit-inner-spin-button {
     box-shadow 0.28s ease;
 }
 
-
 .poster-card:hover .poster-container {
   border: 1px solid rgba(255, 255, 255, 0.22);
+}
+
+/* ─── Stack Name Button Chevron ─────────────────── */
+.stack-name-btn .chevron-icon {
+  opacity: 0;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+.stack-name-btn:hover .chevron-icon,
+.stack-name-btn:focus-visible .chevron-icon {
+  opacity: 1;
+  transform: translateX(2px);
+}
+
+/* ─── Poster Bottom Info Overlay ────────────────── */
+.poster-bottom-info {
+  transition: opacity 0.2s ease;
+  z-index: 1;
+}
+
+.poster-bottom-info.hidden-by-actions {
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* ─── Action Button Hover ───────────────────────── */
@@ -327,24 +398,38 @@ body {
   margin: 0 auto;
 }
 
-/* ─── Responsive Poster Cards ──────────────────── */
+/* ─── Desktop zoom (115%) ────────────────────────── */
+@media (min-width: 1024px) {
+  html {
+    zoom: 1.20;
+  }
+}
+
+/* ─── Poster card in detail grid fills the grid column ── */
+.stack-detail-grid .poster-card {
+  width: 100% !important;
+  min-width: 0 !important;
+  flex-shrink: unset !important;
+}
+
+/* ─── Responsive Poster Cards (carousel) ────────── */
 @media (min-width: 768px) {
   .poster-card {
-    width: min(20vw, 170px) !important;
+    width: min(18vw, 160px) !important;
     min-width: 130px !important;
   }
 }
 
 @media (min-width: 1024px) {
   .poster-card {
-    width: min(14vw, 190px) !important;
+    width: min(13vw, 185px) !important;
     min-width: 140px !important;
   }
 }
 
 @media (min-width: 1440px) {
   .poster-card {
-    width: min(11vw, 180px) !important;
+    width: min(10vw, 175px) !important;
     min-width: 140px !important;
   }
 }

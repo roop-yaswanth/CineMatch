@@ -81,7 +81,7 @@ export default function HistoryDrawer({ sessionId, onClose }: Props) {
         {/* Header */}
         <div className="glass" style={{
           position: "sticky", top: 0, zIndex: 10,
-          padding: "20px 24px",
+          padding: "16px 20px 16px 16px",
           display: "flex", alignItems: "center", justifyContent: "space-between",
           borderBottom: "none",
           borderRadius: "24px 0 0 0",
@@ -99,7 +99,7 @@ export default function HistoryDrawer({ sessionId, onClose }: Props) {
         </div>
 
         {/* Content */}
-        <div style={{ padding: "16px 20px 24px" }}>
+        <div style={{ padding: "16px 16px 24px", paddingLeft: "max(16px, env(safe-area-inset-left))" }}>
           {loading && (
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
               {Array.from({ length: 6 }).map((_, i) => (
