@@ -11,7 +11,7 @@ import {
 } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import Image from "next/image";
-import HistoryDrawer from "@/components/HistoryDrawer";
+import YourLikesView from "@/components/YourLikesView";
 import PreferencesModal from "@/components/PreferencesModal";
 import MobileMenu from "@/components/MobileMenu";
 import {
@@ -199,7 +199,7 @@ export default function RecommendationsView({
   const [movies, setMovies] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState(false);
   const [initialLoad, setInitialLoad] = useState(true);
-  const [showHistory, setShowHistory] = useState(false);
+  const [showYourLikes, setShowYourLikes] = useState(false);
   const [showPrefs, setShowPrefs] = useState(false);
   const [showUpdateToast, setShowUpdateToast] = useState(false);
   const [activeStack, setActiveStack] = useState<StackId | null>(null);
@@ -568,7 +568,7 @@ export default function RecommendationsView({
           <MobileMenu
             onLogout={onLogout}
             onPreferences={() => setShowPrefs(true)}
-            onHistory={() => setShowHistory(true)}
+            onYourLikes={() => setShowYourLikes(true)}
             onRefresh={() => void generate(preferences)}
             onReset={onBackToOnboarding}
           />
@@ -880,10 +880,10 @@ export default function RecommendationsView({
         )}
       </AnimatePresence>
 
-      {showHistory && (
-        <HistoryDrawer
+      {showYourLikes && (
+        <YourLikesView
           sessionId={session.session_id}
-          onClose={() => setShowHistory(false)}
+          onClose={() => setShowYourLikes(false)}
         />
       )}
 

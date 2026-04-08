@@ -157,6 +157,8 @@ export interface HistoryItem {
   rating: string;
   context: "onboarding" | "recommendation";
   year?: number;
+  original_language?: string;
+  primary_genre?: string;
 }
 
 /* ─── Constants ─────────────────────────────────────────────── */
