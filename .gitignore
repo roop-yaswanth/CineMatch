@@ -58,3 +58,5 @@ RecBole-GNN/
 update_faiss.py
 update_gcl.py
 Cinematchapi/
+Cinematchproapi/
+minimal *
