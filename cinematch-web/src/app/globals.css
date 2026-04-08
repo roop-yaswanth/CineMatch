@@ -446,3 +446,28 @@ body {
     pointer-events: auto;
   }
 }
+
+/* Onboarding desktop spacing tune */
+@media (min-width: 1024px) {
+  .onboarding-rating-layout {
+    justify-content: flex-start !important;
+    gap: 4px;
+    padding-top: 10px !important;
+    padding-bottom: 8px !important;
+  }
+
+  .onboarding-card-zone {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    max-width: 500px !important;
+  }
+
+  .onboarding-card-shell {
+    width: clamp(240px, 30vh, 360px) !important;
+  }
+
+  .onboarding-actions {
+    max-width: 520px !important;
+    padding-top: 0 !important;
+  }
+}

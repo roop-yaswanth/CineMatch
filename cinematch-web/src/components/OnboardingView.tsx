@@ -236,9 +236,9 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
           </p>
 
           <div style={{ marginTop: "28px", textAlign: "left", display: "flex", flexDirection: "column", gap: "20px" }}>
-            {/* Region */}
+            {/* Your Region */}
             <div>
-              <label style={sectionLabelStyle}>Region</label>
+              <label style={sectionLabelStyle}>Your Region</label>
               <div style={{ marginTop: "8px", display: "flex", flexWrap: "wrap", gap: "6px" }}>
                 {REGION_OPTIONS.map((region) => (
                   <PrefPill
@@ -308,10 +308,10 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
 
   /* ─── Rating Step ──────────────────────────────── */
   return (
-    <div style={{
+    <div className="onboarding-rating-layout" style={{
       display: "flex", flexDirection: "column", alignItems: "center",
       justifyContent: "space-between",
-      height: "100dvh", padding: "12px 16px",
+      height: "100dvh", padding: "6px 16px 6px",
       fontFamily: "var(--font-sans)", width: "100%", overflow: "hidden",
     }}>
       {/* Header */}
@@ -334,7 +334,7 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
 
       {/* Progress bar */}
       {state && (
-        <div style={{ width: "100%", maxWidth: "500px", marginTop: "8px", flexShrink: 0 }}>
+        <div style={{ width: "100%", maxWidth: "500px", marginTop: "4px", marginBottom: "4px", flexShrink: 0 }}>
           <div style={{ height: "2px", backgroundColor: "var(--color-border)", borderRadius: "var(--radius-pill)", overflow: "hidden" }}>
             <motion.div
               style={{ height: "100%", backgroundColor: "var(--color-text-primary)", borderRadius: "var(--radius-pill)" }}
@@ -343,7 +343,7 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
               transition={{ duration: 0.4, ease: "easeOut" }}
             />
           </div>
-          <div style={{ marginTop: "6px", display: "flex", justifyContent: "space-between", fontSize: "10px", color: "var(--color-text-muted)", fontWeight: 300 }}>
+          <div style={{ marginTop: "3px", display: "flex", justifyContent: "space-between", fontSize: "10px", color: "var(--color-text-muted)", fontWeight: 300 }}>
             <span>{likeCount} liked / {minLikes} needed</span>
             <span>{Object.values(state.feedback_counts).reduce((a, b) => a + b, 0)} rated</span>
           </div>
@@ -351,15 +351,16 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
       )}
 
       {/* Movie card — fills remaining space */}
-      <div style={{ width: "100%", maxWidth: "420px", flex: 1, display: "flex", alignItems: "center", justifyContent: "center", minHeight: 0, overflow: "hidden", margin: "4px 0" }}>
+      <div className="onboarding-card-zone" style={{ width: "100%", maxWidth: "420px", flex: 1, display: "flex", alignItems: "center", justifyContent: "center", minHeight: 0, overflow: "hidden", margin: "0", padding: "0" }}>
         <AnimatePresence initial={false} custom={lastSwipe} mode="wait">
           {(!optimisticRemoved && state?.movie) ? (
             <motion.div
+              className="onboarding-card-shell"
               key={state.movie.id}
               custom={lastSwipe}
               variants={cardVariants}
               initial="enter" animate="center" exit="exit"
-              style={{ width: "clamp(240px, 78vw, 360px)", maxWidth: "100%", cursor: "grab", touchAction: "none" }}
+              style={{ width: "clamp(220px, 70vw, 320px)", maxWidth: "100%", cursor: "grab", touchAction: "none" }}
               drag
               dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
               dragElastic={0.65}
@@ -509,18 +510,18 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
       </div>
 
       {/* Action buttons — fixed at bottom */}
-      <div style={{ width: "100%", maxWidth: "600px", flexShrink: 0, paddingBottom: "8px" }}>
+      <div className="onboarding-actions" style={{ width: "100%", maxWidth: "600px", flexShrink: 0, paddingTop: "4px", paddingBottom: "2px" }}>
         {state?.movie && (
           <>
-            <p style={{ marginBottom: "10px", textAlign: "center", fontSize: "11px", color: "var(--color-text-muted)", fontWeight: 300 }}>
+            <p style={{ marginBottom: "6px", textAlign: "center", fontSize: "10px", color: "var(--color-text-muted)", fontWeight: 300 }}>
               Swipe right to like, left to dislike, down for okay, up to skip.
             </p>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "8px", justifyContent: "center" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "6px", justifyContent: "center" }}>
               {RATING_OPTIONS.map((opt) => (
                 <motion.button key={opt.value} whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
                   onClick={() => handleRate(opt.value)} disabled={loading} className="glass-button"
                   style={{
-                    padding: "12px 0", borderRadius: "var(--radius-pill)",
+                    padding: "10px 0", borderRadius: "var(--radius-pill)",
                     fontSize: "13px", fontWeight: 500, color: opt.color,
                     cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.4 : 1,
                     display: "flex", alignItems: "center", justifyContent: "center", gap: "4px",
@@ -539,9 +540,9 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
             whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}
             onClick={() => onComplete(state.session)} className="glass-button"
             style={{
-              marginTop: "12px", width: "100%", padding: "14px 0",
+              marginTop: "8px", width: "100%", padding: "11px 0",
               background: "rgba(255,255,255,0.12)", color: "var(--color-text-primary)",
-              fontSize: "14px", fontWeight: 500, borderRadius: "var(--radius-pill)", cursor: "pointer",
+              fontSize: "13px", fontWeight: 500, borderRadius: "var(--radius-pill)", cursor: "pointer",
             }}>
             Generate recommendations →
           </motion.button>
