@@ -396,6 +396,7 @@ export default function RecommendationsView({
   const generate = useCallback(
     async (nextPreferences: RecommendationPreferences = preferences) => {
       setLoading(true);
+      setActiveStack(null);  // close detail overlay before clearing stacks
       setStacks([]);
       setMovies([]);
       bucketCacheRef.current = EMPTY_CACHE();
@@ -811,14 +812,18 @@ export default function RecommendationsView({
 
       {/* Stack detail overlay */}
       <AnimatePresence>
-        {activeStack && (
-          <StackDetailView
-            stack={stacks.find((s) => s.id === activeStack)!}
-            onBack={() => setActiveStack(null)}
-            onAction={handleAction}
-            disabled={loading}
-          />
-        )}
+        {activeStack && (() => {
+          const activeStackData = stacks.find((s) => s.id === activeStack);
+          if (!activeStackData) return null;
+          return (
+            <StackDetailView
+              stack={activeStackData}
+              onBack={() => setActiveStack(null)}
+              onAction={handleAction}
+              disabled={loading}
+            />
+          );
+        })()}
       </AnimatePresence>
 
       <AnimatePresence>
