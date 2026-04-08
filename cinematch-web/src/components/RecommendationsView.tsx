@@ -465,6 +465,8 @@ export default function RecommendationsView({
       actionCountRef.current.total++;
       if (action === "like" || action === "okay") actionCountRef.current.positive++;
       if (action === "dislike") actionCountRef.current.negative++;
+      // Skip = half-dislike: counts 0.5 toward negative threshold
+      if (action === "remove") actionCountRef.current.negative += 0.5;
 
       const { positive, negative, total } = actionCountRef.current;
       const shouldAutoRerun = negative >= 10 || total >= 10 || positive >= 10;
