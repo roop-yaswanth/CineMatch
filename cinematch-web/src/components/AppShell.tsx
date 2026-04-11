@@ -18,19 +18,20 @@ const pageVariants = {
 };
 
 const STORAGE_KEY = "cinematch_email";
+const INACTIVITY_MS = 30 * 60 * 1000;
 
 export default function AppShell() {
-  const [phase, setPhase] = useState<AppPhase>("restoring");
+  const [phase, setPhase] = useState<AppPhase>(() => {
+    if (typeof window === "undefined") return "restoring";
+    return localStorage.getItem(STORAGE_KEY) ? "restoring" : "login";
+  });
   const [session, setSession] = useState<UserSession | null>(null);
   const [forcePreferences, setForcePreferences] = useState(false);
 
   // Restore session from localStorage on mount
   useEffect(() => {
     const savedEmail = localStorage.getItem(STORAGE_KEY);
-    if (!savedEmail) {
-      setPhase("login");
-      return;
-    }
+    if (!savedEmail) return;
     apiLogin(savedEmail)
       .then((restored) => {
         setSession(restored);
@@ -75,9 +76,6 @@ export default function AppShell() {
     setForcePreferences(false);
     setPhase("login");
   }, []);
-
-  // ── 30-minute inactivity timeout ──────────────────────────────────────
-  const INACTIVITY_MS = 30 * 60 * 1000;
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showTimeoutToast, setShowTimeoutToast] = useState(false);
 

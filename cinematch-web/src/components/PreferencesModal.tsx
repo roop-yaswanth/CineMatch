@@ -20,7 +20,7 @@ interface Props {
   preferences: Preferences;
   onUpdate: (prefs: Preferences) => void;
   onClose: () => void;
-  /** "recommendations" = Language + Genre only; "onboarding" = Region + Age + Language only */
+  /** "recommendations" = Language + Genre only; "onboarding" = Region + Age + Language + Genre */
   mode?: "recommendations" | "onboarding";
 }
 
@@ -161,26 +161,26 @@ export default function PreferencesModal({ preferences, onUpdate, onClose, mode 
               />
             ))}
           </div>
+          <p style={{ marginTop: "10px", fontSize: "11px", color: "var(--color-text-muted)" }}>
+            Leave empty to use your region or the default mix.
+          </p>
         </Section>
 
-        {/* Genres — shown in recommendations mode or default (not onboarding) */}
-        {mode !== "onboarding" && (
-          <Section title="Genres">
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-              {GENRES.map((genre) => (
-                <GlassPill
-                  key={genre}
-                  label={genre}
-                  active={localPrefs.genres.includes(genre)}
-                  onClick={() => toggle("genres", genre)}
-                />
-              ))}
-            </div>
-            <p style={{ marginTop: "10px", fontSize: "11px", color: "var(--color-text-muted)" }}>
-              Leave empty for all genres.
-            </p>
-          </Section>
-        )}
+        <Section title="Genres">
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+            {GENRES.map((genre) => (
+              <GlassPill
+                key={genre}
+                label={genre}
+                active={localPrefs.genres.includes(genre)}
+                onClick={() => toggle("genres", genre)}
+              />
+            ))}
+          </div>
+          <p style={{ marginTop: "10px", fontSize: "11px", color: "var(--color-text-muted)" }}>
+            Leave empty for all genres.
+          </p>
+        </Section>
 
         {/* Classics toggle — shown in recommendations mode or default (not onboarding) */}
         {mode !== "onboarding" && (

@@ -134,7 +134,7 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
       const regionDefaults = regionLanguages(preferences.region);
       const userLangs = preferences.languages;
       const regionMatchesFully = regionDefaults.every((l) => userLangs.includes(l));
-      const effectiveRegion = regionMatchesFully ? preferences.region : "Other";
+      const effectiveRegion = userLangs.length === 0 || regionMatchesFully ? preferences.region : "Other";
 
       const result = await apiBuildSlate(session.session_id, {
         languages: userLangs,
@@ -287,6 +287,35 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
                   );
                 })}
               </div>
+              <p style={{ marginTop: "8px", fontSize: "11px", color: "var(--color-text-muted)" }}>
+                Optional. Leave this empty and we&apos;ll use your region as the fallback.
+              </p>
+            </div>
+
+            {/* Genres */}
+            <div>
+              <label style={sectionLabelStyle}>Favorite Genres</label>
+              <div style={{ marginTop: "8px", display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                {GENRE_LIST.map((genre) => {
+                  const isSelected = preferences.genres.includes(genre);
+                  return (
+                    <PrefPill
+                      key={genre}
+                      label={genre}
+                      active={isSelected}
+                      onClick={() =>
+                        setPreferences((p) => ({
+                          ...p,
+                          genres: isSelected ? p.genres.filter((g) => g !== genre) : [...p.genres, genre],
+                        }))
+                      }
+                    />
+                  );
+                })}
+              </div>
+              <p style={{ marginTop: "8px", fontSize: "11px", color: "var(--color-text-muted)" }}>
+                Optional. Pick a few if you want the onboarding slate to stay tighter to your taste.
+              </p>
             </div>
 
           </div>
@@ -295,14 +324,14 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
             whileHover={{ scale: 1.01 }}
             whileTap={{ scale: 0.99 }}
             onClick={handleBuildSlate}
-            disabled={loading || preferences.languages.length === 0}
+            disabled={loading}
             className="glass-button"
             style={{
               marginTop: "32px", width: "100%", padding: "14px 0",
               background: "rgba(255,255,255,0.12)",
               color: "var(--color-text-primary)", fontSize: "14px", fontWeight: 500,
               borderRadius: "var(--radius-pill)", cursor: loading ? "not-allowed" : "pointer",
-              opacity: loading || preferences.languages.length === 0 ? 0.4 : 1,
+              opacity: loading ? 0.4 : 1,
             }}
           >
             {loading ? "Building slate..." : "Build my slate"}

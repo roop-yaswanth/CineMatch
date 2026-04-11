@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
-import { apiGetHistory, languageLabel, LANGUAGE_LABELS, type HistoryItem } from "@/lib/api";
+import { apiGetHistory, languageLabel, type HistoryItem } from "@/lib/api";
 import { usePoster } from "@/lib/usePoster";
 
 interface Props {
@@ -12,6 +12,7 @@ interface Props {
 }
 
 type InteractionFilter = "all" | "like" | "okay" | "dislike" | "not_watched";
+type HistoryListItem = HistoryItem & { genres?: string[] };
 
 const RATING_CONFIG: Record<string, { label: string; color: string; icon: string }> = {
   like: { label: "Liked", color: "var(--color-like)", icon: "♥" },
@@ -35,7 +36,7 @@ const IconHeart = () => (
 );
 
 export default function YourLikesView({ sessionId, onClose }: Props) {
-  const [items, setItems] = useState<HistoryItem[]>([]);
+  const [items, setItems] = useState<HistoryListItem[]>([]);
   const [loading, setLoading] = useState(true);
   
   // Filters
@@ -55,9 +56,9 @@ export default function YourLikesView({ sessionId, onClose }: Props) {
     const genreSet = new Set<string>();
     const langSet = new Set<string>();
     
-    items.forEach((item: any) => {
+    items.forEach((item) => {
       if (item.genres && Array.isArray(item.genres)) {
-        item.genres.forEach((g: string) => genreSet.add(g));
+        item.genres.forEach((g) => genreSet.add(g));
       }
       if (item.primary_genre) {
         genreSet.add(item.primary_genre);
@@ -84,7 +85,7 @@ export default function YourLikesView({ sessionId, onClose }: Props) {
 
     // Genre filter
     if (genreFilter !== "all") {
-      filtered = filtered.filter((item: any) => {
+      filtered = filtered.filter((item) => {
         if (item.genres && Array.isArray(item.genres)) {
           return item.genres.includes(genreFilter);
         }
@@ -97,7 +98,7 @@ export default function YourLikesView({ sessionId, onClose }: Props) {
 
     // Language filter
     if (languageFilter !== "all") {
-      filtered = filtered.filter((item: any) => item.original_language === languageFilter);
+      filtered = filtered.filter((item) => item.original_language === languageFilter);
     }
 
     return filtered;

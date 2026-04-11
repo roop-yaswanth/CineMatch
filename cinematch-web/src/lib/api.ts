@@ -74,6 +74,7 @@ export interface Movie {
 export interface UserProfile {
   preferred_languages?: string[];
   preferred_genres?: string[];
+  genre_picks?: string[];
   include_classics?: boolean;
   age_group?: string;
   region?: string;
@@ -212,15 +213,13 @@ export function recommendationId(
 export function preferencesFromProfile(
   profile?: UserProfile | null
 ): RecommendationPreferences {
+  const savedGenres = profile?.preferred_genres ?? profile?.genre_picks ?? [];
   return {
-    languages:
-      profile?.preferred_languages?.filter(Boolean) && profile.preferred_languages.length > 0
-        ? profile.preferred_languages
-        : ["en"],
-    genres: profile?.preferred_genres ?? [],
+    languages: profile?.preferred_languages?.filter(Boolean) ?? [],
+    genres: savedGenres.filter(Boolean),
     semantic_index: "tmdb_bge",
     include_classics: profile?.include_classics ?? false,
-    age_group: profile?.age_group ?? "18-24",
+    age_group: profile?.age_group ?? "25-34",
     region: profile?.region ?? "USA",
   };
 }

@@ -452,8 +452,30 @@ body {
   justify-content: space-between;
 }
 
+.onboarding-card-zone {
+  max-height: min(52vh, 460px);
+}
+
+.onboarding-card-shell {
+  width: clamp(195px, 58vw, 300px) !important;
+}
+
+.onboarding-actions {
+  padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px));
+}
+
 body:has(.onboarding-rating-layout) {
   overflow: hidden;
+}
+
+@media (max-height: 760px) {
+  .onboarding-card-zone {
+    max-height: min(46vh, 380px);
+  }
+
+  .onboarding-card-shell {
+    width: clamp(180px, 52vw, 260px) !important;
+  }
 }
 
 /* Onboarding desktop spacing tune */

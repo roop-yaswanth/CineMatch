@@ -4,7 +4,6 @@ import {
   startTransition,
   useCallback,
   useEffect,
-  useMemo,
   useRef,
   useState,
   type ReactNode,
@@ -18,13 +17,11 @@ import {
   apiMultiRecommendations,
   apiRecommendationAction,
   apiSearchMovies,
-  LANGUAGE_LABELS,
   languageLabel,
   posterUrl,
   prefetchPosters,
   preferencesFromProfile,
   recommendationId,
-  regionLanguages,
   type MultiBucketResponse,
   type Recommendation,
   type RecommendationPreferences,
@@ -157,21 +154,25 @@ function partitionFromBuckets(
     });
   }
 
-  // Hollywood SECOND
-  result.push({
-    id: "hollywood",
-    label: "Hollywood",
-    subtitle: "Handpicked from your taste profile.",
-    movies: english || [],
-  });
+  // English stack, when present
+  if ((english || []).length > 0) {
+    result.push({
+      id: "hollywood",
+      label: "Hollywood",
+      subtitle: "Handpicked from your taste profile.",
+      movies: english || [],
+    });
+  }
 
-  // Global Cinema THIRD (IMDb ≥ 7.0, non-selected languages)
-  result.push({
-    id: "other",
-    label: "Global Cinema",
-    subtitle: "Hidden gems across cultures — curated by plot similarity.",
-    movies: globalMovies || [],
-  });
+  // Global Cinema stack, when present
+  if ((globalMovies || []).length > 0) {
+    result.push({
+      id: "other",
+      label: "Global Cinema",
+      subtitle: "Hidden gems across cultures — curated by plot similarity.",
+      movies: globalMovies || [],
+    });
+  }
 
   const allMovies = [
     ...(hasRegional ? regionalMerged : (regional._merged || [])),
@@ -258,8 +259,8 @@ export default function RecommendationsView({
   // Apply frontend classics filter (genres are handled by backend, not here)
   const applyFilters = useCallback((arr: Recommendation[], prefs: RecommendationPreferences): Recommendation[] => {
     if (!prefs.include_classics) {
-      const modern = arr.filter((m: any) => {
-        const y = typeof m.year === "number" ? m.year : parseInt(m.year, 10);
+      const modern = arr.filter((m) => {
+        const y = typeof m.year === "number" ? m.year : parseInt(String(m.year ?? ""), 10);
         return isNaN(y) || y >= 2000;
       });
       if (modern.length > 0) return modern;
@@ -328,29 +329,6 @@ export default function RecommendationsView({
     },
     [applyFilters]
   );
-
-  // ── replenishFromCache ─────────────────────────────────────────────────────
-  // After a movie is removed from a stack, pull from the cache reserve to keep
-  // the stack at BUCKET_DISPLAY. Returns true if any movies were added.
-  const replenishFromCache = useCallback((stackId: StackId): boolean => {
-    const cache = bucketCacheRef.current[stackId];
-    if (!cache || cache.length === 0) return false;
-
-    let addedAny = false;
-    setStacks((prev) =>
-      prev.map((s) => {
-        if (s.id !== stackId) return s;
-        const needed = BUCKET_DISPLAY - s.movies.length;
-        if (needed <= 0) return s;
-        // Take from cache (mutating the ref)
-        const toAdd = cache.splice(0, needed);
-        bucketCacheRef.current[stackId] = cache;
-        addedAny = true;
-        return { ...s, movies: [...s.movies, ...toAdd] };
-      })
-    );
-    return addedAny;
-  }, []);
 
   // ── silentRefresh ──────────────────────────────────────────────────────────
   // Fires ONLY when: cache for a stack is exhausted AND display < CACHE_REFETCH_THRESHOLD.
@@ -1259,7 +1237,6 @@ function PosterCard({
       : "";
   const genres =
     movie.genres?.slice(0, 3).join(", ") || movie.primary_genre || "";
-  const meta = [movie.year, lang, imdb].filter(Boolean).join(" · ");
 
   return (
     <motion.article
