@@ -481,25 +481,24 @@ body:has(.onboarding-rating-layout) {
 /* Onboarding desktop spacing tune */
 @media (min-width: 1024px) {
   .onboarding-rating-layout {
-    justify-content: flex-start;
-    gap: 12px;
-    padding-top: 20px;
-    padding-bottom: 20px;
+    justify-content: center;
+    gap: 16px;
+    padding: 24px;
   }
 
   .onboarding-card-zone {
-    flex: 0 0 auto !important;
-    height: clamp(380px, 55vh, 520px) !important;
+    flex: 0 1 auto !important;
+    height: clamp(380px, 60vh, 520px) !important;
     min-height: 0 !important;
     max-width: 500px !important;
   }
 
   .onboarding-card-shell {
-    width: clamp(240px, 30vh, 290px) !important;
+    width: clamp(220px, 35vh, 260px) !important;
   }
 
   .onboarding-actions {
     max-width: 520px !important;
-    padding-top: 0 !important;
+    padding-top: 8px !important;
   }
 }

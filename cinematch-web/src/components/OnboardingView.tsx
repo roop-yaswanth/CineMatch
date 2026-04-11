@@ -345,7 +345,7 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
   return (
     <div className="onboarding-rating-layout" style={{
       display: "flex", flexDirection: "column", alignItems: "center",
-      height: "100dvh", padding: "6px 16px 6px",
+      position: "fixed", inset: 0, padding: "16px 16px",
       fontFamily: "var(--font-sans)", width: "100%", overflow: "hidden",
     }}>
       {/* Header */}
