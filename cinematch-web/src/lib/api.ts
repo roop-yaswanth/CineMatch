@@ -307,6 +307,7 @@ export async function apiMultiRecommendations(
     include_classics: boolean;
     semantic_index: string;
     per_bucket_k?: number;
+    exclude_ids?: number[];
   }
 ): Promise<MultiBucketResponse> {
   return request<MultiBucketResponse>("/api/recommendations/multi", {

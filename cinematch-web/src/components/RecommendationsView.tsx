@@ -215,11 +215,17 @@ export default function RecommendationsView({
   const [showSearch, setShowSearch] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Action counter for auto-rerun (mirrors Gradio trigger logic)
+  // Overlay state for taste-profile auto-rerun (keeps stacks visible while updating)
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  // Action counter for auto-rerun
   const actionCountRef = useRef({ positive: 0, negative: 0, total: 0 });
 
   // Every movie ID the user has acted on — prevents re-showing after refresh
   const seenIdsRef = useRef<Set<number>>(new Set());
+
+  // All movie IDs ever displayed — sent to backend on auto-rerun so it generates truly new movies
+  const displayedIdsRef = useRef<Set<number>>(new Set());
 
   // ── Bucket cache ───────────────────────────────────────────────────────────
   // Stores the "reserve" movies (indices 50-100) that are not yet displayed.
@@ -324,6 +330,8 @@ export default function RecommendationsView({
       };
 
       const { stacks: newStacks, allMovies } = partitionFromBuckets(displayResp, prefs);
+      // Track all displayed IDs so we can exclude them on the next auto-rerun
+      for (const m of allMovies) displayedIdsRef.current.add(recommendationId(m));
       setStacks(newStacks);
       setMovies(allMovies);
     },
@@ -370,17 +378,31 @@ export default function RecommendationsView({
     }
   }, [applyBucketResponse, onSessionUpdate, session.session_id]);
 
-  // ── generate (full/manual refresh) ────────────────────────────────────────
+  // ── generate ──────────────────────────────────────────────────────────────
+  // autoRerun=true: overlay mode — keep existing stacks visible while fetching,
+  //   pass displayedIds to backend so it returns genuinely new movies.
+  // autoRerun=false (default): full clear → loading spinner → new stacks.
   const generate = useCallback(
-    async (nextPreferences: RecommendationPreferences = preferences) => {
-      setLoading(true);
-      setActiveStack(null);  // close detail overlay before clearing stacks
-      setStacks([]);
-      setMovies([]);
-      bucketCacheRef.current = EMPTY_CACHE();
-      seenIdsRef.current = new Set();
-      actionCountRef.current = { positive: 0, negative: 0, total: 0 };
+    async (
+      nextPreferences: RecommendationPreferences = preferences,
+      { autoRerun = false }: { autoRerun?: boolean } = {}
+    ) => {
+      if (autoRerun) {
+        setIsUpdating(true);
+      } else {
+        setLoading(true);
+        setActiveStack(null);
+        setStacks([]);
+        setMovies([]);
+        bucketCacheRef.current = EMPTY_CACHE();
+        seenIdsRef.current = new Set();
+        displayedIdsRef.current = new Set();
+        actionCountRef.current = { positive: 0, negative: 0, total: 0 };
+      }
       try {
+        const excludeIds = autoRerun
+          ? Array.from(displayedIdsRef.current)
+          : undefined;
         const resp = await apiMultiRecommendations(session.session_id, {
           languages:        nextPreferences.languages,
           genres:           nextPreferences.genres,
@@ -389,6 +411,7 @@ export default function RecommendationsView({
           include_classics: nextPreferences.include_classics,
           semantic_index:   nextPreferences.semantic_index,
           per_bucket_k:     BUCKET_FETCH,
+          exclude_ids:      excludeIds,
         });
 
         const allMovies = [
@@ -397,12 +420,20 @@ export default function RecommendationsView({
           ...(resp.buckets.global || []),
         ];
         await prefetchPosters(allMovies);
+        // On auto-rerun: clear stacks now that new data is ready, then apply
+        if (autoRerun) {
+          bucketCacheRef.current = EMPTY_CACHE();
+          seenIdsRef.current = new Set();
+          displayedIdsRef.current = new Set();
+          actionCountRef.current = { positive: 0, negative: 0, total: 0 };
+        }
         applyBucketResponse(resp, nextPreferences);
         if (resp.session) onSessionUpdate(resp.session);
       } catch (err) {
         console.error(err);
       } finally {
         setLoading(false);
+        setIsUpdating(false);
       }
     },
     [applyBucketResponse, onSessionUpdate, preferences, session.session_id]
@@ -449,18 +480,18 @@ export default function RecommendationsView({
       const { positive, negative, total } = actionCountRef.current;
       const shouldAutoRerun = negative >= 10 || total >= 10 || positive >= 10;
 
-      // 4. Taste Profile Update
+      // 4. Taste Profile Update — overlay mode: keep stacks visible, fetch new movies
       if (shouldAutoRerun) {
         actionCountRef.current = { positive: 0, negative: 0, total: 0 };
-        setShowUpdateToast(true);
+        // isUpdating drives the overlay; it is cleared in generate()'s finally block
+        setIsUpdating(true);
         try {
           await apiRecommendationAction(session.session_id, tmdbId, action);
-          await generate(preferences);
+          await generate(preferences, { autoRerun: true });
         } catch (err) {
           console.error("Taste profile update failed:", err);
-          await generate(preferences);
+          try { await generate(preferences, { autoRerun: true }); } catch (_) { setIsUpdating(false); }
         }
-        setTimeout(() => setShowUpdateToast(false), 1500);
         return;
       }
 
@@ -807,7 +838,7 @@ export default function RecommendationsView({
       </AnimatePresence>
 
       <AnimatePresence>
-        {showUpdateToast && (
+        {(showUpdateToast || isUpdating) && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
