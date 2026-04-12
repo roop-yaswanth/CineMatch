@@ -58,24 +58,24 @@ export default function MovieCard({ movie, priority = false, className = "", com
           
           {/* Gradient overlay at bottom */}
           <div className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-black/90 via-black/60 to-transparent pointer-events-none" />
-          
-          {/* Rating badge top-right */}
-          {(imdb || tmdbRating) && (
-            <div className="absolute top-2 right-2 px-2 py-1 rounded-md bg-black/70 backdrop-blur-sm">
-              {imdb ? (
-                <span className="text-xs font-semibold text-yellow-400">
-                  IMDb {imdb}
-                </span>
-              ) : (
-                <span className="text-xs font-semibold text-yellow-400">
-                  ★ {tmdbRating}
-                </span>
-              )}
-            </div>
-          )}
-          
+
           {/* Info overlay at bottom */}
           <div className="absolute inset-x-0 bottom-0 p-3 text-white">
+            {/* Rating on top of info */}
+            {(imdb || tmdbRating) && (
+              <div className="mb-2">
+                {imdb ? (
+                  <span className="text-xs font-semibold text-yellow-400">
+                    IMDb {imdb}
+                  </span>
+                ) : (
+                  <span className="text-xs font-semibold text-yellow-400">
+                    ★ {tmdbRating}
+                  </span>
+                )}
+              </div>
+            )}
+
             <h2 className="text-sm font-semibold leading-tight line-clamp-2 drop-shadow-lg">
               {movie.title}
             </h2>
