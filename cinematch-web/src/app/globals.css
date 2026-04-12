@@ -152,6 +152,7 @@ input {
   pointer-events: none;
   visibility: hidden;
   transition: opacity 0.22s ease, visibility 0.22s ease;
+  z-index: 10;
 }
 
 .poster-container:hover .action-overlay,
