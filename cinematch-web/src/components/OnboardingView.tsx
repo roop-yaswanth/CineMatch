@@ -370,30 +370,25 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
         />
       </div>
 
-      {/* Progress Ring */}
+      {/* Progress Horizontal */}
       {state && (
-        <div style={{ position: "relative", width: "100%", maxWidth: "500px", marginTop: "8px", flexShrink: 0, display: "flex", justifyContent: "center", alignItems: "center", flexDirection: "column" }}>
-            <div style={{ position: "relative", width: "48px", height: "48px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <svg width="48" height="48" viewBox="0 0 48 48" style={{ transform: "rotate(-90deg)" }}>
-                    <circle 
-                        cx="24" cy="24" r="20" 
-                        fill="none" stroke="var(--color-border)" strokeWidth="4" 
-                    />
-                    <motion.circle 
-                        cx="24" cy="24" r="20" 
-                        fill="none" stroke="var(--color-like)" strokeWidth="4" strokeLinecap="round"
-                        initial={{ strokeDasharray: "125.6", strokeDashoffset: "125.6" }}
-                        animate={{ strokeDashoffset: `${125.6 - (125.6 * Math.min(likeCount / Math.max(minLikes, 1), 1))}` }}
-                        transition={{ duration: 0.8, ease: "easeOut" }}
-                    />
-                </svg>
-                <div style={{ position: "absolute", fontSize: "12px", fontWeight: 700, color: "var(--color-text-primary)" }}>
-                    {likeCount}
-                </div>
-            </div>
-            <div style={{ marginTop: "4px", fontSize: "10px", color: "var(--color-text-muted)", fontWeight: 300, textAlign: "center" }}>
-                {minLikes} likes needed
-            </div>
+        <div style={{ width: "100%", maxWidth: "420px", marginTop: "12px", flexShrink: 0 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "6px" }}>
+            <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-text-primary)", letterSpacing: "0.02em", textTransform: "uppercase" }}>
+              Taste Profile
+            </span>
+            <span style={{ fontSize: "11px", color: "var(--color-text-muted)" }}>
+              {likeCount} / {minLikes} likes
+            </span>
+          </div>
+          <div style={{ height: "6px", width: "100%", background: "var(--color-border)", borderRadius: "3px", overflow: "hidden" }}>
+            <motion.div
+              initial={{ width: 0 }}
+              animate={{ width: `${Math.min((likeCount / Math.max(minLikes, 1)) * 100, 100)}%` }}
+              transition={{ duration: 1, ease: "easeOut" }}
+              style={{ height: "100%", background: "var(--color-like)", borderRadius: "3px" }}
+            />
+          </div>
         </div>
       )}
 
