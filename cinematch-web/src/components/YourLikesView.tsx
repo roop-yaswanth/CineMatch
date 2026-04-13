@@ -11,14 +11,68 @@ interface Props {
   onClose: () => void;
 }
 
-type InteractionFilter = "all" | "like" | "okay" | "dislike" | "not_watched";
+type InteractionFilter = "all" | "like" | "okay" | "dislike" | "not_watched" | "watchlist" | "watched";
 type HistoryListItem = HistoryItem & { genres?: string[] };
 
-const RATING_CONFIG: Record<string, { label: string; color: string; icon: string }> = {
-  like: { label: "Liked", color: "var(--color-like)", icon: "♥" },
-  okay: { label: "Okay", color: "var(--color-okay)", icon: "○" },
-  dislike: { label: "Disliked", color: "var(--color-dislike)", icon: "✕" },
-  not_watched: { label: "Skipped", color: "var(--color-text-muted)", icon: "→" },
+const RATING_CONFIG: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
+  like: {
+    label: "Liked",
+    color: "var(--color-like)",
+    icon: (
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+      </svg>
+    ),
+  },
+  okay: {
+    label: "Okay",
+    color: "var(--color-okay)",
+    icon: (
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z" />
+        <path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" />
+      </svg>
+    ),
+  },
+  dislike: {
+    label: "Disliked",
+    color: "var(--color-dislike)",
+    icon: (
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10z" />
+        <path d="M17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17" />
+      </svg>
+    ),
+  },
+  not_watched: {
+    label: "Skipped",
+    color: "var(--color-text-muted)",
+    icon: (
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="13 17 18 12 13 7" />
+        <polyline points="6 17 11 12 6 7" />
+      </svg>
+    ),
+  },
+  watchlist: {
+    label: "Watchlist",
+    color: "var(--color-accent)",
+    icon: (
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <line x1="12" y1="5" x2="12" y2="19" />
+        <line x1="5" y1="12" x2="19" y2="12" />
+      </svg>
+    ),
+  },
+  watched: {
+    label: "Watched",
+    color: "#22c55e",
+    icon: (
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="20 6 9 17 4 12" />
+      </svg>
+    ),
+  },
 };
 
 const INTERACTION_FILTERS: Array<{ value: InteractionFilter; label: string }> = [
@@ -27,6 +81,8 @@ const INTERACTION_FILTERS: Array<{ value: InteractionFilter; label: string }> = 
   { value: "okay", label: "Okay" },
   { value: "dislike", label: "Disliked" },
   { value: "not_watched", label: "Skipped" },
+  { value: "watchlist", label: "Watchlist" },
+  { value: "watched", label: "Watched" },
 ];
 
 const IconHeart = () => (
@@ -45,8 +101,30 @@ export default function YourLikesView({ sessionId, onClose }: Props) {
   const [languageFilter, setLanguageFilter] = useState<string>("all");
 
   useEffect(() => {
+    const CACHE_KEY = `history_cache_${sessionId}`;
+    const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+    try {
+      const cached = localStorage.getItem(CACHE_KEY);
+      if (cached) {
+        const { data, ts } = JSON.parse(cached) as { data: HistoryListItem[]; ts: number };
+        if (Date.now() - ts < CACHE_TTL) {
+          setItems(data);
+          setLoading(false);
+          return;
+        }
+        setItems(data);
+        setLoading(false);
+      }
+    } catch { /* ignore */ }
+
     apiGetHistory(sessionId)
-      .then(setItems)
+      .then((data) => {
+        setItems(data);
+        try {
+          localStorage.setItem(CACHE_KEY, JSON.stringify({ data, ts: Date.now() }));
+        } catch { /* storage full */ }
+      })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [sessionId]);
@@ -196,18 +274,17 @@ export default function YourLikesView({ sessionId, onClose }: Props) {
           }}
         >
           {/* Interaction Filter */}
-          <div style={{ display: "flex", gap: "6px", flexWrap: "nowrap" }}>
+          <select
+            value={interactionFilter}
+            onChange={(e) => setInteractionFilter(e.target.value as InteractionFilter)}
+            className="filter-select"
+          >
             {INTERACTION_FILTERS.map((filter) => (
-              <button
-                key={filter.value}
-                onClick={() => setInteractionFilter(filter.value)}
-                className="filter-pill"
-                data-active={interactionFilter === filter.value}
-              >
+              <option key={filter.value} value={filter.value}>
                 {filter.label}
-              </button>
+              </option>
             ))}
-          </div>
+          </select>
 
           <div className="likes-filter-sep" style={{ width: "1px", height: "24px", background: "var(--color-border-subtle)" }} />
 
@@ -255,11 +332,16 @@ export default function YourLikesView({ sessionId, onClose }: Props) {
               }}
             >
               {Array.from({ length: 12 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="skeleton-shimmer"
-                  style={{ height: "280px", borderRadius: "16px" }}
-                />
+                <div key={i} style={{ borderRadius: "16px", overflow: "hidden" }}>
+                  <div
+                    className="skeleton-shimmer"
+                    style={{ width: "100%", paddingBottom: "150%", borderRadius: "12px" }}
+                  />
+                  <div style={{ padding: "10px 4px 4px", display: "flex", flexDirection: "column", gap: "6px" }}>
+                    <div className="skeleton-shimmer" style={{ height: "13px", width: "85%", borderRadius: "999px" }} />
+                    <div className="skeleton-shimmer" style={{ height: "11px", width: "50%", borderRadius: "999px" }} />
+                  </div>
+                </div>
               ))}
             </div>
           )}
@@ -308,27 +390,6 @@ export default function YourLikesView({ sessionId, onClose }: Props) {
       </motion.div>
 
       <style>{`
-        .filter-pill {
-          padding: 7px 16px;
-          border-radius: 20px;
-          border: 1px solid var(--color-border-subtle);
-          background: rgba(255, 255, 255, 0.03);
-          color: var(--color-text-secondary);
-          font-size: 13px;
-          font-weight: 500;
-          cursor: pointer;
-          transition: all 0.2s;
-          white-space: nowrap;
-        }
-        .filter-pill:hover {
-          background: rgba(255, 255, 255, 0.06);
-          border-color: var(--color-border);
-        }
-        .filter-pill[data-active="true"] {
-          background: var(--color-like);
-          color: #fff;
-          border-color: var(--color-like);
-        }
         .filter-select {
           padding: 7px 14px;
           border-radius: 12px;
@@ -379,10 +440,6 @@ export default function YourLikesView({ sessionId, onClose }: Props) {
             grid-template-columns: repeat(2, 1fr) !important;
             gap: 10px !important;
           }
-          .filter-pill {
-            padding: 6px 12px;
-            font-size: 12px;
-          }
           .filter-select {
             padding: 6px 10px;
             font-size: 12px;
@@ -400,7 +457,7 @@ function MovieCard({ item, idx }: { item: HistoryItem; idx: number }) {
   const config = RATING_CONFIG[item.rating] || {
     label: item.rating,
     color: "var(--color-text-muted)",
-    icon: "",
+    icon: null,
   };
 
   return (
@@ -453,7 +510,7 @@ function MovieCard({ item, idx }: { item: HistoryItem; idx: number }) {
             color: config.color,
           }}
         >
-          <span style={{ fontSize: "10px" }}>{config.icon}</span>
+          <span style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>{config.icon}</span>
           {config.label}
         </div>
       </div>
@@ -462,7 +519,7 @@ function MovieCard({ item, idx }: { item: HistoryItem; idx: number }) {
       <div style={{ padding: "12px" }}>
         <p
           style={{
-            fontSize: "14px",
+            fontSize: "12px",
             fontWeight: 600,
             color: "var(--color-text-primary)",
             overflow: "hidden",

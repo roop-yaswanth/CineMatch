@@ -108,6 +108,7 @@ export interface Recommendation {
   title: string;
   year?: number;
   poster_path?: string;
+  backdrop_path?: string;
   overview?: string;
   genres?: string[];
   vote_average?: number;
@@ -116,6 +117,9 @@ export interface Recommendation {
   original_language?: string;
   director?: string;
   imdb_rating?: number;
+  imdb_votes?: number;
+  vote_count?: number;
+  runtime?: number;
   primary_genre?: string;
 }
 
@@ -345,6 +349,7 @@ export interface SearchResult {
   year?: number;
   original_language: string;
   poster_path?: string;
+  backdrop_path?: string;
   imdb_rating?: number;
   imdb_votes?: number;
   genres: string[];

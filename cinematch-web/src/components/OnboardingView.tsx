@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useMotionValue } from "framer-motion";
 import MovieCard from "@/components/MovieCard";
 import PreferencesModal from "@/components/PreferencesModal";
 import MobileMenu from "@/components/MobileMenu";
@@ -111,6 +111,10 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
   const [optimisticRemoved, setOptimisticRemoved] = useState(false);
   const [hasInteracted, setHasInteracted] = useState(false);
   const [loadingVariantIdx, setLoadingVariantIdx] = useState(0);
+
+  // Drag indicator
+  const dragX = useMotionValue(0);
+  const dragY = useMotionValue(0);
 
   const ratingDirection = useCallback((rating: string): SwipeDirection => {
     switch (rating) {
@@ -366,21 +370,30 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
         />
       </div>
 
-      {/* Progress bar */}
+      {/* Progress Ring */}
       {state && (
-        <div style={{ width: "100%", maxWidth: "500px", marginTop: "4px", marginBottom: "4px", flexShrink: 0 }}>
-          <div style={{ height: "2px", backgroundColor: "var(--color-border)", borderRadius: "var(--radius-pill)", overflow: "hidden" }}>
-            <motion.div
-              style={{ height: "100%", backgroundColor: "var(--color-text-primary)", borderRadius: "var(--radius-pill)" }}
-              initial={{ width: 0 }}
-              animate={{ width: `${((state.session.onboarding_index + 1) / Math.max(state.session.onboarding_total, 1)) * 100}%` }}
-              transition={{ duration: 0.4, ease: "easeOut" }}
-            />
-          </div>
-          <div style={{ marginTop: "3px", display: "flex", justifyContent: "space-between", fontSize: "10px", color: "var(--color-text-muted)", fontWeight: 300 }}>
-            <span>{likeCount} liked / {minLikes} needed</span>
-            <span>{Object.values(state.feedback_counts).reduce((a, b) => a + b, 0)} rated</span>
-          </div>
+        <div style={{ position: "relative", width: "100%", maxWidth: "500px", marginTop: "8px", flexShrink: 0, display: "flex", justifyContent: "center", alignItems: "center", flexDirection: "column" }}>
+            <div style={{ position: "relative", width: "48px", height: "48px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <svg width="48" height="48" viewBox="0 0 48 48" style={{ transform: "rotate(-90deg)" }}>
+                    <circle 
+                        cx="24" cy="24" r="20" 
+                        fill="none" stroke="var(--color-border)" strokeWidth="4" 
+                    />
+                    <motion.circle 
+                        cx="24" cy="24" r="20" 
+                        fill="none" stroke="var(--color-like)" strokeWidth="4" strokeLinecap="round"
+                        initial={{ strokeDasharray: "125.6", strokeDashoffset: "125.6" }}
+                        animate={{ strokeDashoffset: `${125.6 - (125.6 * Math.min(likeCount / Math.max(minLikes, 1), 1))}` }}
+                        transition={{ duration: 0.8, ease: "easeOut" }}
+                    />
+                </svg>
+                <div style={{ position: "absolute", fontSize: "12px", fontWeight: 700, color: "var(--color-text-primary)" }}>
+                    {likeCount}
+                </div>
+            </div>
+            <div style={{ marginTop: "4px", fontSize: "10px", color: "var(--color-text-muted)", fontWeight: 300, textAlign: "center" }}>
+                {minLikes} likes needed
+            </div>
         </div>
       )}
 
@@ -411,13 +424,16 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
                 custom={lastSwipe}
                 variants={cardVariants}
                 initial="enter" animate="center" exit="exit"
-                style={{ width: "clamp(220px, 70vw, 320px)", maxWidth: "100%", cursor: "grab", touchAction: "none" }}
+                style={{ width: "clamp(220px, 70vw, 320px)", maxWidth: "100%", cursor: "grab", touchAction: "none", position: "relative" }}
                 drag
                 dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
                 dragElastic={0.65}
-                onDragEnd={handleDragEnd}
+                onDrag={(_, info) => { dragX.set(info.offset.x); dragY.set(info.offset.y); }}
+                onDragEnd={(e, info) => { dragX.set(0); dragY.set(0); handleDragEnd(e, info); }}
                 whileDrag={{ scale: 1.02, rotate: 1.5, cursor: "grabbing" }}
               >
+                {/* Swipe direction indicator */}
+                <SwipeIndicator dragX={dragX} dragY={dragY} />
 
                 <MovieCard movie={state.movie} priority noLayout />
 
@@ -613,6 +629,71 @@ const sectionLabelStyle: React.CSSProperties = {
   fontSize: "11px", color: "var(--color-text-secondary)", fontWeight: 500,
   letterSpacing: "0.05em", textTransform: "uppercase",
 };
+
+import type { MotionValue } from "framer-motion";
+import { useMotionValueEvent } from "framer-motion";
+
+function SwipeIndicator({
+  dragX, dragY,
+}: {
+  dragX: MotionValue<number>;
+  dragY: MotionValue<number>;
+}) {
+  const [label, setLabel] = useState<{ text: string; color: string; pos: "left" | "right" | "top" | "bottom" } | null>(null);
+  const [opacity, setOpacity] = useState(0);
+
+  useMotionValueEvent(dragX, "change", (x) => {
+    const y = dragY.get();
+    update(x, y);
+  });
+  useMotionValueEvent(dragY, "change", (y) => {
+    const x = dragX.get();
+    update(x, y);
+  });
+
+  function update(x: number, y: number) {
+    const abs = Math.max(Math.abs(x), Math.abs(y));
+    setOpacity(Math.min(1, (abs - 20) / 40));
+    if (Math.abs(x) < 20 && Math.abs(y) < 20) { setLabel(null); return; }
+    if (Math.abs(x) >= Math.abs(y)) {
+      setLabel(x > 0
+        ? { text: "LIKE", color: "var(--color-like)", pos: "left" }
+        : { text: "DISLIKE", color: "var(--color-dislike)", pos: "right" });
+    } else {
+      setLabel(y > 0
+        ? { text: "OKAY", color: "var(--color-okay)", pos: "top" }
+        : { text: "SKIP", color: "var(--color-skip)", pos: "bottom" });
+    }
+  }
+
+  if (!label || opacity <= 0) return null;
+
+  const posStyle: React.CSSProperties =
+    label.pos === "left" ? { left: "16px", top: "50%", transform: "translateY(-50%) rotate(-12deg)" } :
+    label.pos === "right" ? { right: "16px", top: "50%", transform: "translateY(-50%) rotate(12deg)" } :
+    label.pos === "top" ? { top: "16px", left: "50%", transform: "translateX(-50%)" } :
+    { bottom: "16px", left: "50%", transform: "translateX(-50%)" };
+
+  return (
+    <div style={{ position: "absolute", zIndex: 30, pointerEvents: "none", opacity, ...posStyle }}>
+      <span style={{
+        display: "inline-block",
+        padding: "6px 14px",
+        borderRadius: "8px",
+        border: `2px solid ${label.color}`,
+        color: label.color,
+        fontSize: "18px",
+        fontWeight: 800,
+        letterSpacing: "0.1em",
+        background: `${label.color}18`,
+        backdropFilter: "blur(4px)",
+        textShadow: `0 0 12px ${label.color}88`,
+      }}>
+        {label.text}
+      </span>
+    </div>
+  );
+}
 
 function PrefPill({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
   return (

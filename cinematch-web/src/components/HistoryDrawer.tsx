@@ -16,8 +16,34 @@ export default function HistoryDrawer({ sessionId, onClose }: Props) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const CACHE_KEY = `history_cache_${sessionId}`;
+    const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+    // Load from cache immediately for instant display
+    try {
+      const cached = localStorage.getItem(CACHE_KEY);
+      if (cached) {
+        const { data, ts } = JSON.parse(cached) as { data: HistoryItem[]; ts: number };
+        if (Date.now() - ts < CACHE_TTL) {
+          setItems(data);
+          setLoading(false);
+          return; // Cache is fresh, skip API call
+        }
+        // Stale cache: show immediately while fetching fresh
+        setItems(data);
+        setLoading(false);
+      }
+    } catch {
+      // ignore bad cache
+    }
+
     apiGetHistory(sessionId)
-      .then(setItems)
+      .then((data) => {
+        setItems(data);
+        try {
+          localStorage.setItem(CACHE_KEY, JSON.stringify({ data, ts: Date.now() }));
+        } catch { /* storage full */ }
+      })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [sessionId]);
@@ -33,12 +59,56 @@ export default function HistoryDrawer({ sessionId, onClose }: Props) {
     return { onboarding, recommendation };
   }, [items]);
 
-  const ratingConfig: Record<string, { label: string; color: string; icon: string }> = {
-    like: { label: "Liked", color: "var(--color-like)", icon: "♥" },
-    okay: { label: "Okay", color: "var(--color-okay)", icon: "○" },
-    dislike: { label: "Disliked", color: "var(--color-dislike)", icon: "✕" },
-    not_watched: { label: "Skipped", color: "var(--color-text-muted)", icon: "→" },
-    remove: { label: "Removed", color: "var(--color-danger)", icon: "✕" },
+  const ratingConfig: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
+    like: {
+      label: "Liked",
+      color: "var(--color-like)",
+      icon: (
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+        </svg>
+      ),
+    },
+    okay: {
+      label: "Okay",
+      color: "var(--color-okay)",
+      icon: (
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z" />
+          <path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" />
+        </svg>
+      ),
+    },
+    dislike: {
+      label: "Disliked",
+      color: "var(--color-dislike)",
+      icon: (
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10z" />
+          <path d="M17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17" />
+        </svg>
+      ),
+    },
+    not_watched: {
+      label: "Skipped",
+      color: "var(--color-text-muted)",
+      icon: (
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="13 17 18 12 13 7" />
+          <polyline points="6 17 11 12 6 7" />
+        </svg>
+      ),
+    },
+    remove: {
+      label: "Removed",
+      color: "var(--color-danger)",
+      icon: (
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18" />
+          <line x1="6" y1="6" x2="18" y2="18" />
+        </svg>
+      ),
+    },
   };
 
   const renderItemEl = (item: HistoryItem, idx: number) => (
@@ -166,7 +236,7 @@ function HistoryItemCard({
 }: {
   item: HistoryItem;
   idx: number;
-  ratingConfig: Record<string, { label: string; color: string; icon: string }>;
+  ratingConfig: Record<string, { label: string; color: string; icon: React.ReactNode }>;
   onDelete: (tmdbId: number) => void;
 }) {
   const poster = usePoster(item.poster_path, item.tmdb_id, "w92");
@@ -220,7 +290,7 @@ function HistoryItemCard({
             fontSize: "11px", fontWeight: 500, color: config.color,
             display: "flex", alignItems: "center", gap: "3px",
           }}>
-            <span style={{ fontSize: "9px" }}>{config.icon}</span>
+            <span style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>{config.icon}</span>
             {config.label}
           </span>
           {item.year && (
@@ -257,7 +327,10 @@ function HistoryItemCard({
         }}
         title="Remove from history"
       >
-        ✕
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18" />
+          <line x1="6" y1="6" x2="18" y2="18" />
+        </svg>
       </motion.button>
     </motion.div>
   );

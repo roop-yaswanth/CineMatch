@@ -12,7 +12,9 @@ import { AnimatePresence, motion } from "framer-motion";
 import Image from "next/image";
 import YourLikesView from "@/components/YourLikesView";
 import PreferencesModal from "@/components/PreferencesModal";
+import MovieDetailModal, { type DetailMovie } from "@/components/modals/MovieDetailModal";
 import MobileMenu from "@/components/MobileMenu";
+import BottomNav from "@/components/BottomNav";
 import {
   apiMultiRecommendations,
   apiRecommendationAction,
@@ -37,7 +39,7 @@ interface Props {
   onLogout: () => void;
 }
 
-type RecommendationAction = "like" | "okay" | "dislike" | "remove";
+type RecommendationAction = "like" | "okay" | "dislike" | "remove" | "watchlist" | "watched";
 type StackId = "hollywood" | "matched" | "other";
 
 interface Stack {
@@ -215,8 +217,12 @@ export default function RecommendationsView({
   const [showSearch, setShowSearch] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Detail Modal state
+  const [activeMovie, setActiveMovie] = useState<DetailMovie | null>(null);
+
   // Overlay state for taste-profile auto-rerun (keeps stacks visible while updating)
   const [isUpdating, setIsUpdating] = useState(false);
+
 
   // Action counter for auto-rerun
   const actionCountRef = useRef({ positive: 0, negative: 0, total: 0 });
@@ -259,7 +265,7 @@ export default function RecommendationsView({
       } finally {
         setSearchLoading(false);
       }
-    }, 300); // 300ms debounce
+    }, 2000); // 2s debounce — only call after user stops typing
   }, []);
 
   // Apply frontend classics filter (genres are handled by backend, not here)
@@ -446,11 +452,16 @@ export default function RecommendationsView({
   }, [generate, initialLoad, preferences]);
 
   const handleAction = useCallback(
-    async (movie: Recommendation, action: RecommendationAction) => {
-      const tmdbId = recommendationId(movie);
+    async (movie: Recommendation | DetailMovie, action: RecommendationAction) => {
+      const tmdbId = "tmdb_id" in movie && movie.tmdb_id ? movie.tmdb_id : movie.id;
 
       // 1. Mark as seen
       seenIdsRef.current.add(tmdbId);
+
+      // Dismiss modal if open
+      if (activeMovie && (activeMovie.id === tmdbId || activeMovie.tmdb_id === tmdbId)) {
+          setActiveMovie(null);
+      }
 
       // 2. Optimistic removal from stacks + cache replenish
       setMovies((prev) => prev.filter((m) => recommendationId(m) !== tmdbId));
@@ -538,16 +549,20 @@ export default function RecommendationsView({
         width: "100%",
         maxWidth: "100vw",
         overflowX: "hidden",
+        position: "relative",
       }}
     >
+      <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", minHeight: "100dvh" }}>
       {/* Header */}
       <header
         style={{
           position: "sticky",
           top: 0,
           zIndex: 40,
-          background: "var(--color-bg)",
-          borderBottom: "1px solid var(--color-border-subtle)",
+          background: "rgba(9, 9, 11, 0.4)",
+          backdropFilter: "blur(20px)",
+          WebkitBackdropFilter: "blur(20px)",
+          borderBottom: "1px solid rgba(255, 255, 255, 0.05)",
         }}
       >
         <div
@@ -559,10 +574,11 @@ export default function RecommendationsView({
             justifyContent: "space-between",
           }}
         >
-          <div style={{ width: "40px" }} /> {/* Spacer to balance menu */}
+          <div style={{ width: "40px", flexShrink: 0 }} />
 
           <h1
             style={{
+              flex: 1,
               fontSize: "20px",
               fontWeight: 700,
               letterSpacing: "-0.03em",
@@ -577,13 +593,17 @@ export default function RecommendationsView({
             CineMatch
           </h1>
 
-          <MobileMenu
-            onLogout={onLogout}
-            onPreferences={() => setShowPrefs(true)}
-            onYourLikes={() => setShowYourLikes(true)}
-            onRefresh={() => void generate(preferences)}
-            onReset={onBackToOnboarding}
-          />
+          <div style={{ width: "40px", flexShrink: 0, display: "flex", justifyContent: "flex-end" }}>
+            <div>
+              <MobileMenu
+                onLogout={onLogout}
+                onPreferences={() => setShowPrefs(true)}
+                onYourLikes={() => setShowYourLikes(true)}
+                onRefresh={() => void generate(preferences)}
+                onReset={onBackToOnboarding}
+              />
+            </div>
+          </div>
         </div>
         
         {/* Search Bar */}
@@ -638,7 +658,10 @@ export default function RecommendationsView({
                   color: "var(--color-text-muted)",
                 }}
               >
-                ✕
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
               </button>
             )}
           </div>
@@ -680,7 +703,7 @@ export default function RecommendationsView({
                       cursor: "pointer",
                     }}
                     onClick={() => {
-                      // Could navigate to movie detail or add to recommendations
+                      setActiveMovie({ ...movie, id: movie.tmdb_id });
                       setShowSearch(false);
                       setSearchQuery("");
                     }}
@@ -758,7 +781,7 @@ export default function RecommendationsView({
                 color: "var(--color-text-primary)",
               }}
             >
-              For You
+              {/* For You */}
             </h2>
           </div>
 
@@ -815,6 +838,7 @@ export default function RecommendationsView({
                 disabled={loading}
                 onAction={handleAction}
                 onOpenDetail={() => setActiveStack(stack.id)}
+                onMovieClick={(m) => setActiveMovie(m as any)}
               />
             ))}
           </div>
@@ -831,11 +855,13 @@ export default function RecommendationsView({
               stack={activeStackData}
               onBack={() => setActiveStack(null)}
               onAction={handleAction}
+              onMovieClick={(m) => setActiveMovie(m as any)}
               disabled={loading}
             />
           );
         })()}
       </AnimatePresence>
+
 
       <AnimatePresence>
         {(showUpdateToast || isUpdating) && (
@@ -911,6 +937,24 @@ export default function RecommendationsView({
           mode="recommendations"
         />
       )}
+
+      {/* Movie Details Modal */}
+      <MovieDetailModal
+          isOpen={!!activeMovie}
+          onClose={() => setActiveMovie(null)}
+          movie={activeMovie}
+          onAction={(action) => {
+              if (activeMovie) {
+                  handleAction(activeMovie, action);
+              }
+          }}
+      />
+      {/* <BottomNav 
+        onYourLikes={() => setShowYourLikes(true)}
+        onPreferences={() => setShowPrefs(true)}
+        onRefresh={() => void generate(preferences)}
+      /> */}
+      </div>
     </div>
   );
 }
@@ -921,11 +965,13 @@ function StackDetailView({
   stack,
   onBack,
   onAction,
+  onMovieClick,
   disabled,
 }: {
   stack: Stack;
   onBack: () => void;
   onAction: (movie: Recommendation, action: RecommendationAction) => void;
+  onMovieClick: (movie: Recommendation) => void;
   disabled: boolean;
 }) {
   return (
@@ -951,7 +997,7 @@ function StackDetailView({
           zIndex: 10,
           background: "var(--color-bg)",
           borderBottom: "1px solid var(--color-border-subtle)",
-          padding: "12px 16px",
+          padding: "calc(20px + env(safe-area-inset-top, 0px)) 16px 14px",
           display: "flex",
           alignItems: "center",
           gap: "16px",
@@ -974,7 +1020,12 @@ function StackDetailView({
             boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
           }}
         >
-          <span style={{ fontSize: "16px", transform: "translateY(-1px)" }}>←</span> Back
+          <span style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="19" y1="12" x2="5" y2="12" />
+              <polyline points="12 19 5 12 12 5" />
+            </svg>
+          </span> Back
         </button>
         <div>
           <h2
@@ -1013,6 +1064,7 @@ function StackDetailView({
               movie={movie}
               disabled={disabled}
               onAction={onAction}
+              onClick={() => onMovieClick(movie)}
               priority={index < 4}
               showFullInfo
             />
@@ -1035,11 +1087,13 @@ function StackRow({
   disabled,
   onAction,
   onOpenDetail,
+  onMovieClick,
 }: {
   stack: Stack;
   disabled: boolean;
   onAction: (movie: Recommendation, action: RecommendationAction) => void;
   onOpenDetail: () => void;
+  onMovieClick: (movie: Recommendation) => void;
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [scrollInfo, setScrollInfo] = useState({ canLeft: false, canRight: false });
@@ -1159,7 +1213,9 @@ function StackRow({
             aria-label="Previous"
             style={{ opacity: canLeft ? 1 : 0, pointerEvents: canLeft ? "auto" : "none" }}
           >
-            ‹
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
           </button>
 
           {/* Desktop-only right chevron */}
@@ -1169,7 +1225,9 @@ function StackRow({
             aria-label="Next"
             style={{ opacity: canRight ? 1 : 0, pointerEvents: canRight ? "auto" : "none" }}
           >
-            ›
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
           </button>
 
           {/* Native-scroll track */}
@@ -1181,6 +1239,7 @@ function StackRow({
                   movie={movie}
                   disabled={disabled}
                   onAction={onAction}
+                  onClick={() => onMovieClick(movie)}
                   priority={index === 0}
                 />
               ))}
@@ -1200,15 +1259,18 @@ function PosterCard({
   onAction,
   priority = false,
   showFullInfo = false,
+  onClick,
 }: {
   movie: Recommendation;
   disabled: boolean;
   onAction: (movie: Recommendation, action: RecommendationAction) => void;
   priority?: boolean;
   showFullInfo?: boolean;
+  onClick?: () => void;
 }) {
   const poster = usePoster(movie.poster_path, recommendationId(movie), "w500");
   const [showActions, setShowActions] = useState(false);
+  const [showReason, setShowReason] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const touchStartXRef = useRef<number | null>(null);
 
@@ -1231,7 +1293,6 @@ function PosterCard({
   }, [showActions]);
 
   // Touch handler — suppresses ghost click after touchend.
-  // Local swipe guard: if horizontal movement > 10px, treat as carousel scroll, not tap.
   const handleContainerTouchStart = (e: React.TouchEvent) => {
     touchStartXRef.current = e.touches[0].clientX;
   };
@@ -1245,30 +1306,200 @@ function PosterCard({
     if (!showActions) {
       overlayJustShownRef.current = true;
       setShowActions(true);
-      setTimeout(() => {
-        overlayJustShownRef.current = false;
-      }, 400);
+      setTimeout(() => { overlayJustShownRef.current = false; }, 400);
     } else {
       setShowActions(false);
     }
   };
 
-  // Mouse-only click toggle (touch path is fully handled by onTouchEnd above)
+  // Mouse-only click
   const handleContainerClick = () => {
-    setShowActions((v) => !v);
+    onClick?.();
   };
 
-  const lang = movie.original_language
-    ? languageLabel(movie.original_language)
-    : "";
+  const lang = movie.original_language ? languageLabel(movie.original_language) : "";
   const imdb = movie.imdb_rating
     ? `IMDb ${movie.imdb_rating.toFixed(1)}`
     : movie.vote_average
       ? `★ ${movie.vote_average.toFixed(1)}`
       : "";
-  const genres =
-    movie.genres?.slice(0, 3).join(", ") || movie.primary_genre || "";
+  const genres = movie.genres?.slice(0, 2).join(", ") || movie.primary_genre || "";
 
+  // showFullInfo = stack detail view — render info BELOW poster (like YourLikes)
+  if (showFullInfo) {
+    return (
+      <motion.article
+        ref={cardRef}
+        layout
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.88, transition: { duration: 0.25, ease: "easeIn" } }}
+        transition={{
+          layout: { type: "spring", stiffness: 400, damping: 36 },
+          opacity: { duration: 0.2 },
+          scale: { duration: 0.2 },
+        }}
+        className="poster-card glass-card"
+        style={{
+          width: "min(42vw, 165px)",
+          minWidth: "130px",
+          flexShrink: 0,
+          scrollSnapAlign: "start",
+          borderRadius: "16px",
+          overflow: "hidden",
+        }}
+      >
+        {/* Poster */}
+        <div
+          className="poster-container"
+          onTouchStart={handleContainerTouchStart}
+          onTouchEnd={handleContainerTouchEnd}
+          onClick={handleContainerClick}
+          style={{
+            position: "relative",
+            aspectRatio: "2 / 3",
+            borderRadius: "0", // Let parent handle rounding
+            overflow: "hidden",
+            background: "var(--color-surface)",
+            cursor: "pointer",
+          }}
+        >
+          <Image
+            src={poster}
+            alt={movie.title}
+            fill
+            sizes="(max-width: 640px) 48vw, 180px"
+            style={{ objectFit: "cover" }}
+            unoptimized
+            priority={priority}
+          />
+
+          {/* IMDb badge top-right — always visible */}
+          {imdb && (
+            <div
+              style={{
+                position: "absolute",
+                top: "12px",
+                right: "12px",
+                padding: "4px 8px",
+                borderRadius: "8px",
+                background: "rgba(0,0,0,0.75)",
+                backdropFilter: "blur(4px)",
+                WebkitBackdropFilter: "blur(4px)",
+                fontSize: "10px",
+                fontWeight: 600,
+                color: "#fbbf24",
+                pointerEvents: "none",
+              }}
+            >
+              {imdb}
+            </div>
+          )}
+
+          {/* Action overlay */}
+          <div
+            className={`action-overlay ${showActions ? "active" : ""}`}
+            style={{
+              position: "absolute",
+              inset: 0,
+              display: "flex",
+              flexWrap: "wrap",
+              alignContent: "center",
+              justifyContent: "center",
+              gap: "8px",
+              background: "linear-gradient(160deg, rgba(10,10,18,0.72) 0%, rgba(0,0,0,0.92) 100%)",
+              backdropFilter: "blur(6px)",
+              WebkitBackdropFilter: "blur(6px)",
+              padding: "24px 12px 12px", // Increased top padding to push buttons down
+            }}
+          >
+            {CARD_ACTIONS.map((btn) => (
+              <button
+                key={btn.action}
+                onTouchEnd={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (disabled || overlayJustShownRef.current) return;
+                  setShowActions(false);
+                  onAction(movie, btn.action);
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (disabled) return;
+                  setShowActions(false);
+                  onAction(movie, btn.action);
+                }}
+                disabled={disabled}
+                className="action-btn"
+                style={{
+                  width: "calc(50% - 4px)",
+                  color: btn.color,
+                  opacity: disabled ? 0.4 : 1,
+                  cursor: disabled ? "not-allowed" : "pointer",
+                }}
+              >
+                <span style={{ display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}>
+                  {btn.icon}
+                </span>
+                <span style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                  {btn.label}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Info BELOW poster — Click for Full Details */}
+        <div 
+          onClick={(e) => {
+            e.stopPropagation();
+            if (onClick) onClick();
+          }}
+          style={{ 
+            padding: "10px 8px 12px", 
+            cursor: "pointer",
+            background: "transparent" // Ensure click area is solid
+          }}
+        >
+          <p
+            style={{
+              fontSize: "11px",
+              fontWeight: 600,
+              color: "var(--color-text-primary)",
+              margin: 0,
+              lineHeight: 1.3,
+              display: "-webkit-box",
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden",
+            }}
+          >
+            {movie.title}
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: "3px", marginTop: "5px" }}>
+            <p style={{ fontSize: "10px", color: "var(--color-text-muted)", margin: 0 }}>
+              {[movie.year, lang].filter(Boolean).join(" · ")}
+            </p>
+            {genres && (
+              <p style={{ 
+                fontSize: "9px", 
+                color: "var(--color-text-muted)", 
+                opacity: 0.6, 
+                margin: 0,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis"
+              }}>
+                {genres}
+              </p>
+            )}
+          </div>
+        </div>
+      </motion.article>
+    );
+  }
+
+  // Default carousel card — info overlaid on poster
   return (
     <motion.article
       ref={cardRef}
@@ -1339,6 +1570,81 @@ function PosterCard({
           </div>
         )}
 
+        {/* Match score badge top-left */}
+        {movie.score !== undefined && movie.score >= 0.70 && (
+          <div
+            className={showActions ? "hidden-by-actions" : ""}
+            style={{
+              position: "absolute",
+              top: "6px",
+              left: "6px",
+              padding: "3px 7px",
+              borderRadius: "6px",
+              background: movie.score >= 0.85 ? "rgba(34,197,94,0.85)" : "rgba(234,179,8,0.85)",
+              backdropFilter: "blur(4px)",
+              WebkitBackdropFilter: "blur(4px)",
+              fontSize: "10px",
+              fontWeight: 700,
+              color: "#fff",
+              pointerEvents: "none",
+              letterSpacing: "0.01em",
+            }}
+          >
+            {Math.round(movie.score * 100)}% Match
+          </div>
+        )}
+
+        {/* "Why?" reason chip */}
+        {movie.reason && (
+          <div
+            className={showActions ? "hidden-by-actions" : ""}
+            style={{ position: "absolute", bottom: "8px", left: "8px", zIndex: 3, cursor: "pointer" }}
+            onMouseEnter={() => setShowReason(true)}
+            onMouseLeave={() => setShowReason(false)}
+            onTouchEnd={(e) => { e.stopPropagation(); e.preventDefault(); setShowReason((v) => !v); }}
+          >
+            <div style={{
+              background: "rgba(255,255,255,0.15)",
+              backdropFilter: "blur(6px)",
+              WebkitBackdropFilter: "blur(6px)",
+              border: "1px solid rgba(255,255,255,0.25)",
+              borderRadius: "20px",
+              padding: "2px 8px",
+              fontSize: "10px",
+              fontWeight: 500,
+              color: "rgba(255,255,255,0.9)",
+              display: "flex",
+              alignItems: "center",
+              gap: "3px",
+              userSelect: "none",
+            }}>
+              <span style={{ fontSize: "9px" }}>ⓘ</span> Why?
+            </div>
+            {showReason && (
+              <div style={{
+                position: "absolute",
+                bottom: "calc(100% + 6px)",
+                left: 0,
+                width: "180px",
+                background: "rgba(10,10,18,0.95)",
+                backdropFilter: "blur(12px)",
+                WebkitBackdropFilter: "blur(12px)",
+                border: "1px solid rgba(255,255,255,0.12)",
+                borderRadius: "10px",
+                padding: "10px 12px",
+                fontSize: "11px",
+                lineHeight: 1.5,
+                color: "rgba(255,255,255,0.85)",
+                boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
+                zIndex: 10,
+                pointerEvents: "none",
+              }}>
+                {movie.reason}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Persistent bottom info overlay */}
         <div
           className={`poster-bottom-info ${showActions ? "hidden-by-actions" : ""}`}
@@ -1347,16 +1653,14 @@ function PosterCard({
             bottom: 0,
             left: 0,
             right: 0,
-            background: showFullInfo
-              ? "linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.7) 50%, transparent 100%)"
-              : "linear-gradient(to top, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.5) 55%, transparent 100%)",
-            padding: showFullInfo ? "52px 10px 10px" : "40px 8px 8px",
+            background: "linear-gradient(to top, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.5) 55%, transparent 100%)",
+            padding: "40px 8px 8px",
             pointerEvents: "none",
           }}
         >
           <p
             style={{
-              fontSize: showFullInfo ? "13px" : "11px",
+              fontSize: "11px",
               fontWeight: 600,
               color: "#fff",
               margin: 0,
@@ -1369,36 +1673,10 @@ function PosterCard({
           >
             {movie.title}
           </p>
-          {showFullInfo ? (
-            <>
-              {/* Year · Language · IMDb */}
-              <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.65)", margin: "4px 0 0", lineHeight: 1.3 }}>
-                {[
-                  movie.year,
-                  lang || null,
-                  imdb || null,
-                ].filter(Boolean).join(" · ")}
-              </p>
-              {/* Genre */}
-              {genres && (
-                <p style={{
-                  fontSize: "10px",
-                  color: "rgba(255,255,255,0.45)",
-                  margin: "2px 0 0",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}>
-                  {genres}
-                </p>
-              )}
-            </>
-          ) : (
-            (movie.year || lang || imdb) && (
-              <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.55)", margin: "2px 0 0", lineHeight: 1.3 }}>
-                {[movie.year, lang, imdb].filter(Boolean).join(" · ")}
-              </p>
-            )
+          {(movie.year || lang || imdb) && (
+            <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.55)", margin: "2px 0 0", lineHeight: 1.3 }}>
+              {[movie.year, lang].filter(Boolean).join(" · ")}
+            </p>
           )}
         </div>
 
@@ -1422,8 +1700,6 @@ function PosterCard({
           {CARD_ACTIONS.map((btn) => (
             <button
               key={btn.action}
-              // Touch: preventDefault kills ghost-click; guard prevents
-              // firing on the same tap that opened the overlay.
               onTouchEnd={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
