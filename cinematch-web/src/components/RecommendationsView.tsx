@@ -958,6 +958,7 @@ export default function RecommendationsView({
                   handleAction(activeMovie, action);
               }
           }}
+          onMovieSelect={(m) => setActiveMovie(m)}
       />
       {/* <BottomNav 
         onYourLikes={() => setShowYourLikes(true)}

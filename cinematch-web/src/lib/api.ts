@@ -384,6 +384,13 @@ export async function apiUpdatePreferences(
   });
 }
 
+export async function apiSimilarMovies(tmdbId: number, n = 10): Promise<Recommendation[]> {
+  const data = await request<{ results: Recommendation[] }>(
+    `/api/movies/similar?tmdb_id=${tmdbId}&n=${n}`
+  );
+  return data.results ?? [];
+}
+
 export function posterUrl(path: string | null | undefined, size = "w500"): string {
   if (!path) return "/poster_placeholder.svg";
   if (path.startsWith("http")) return path;

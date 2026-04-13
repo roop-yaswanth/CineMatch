@@ -1,7 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Image from "next/image";
-import { posterUrl, languageLabel } from "@/lib/api";
+import { posterUrl, languageLabel, apiSimilarMovies, type Recommendation } from "@/lib/api";
 
 export interface DetailMovie {
   id: number;
@@ -29,10 +29,14 @@ interface Props {
   onClose: () => void;
   movie: DetailMovie | null;
   onAction?: (action: "like" | "okay" | "dislike" | "watchlist" | "watched") => void;
+  onMovieSelect?: (movie: DetailMovie) => void;
 }
 
-export default function MovieDetailModal({ isOpen, onClose, movie, onAction }: Props) {
+export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onMovieSelect }: Props) {
   const [successAction, setSuccessAction] = useState<string | null>(null);
+  const [similar, setSimilar] = useState<Recommendation[]>([]);
+  const [similarLoading, setSimilarLoading] = useState(false);
+  const similarRowRef = useRef<HTMLDivElement>(null);
 
   // Prevent body scroll when open
   useEffect(() => {
@@ -40,12 +44,24 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction }: P
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "auto";
-      setSuccessAction(null); // Reset on close
+      setSuccessAction(null);
     }
     return () => {
       document.body.style.overflow = "auto";
     };
   }, [isOpen]);
+
+  // Fetch similar movies whenever the movie changes
+  useEffect(() => {
+    const id = movie?.tmdb_id ?? movie?.id;
+    if (!isOpen || !id) { setSimilar([]); return; }
+    setSimilarLoading(true);
+    setSimilar([]);
+    apiSimilarMovies(id, 10)
+      .then(setSimilar)
+      .catch(() => setSimilar([]))
+      .finally(() => setSimilarLoading(false));
+  }, [movie?.id, movie?.tmdb_id, isOpen]);
 
   const handleActionClick = (action: any) => {
     if (!onAction) return;
@@ -93,9 +109,9 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction }: P
             className="glass-modal"
             style={{
               position: "relative",
-              width: "90%",
-              maxWidth: "800px",
-              maxHeight: "90vh",
+              width: "88%",
+              maxWidth: "700px",
+              maxHeight: "82vh",
               overflowY: "auto",
               display: "flex",
               flexDirection: "column",
@@ -132,10 +148,10 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction }: P
               {/* Left Column: Poster Image */}
               <div
                 style={{
-                  flex: "1 1 300px",
+                  flex: "1 1 240px",
                   position: "relative",
                   aspectRatio: "2/3",
-                  minHeight: "400px",
+                  minHeight: "320px",
                   background: "var(--color-surface)",
                 }}
               >
@@ -151,12 +167,12 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction }: P
               {/* Right Column: Details and Actions */}
               <div
                 style={{
-                  flex: "2 1 400px",
-                  padding: "32px 24px",
+                  flex: "2 1 340px",
+                  padding: "24px 20px",
                   display: "flex",
                   flexDirection: "column",
-                  gap: "24px",
-                  background: "var(--color-bg)",
+                  gap: "16px",
+                  background: movie.backdrop_path ? "transparent" : "var(--color-bg)",
                 }}
               >
                 <div>
@@ -179,7 +195,7 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction }: P
                     </div>
                   )}
 
-                  <h2 style={{ margin: "0 0 8px 0", fontSize: "32px", fontWeight: 700, color: "var(--color-text-primary)", lineHeight: 1.1 }}>
+                  <h2 style={{ margin: "0 0 6px 0", fontSize: "26px", fontWeight: 700, color: "var(--color-text-primary)", lineHeight: 1.1 }}>
                     {movie.title}
                   </h2>
 
@@ -217,7 +233,7 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction }: P
                   )}
                 </div>
 
-                <div style={{ fontSize: "15px", lineHeight: 1.6, color: "var(--color-text-secondary)" }}>
+                <div style={{ fontSize: "13px", lineHeight: 1.6, color: "var(--color-text-secondary)" }}>
                   {overview}
                 </div>
 
@@ -239,22 +255,58 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction }: P
                 )}
 
                 {onAction && (
-                    <div style={{ marginTop: "auto", paddingTop: "24px", borderTop: "1px solid var(--color-border-subtle)" }}>
+                    <div style={{ marginTop: "auto", paddingTop: "16px", borderTop: "1px solid var(--color-border-subtle)" }}>
                         <h4 style={{ margin: "0 0 16px 0", fontSize: "12px", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--color-text-muted)" }}>
                             Rate this movie
                         </h4>
                         <div style={{ display: "flex", flexWrap: "wrap", gap: "12px" }}>
-                            <button className="glass-button" onClick={() => onAction("like")} style={{ flex: 1, padding: "12px", color: "var(--color-like)", fontWeight: 600, display: "flex", justifyContent: "center", gap: "8px", alignItems: "center" }}>
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" /></svg>
-                                Like
+                            {/* Like */}
+                            <button className="glass-button" onClick={() => handleActionClick("like")} style={{ flex: 1, padding: "12px", fontWeight: 600, display: "flex", justifyContent: "center", alignItems: "center", height: "46px" }}>
+                                <AnimatePresence mode="wait">
+                                    {successAction === "like" ? (
+                                        <motion.div key="done" initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.5, opacity: 0 }} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--color-like)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                            <span style={{ color: "var(--color-like)", fontWeight: 700 }}>Liked</span>
+                                        </motion.div>
+                                    ) : (
+                                        <motion.div key="icon" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--color-like)" }}>
+                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" /></svg>
+                                            Like
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
                             </button>
-                            <button className="glass-button" onClick={() => onAction("okay")} style={{ flex: 1, padding: "12px", color: "var(--color-okay)", fontWeight: 600, display: "flex", justifyContent: "center", gap: "8px", alignItems: "center" }}>
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z" /><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" /></svg>
-                                Okay
+                            {/* Okay */}
+                            <button className="glass-button" onClick={() => handleActionClick("okay")} style={{ flex: 1, padding: "12px", fontWeight: 600, display: "flex", justifyContent: "center", alignItems: "center", height: "46px" }}>
+                                <AnimatePresence mode="wait">
+                                    {successAction === "okay" ? (
+                                        <motion.div key="done" initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.5, opacity: 0 }} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--color-okay)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                            <span style={{ color: "var(--color-okay)", fontWeight: 700 }}>Okay</span>
+                                        </motion.div>
+                                    ) : (
+                                        <motion.div key="icon" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--color-okay)" }}>
+                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z" /><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" /></svg>
+                                            Okay
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
                             </button>
-                            <button className="glass-button" onClick={() => onAction("dislike")} style={{ flex: 1, padding: "12px", color: "var(--color-dislike)", fontWeight: 600, display: "flex", justifyContent: "center", gap: "8px", alignItems: "center" }}>
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10z" /><path d="M17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17" /></svg>
-                                Dislike
+                            {/* Dislike */}
+                            <button className="glass-button" onClick={() => handleActionClick("dislike")} style={{ flex: 1, padding: "12px", fontWeight: 600, display: "flex", justifyContent: "center", alignItems: "center", height: "46px" }}>
+                                <AnimatePresence mode="wait">
+                                    {successAction === "dislike" ? (
+                                        <motion.div key="done" initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.5, opacity: 0 }} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--color-dislike)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                            <span style={{ color: "var(--color-dislike)", fontWeight: 700 }}>Noted</span>
+                                        </motion.div>
+                                    ) : (
+                                        <motion.div key="icon" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--color-dislike)" }}>
+                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10z" /><path d="M17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17" /></svg>
+                                            Dislike
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
                             </button>
                         </div>
                         <div style={{ display: "flex", gap: "12px", marginTop: "12px" }}>
@@ -293,9 +345,196 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction }: P
                 )}
               </div>
             </div>
+
+            {/* ── More Like This ───────────────────────── */}
+            {(similarLoading || similar.length > 0) && (
+              <div style={{
+                borderTop: "1px solid var(--color-border-subtle)",
+                padding: "16px 20px 20px",
+                position: "relative",
+                zIndex: 1,
+              }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
+                  <h4 style={{
+                    margin: 0,
+                    fontSize: "12px",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.08em",
+                    color: "var(--color-text-muted)",
+                    fontWeight: 600,
+                  }}>
+                    More like this
+                  </h4>
+                  {!similarLoading && similar.length > 0 && (
+                    <div style={{ display: "flex", gap: "6px" }}>
+                      <button
+                        onClick={() => similarRowRef.current?.scrollBy({ left: -300, behavior: "smooth" })}
+                        style={{
+                          width: "28px", height: "28px", borderRadius: "50%",
+                          border: "1px solid var(--color-border-subtle)",
+                          background: "rgba(255,255,255,0.06)",
+                          color: "var(--color-text-secondary)",
+                          cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                        }}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="15 18 9 12 15 6" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => similarRowRef.current?.scrollBy({ left: 300, behavior: "smooth" })}
+                        style={{
+                          width: "28px", height: "28px", borderRadius: "50%",
+                          border: "1px solid var(--color-border-subtle)",
+                          background: "rgba(255,255,255,0.06)",
+                          color: "var(--color-text-secondary)",
+                          cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                        }}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="9 18 15 12 9 6" />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Skeleton row while loading */}
+                {similarLoading && (
+                  <div style={{ display: "flex", gap: "12px", overflowX: "hidden" }}>
+                    {Array.from({ length: 6 }).map((_, i) => (
+                      <div key={i} style={{ flexShrink: 0, width: "90px" }}>
+                        <div className="skeleton-shimmer" style={{ width: "90px", paddingBottom: "135px", borderRadius: "10px" }} />
+                        <div className="skeleton-shimmer" style={{ height: "10px", width: "75%", borderRadius: "999px", marginTop: "8px" }} />
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Similar movies row */}
+                {!similarLoading && similar.length > 0 && (
+                  <div
+                    ref={similarRowRef}
+                    style={{
+                      display: "flex",
+                      gap: "12px",
+                      overflowX: "auto",
+                      paddingBottom: "4px",
+                      scrollSnapType: "x mandatory",
+                      msOverflowStyle: "none",
+                      scrollbarWidth: "none",
+                    }}
+                  >
+                    {similar.map((m) => (
+                      <SimilarCard
+                        key={m.tmdb_id ?? m.id}
+                        movie={m}
+                        onClick={() => {
+                          if (onMovieSelect) {
+                            onMovieSelect({
+                              id: m.tmdb_id ?? m.id,
+                              tmdb_id: m.tmdb_id,
+                              title: m.title,
+                              poster_path: m.poster_path,
+                              backdrop_path: m.backdrop_path,
+                              year: m.year,
+                              original_language: m.original_language,
+                              imdb_rating: m.imdb_rating,
+                              vote_average: m.vote_average,
+                              genres: m.genres,
+                              primary_genre: m.primary_genre,
+                              overview: m.overview,
+                              director: m.director,
+                              runtime: m.runtime,
+                              score: m.score,
+                              reason: m.reason,
+                            });
+                          }
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
           </motion.div>
         </div>
       )}
     </AnimatePresence>
+  );
+}
+
+/* ── Similar Movie Mini-Card ─────────────────────── */
+function SimilarCard({ movie, onClick }: { movie: Recommendation; onClick: () => void }) {
+  const src = movie.poster_path
+    ? posterUrl(movie.poster_path, "w185")
+    : "/poster_placeholder.svg";
+
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        flexShrink: 0,
+        width: "90px",
+        scrollSnapAlign: "start",
+        background: "none",
+        border: "none",
+        padding: 0,
+        cursor: "pointer",
+        textAlign: "left",
+      }}
+    >
+      <div style={{
+        width: "90px",
+        height: "135px",
+        borderRadius: "10px",
+        overflow: "hidden",
+        background: "var(--color-surface)",
+        position: "relative",
+      }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={src}
+          alt={movie.title}
+          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+          onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = "0"; }}
+        />
+        {movie.imdb_rating && (
+          <div style={{
+            position: "absolute",
+            bottom: "5px",
+            left: "5px",
+            background: "rgba(0,0,0,0.75)",
+            backdropFilter: "blur(4px)",
+            borderRadius: "5px",
+            padding: "2px 5px",
+            fontSize: "9px",
+            fontWeight: 700,
+            color: "#fbbf24",
+          }}>
+            {movie.imdb_rating.toFixed(1)}
+          </div>
+        )}
+      </div>
+      <p style={{
+        margin: "6px 0 0",
+        fontSize: "10px",
+        fontWeight: 500,
+        color: "var(--color-text-secondary)",
+        lineHeight: 1.3,
+        display: "-webkit-box",
+        WebkitLineClamp: 2,
+        WebkitBoxOrient: "vertical",
+        overflow: "hidden",
+      }}>
+        {movie.title}
+      </p>
+      {movie.year && (
+        <p style={{ margin: "2px 0 0", fontSize: "9px", color: "var(--color-text-muted)" }}>
+          {movie.year}
+        </p>
+      )}
+    </button>
   );
 }
