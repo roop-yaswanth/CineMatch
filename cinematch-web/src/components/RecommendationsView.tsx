@@ -801,23 +801,33 @@ export default function RecommendationsView({
                     marginBottom: "14px",
                   }}
                 />
-                <div style={{ display: "flex", gap: "14px", overflow: "hidden" }}>
+                <div style={{ display: "flex", gap: "16px", overflow: "hidden", paddingBottom: "8px" }}>
                   {Array.from({ length: 6 }).map((_, j) => (
-                    <div key={j} style={{ width: "160px", flexShrink: 0 }}>
+                    <div key={j} style={{ width: "min(40vw, 150px)", flexShrink: 0 }}>
                       <div
-                        className="skeleton-shimmer"
+                        className="skeleton-shimmer skeleton-grain"
                         style={{
                           aspectRatio: "2 / 3",
-                          borderRadius: "var(--radius-poster)",
+                          borderRadius: "16px",
+                          marginBottom: "12px"
                         }}
                       />
                       <div
                         className="skeleton-shimmer"
                         style={{
-                          height: "12px",
-                          width: "80%",
-                          borderRadius: "999px",
-                          marginTop: "10px",
+                          height: "10px",
+                          width: "85%",
+                          borderRadius: "4px",
+                          marginBottom: "6px"
+                        }}
+                      />
+                      <div
+                        className="skeleton-shimmer"
+                        style={{
+                          height: "8px",
+                          width: "50%",
+                          borderRadius: "4px",
+                          opacity: 0.6
                         }}
                       />
                     </div>
