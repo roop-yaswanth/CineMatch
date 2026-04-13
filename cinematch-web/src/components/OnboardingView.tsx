@@ -115,6 +115,7 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
   // Drag indicator
   const dragX = useMotionValue(0);
   const dragY = useMotionValue(0);
+  const [cardGlow, setCardGlow] = useState("none");
 
   const ratingDirection = useCallback((rating: string): SwipeDirection => {
     switch (rating) {
@@ -419,16 +420,26 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
                 custom={lastSwipe}
                 variants={cardVariants}
                 initial="enter" animate="center" exit="exit"
-                style={{ width: "clamp(220px, 70vw, 320px)", maxWidth: "100%", cursor: "grab", touchAction: "none", position: "relative" }}
+                style={{ width: "clamp(220px, 70vw, 320px)", maxWidth: "100%", cursor: "grab", touchAction: "none", position: "relative", borderRadius: "var(--radius-poster)", boxShadow: cardGlow }}
                 drag
                 dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
                 dragElastic={0.65}
-                onDrag={(_, info) => { dragX.set(info.offset.x); dragY.set(info.offset.y); }}
-                onDragEnd={(e, info) => { dragX.set(0); dragY.set(0); handleDragEnd(e, info); }}
+                onDrag={(_, info) => {
+                  const x = info.offset.x, y = info.offset.y;
+                  dragX.set(x); dragY.set(y);
+                  const ax = Math.abs(x), ay = Math.abs(y);
+                  if (ax < 16 && ay < 16) { setCardGlow("none"); return; }
+                  const op = Math.min(1, (Math.max(ax, ay) - 16) / 80);
+                  const c = ax >= ay
+                    ? (x > 0 ? "34,197,94" : "239,68,68")
+                    : (y > 0 ? "245,158,11" : "148,163,184");
+                  setCardGlow(`0 0 ${44 * op}px ${14 * op}px rgba(${c},${0.7 * op})`);
+                }}
+                onDragEnd={(e, info) => { dragX.set(0); dragY.set(0); setCardGlow("none"); handleDragEnd(e, info); }}
                 whileDrag={{ scale: 1.02, rotate: 1.5, cursor: "grabbing" }}
               >
-                {/* Swipe direction indicator */}
-                <SwipeIndicator dragX={dragX} dragY={dragY} />
+                {/* Swipe glow feedback */}
+                <SwipeGlowOverlay dragX={dragX} dragY={dragY} />
 
                 <MovieCard movie={state.movie} priority noLayout />
 
@@ -628,65 +639,79 @@ const sectionLabelStyle: React.CSSProperties = {
 import type { MotionValue } from "framer-motion";
 import { useMotionValueEvent } from "framer-motion";
 
-function SwipeIndicator({
-  dragX, dragY,
-}: {
-  dragX: MotionValue<number>;
-  dragY: MotionValue<number>;
-}) {
-  const [label, setLabel] = useState<{ text: string; color: string; pos: "left" | "right" | "top" | "bottom" } | null>(null);
-  const [opacity, setOpacity] = useState(0);
+const SWIPE_CONFIGS = {
+  right: { label: "LIKE", color: "#22c55e", stampTop: "28px", stampLeft: "18px",  stampRotate: "-22deg" },
+  left:  { label: "NOPE", color: "#ef4444", stampTop: "28px", stampRight: "18px", stampRotate:  "22deg" },
+  down:  { label: "OKAY", color: "#f59e0b", stampTop: "28px", stampLeft: "50%",   stampRotate: "-8deg", stampTranslateX: "-50%" },
+  up:    { label: "SKIP", color: "#94a3b8", stampBottom: "90px", stampLeft: "50%", stampRotate: "8deg",  stampTranslateX: "-50%" },
+} as const;
 
-  useMotionValueEvent(dragX, "change", (x) => {
-    const y = dragY.get();
-    update(x, y);
-  });
-  useMotionValueEvent(dragY, "change", (y) => {
-    const x = dragX.get();
-    update(x, y);
-  });
+type SwipeDir = keyof typeof SWIPE_CONFIGS;
+
+function SwipeGlowOverlay({ dragX, dragY }: { dragX: MotionValue<number>; dragY: MotionValue<number> }) {
+  const [state, setState] = useState<{ dir: SwipeDir; op: number } | null>(null);
+
+  useMotionValueEvent(dragX, "change", (x) => update(x, dragY.get()));
+  useMotionValueEvent(dragY, "change", (y) => update(dragX.get(), y));
 
   function update(x: number, y: number) {
-    const abs = Math.max(Math.abs(x), Math.abs(y));
-    setOpacity(Math.min(1, (abs - 20) / 40));
-    if (Math.abs(x) < 20 && Math.abs(y) < 20) { setLabel(null); return; }
-    if (Math.abs(x) >= Math.abs(y)) {
-      setLabel(x > 0
-        ? { text: "LIKE", color: "var(--color-like)", pos: "left" }
-        : { text: "DISLIKE", color: "var(--color-dislike)", pos: "right" });
-    } else {
-      setLabel(y > 0
-        ? { text: "OKAY", color: "var(--color-okay)", pos: "top" }
-        : { text: "SKIP", color: "var(--color-skip)", pos: "bottom" });
-    }
+    const ax = Math.abs(x), ay = Math.abs(y);
+    if (ax < 16 && ay < 16) { setState(null); return; }
+    const horizontal = ax >= ay;
+    const dir: SwipeDir = horizontal ? (x > 0 ? "right" : "left") : (y > 0 ? "down" : "up");
+    const raw = (horizontal ? ax : ay) - 16;
+    setState({ dir, op: Math.min(1, raw / 80) });
   }
 
-  if (!label || opacity <= 0) return null;
-
-  const posStyle: React.CSSProperties =
-    label.pos === "left" ? { left: "16px", top: "50%", transform: "translateY(-50%) rotate(-12deg)" } :
-    label.pos === "right" ? { right: "16px", top: "50%", transform: "translateY(-50%) rotate(12deg)" } :
-    label.pos === "top" ? { top: "16px", left: "50%", transform: "translateX(-50%)" } :
-    { bottom: "16px", left: "50%", transform: "translateX(-50%)" };
+  if (!state) return null;
+  const { dir, op } = state;
+  const cfg = SWIPE_CONFIGS[dir];
+  const hex = cfg.color;
+  const stOp = Math.min(1, op * 1.8); // stamp appears slightly faster
 
   return (
-    <div style={{ position: "absolute", zIndex: 30, pointerEvents: "none", opacity, ...posStyle }}>
-      <span style={{
-        display: "inline-block",
-        padding: "6px 14px",
-        borderRadius: "8px",
-        border: `2px solid ${label.color}`,
-        color: label.color,
-        fontSize: "18px",
-        fontWeight: 800,
-        letterSpacing: "0.1em",
-        background: `${label.color}18`,
-        backdropFilter: "blur(4px)",
-        textShadow: `0 0 12px ${label.color}88`,
+    <>
+      {/* Solid color tint — clean, confident, no gradient */}
+      <div style={{
+        position: "absolute", inset: 0, borderRadius: "var(--radius-poster)",
+        background: hex, opacity: op * 0.22,
+        pointerEvents: "none", zIndex: 10,
+      }} />
+
+      {/* Stamp — corner-positioned, rotated, Tinder-style */}
+      <div style={{
+        position: "absolute",
+        ...("stampTop"    in cfg && { top:    cfg.stampTop }),
+        ...("stampBottom" in cfg && { bottom: cfg.stampBottom }),
+        ...("stampLeft"   in cfg && { left:   cfg.stampLeft }),
+        ...("stampRight"  in cfg && { right:  cfg.stampRight }),
+        transform: [
+          `rotate(${cfg.stampRotate})`,
+          "stampTranslateX" in cfg ? `translateX(${cfg.stampTranslateX})` : "",
+        ].filter(Boolean).join(" "),
+        zIndex: 20, pointerEvents: "none", opacity: stOp,
       }}>
-        {label.text}
-      </span>
-    </div>
+        <div style={{
+          padding: "5px 16px 6px",
+          border: `4px solid ${hex}`,
+          borderRadius: "6px",
+          color: hex,
+          fontSize: "26px",
+          fontWeight: 900,
+          letterSpacing: "0.16em",
+          lineHeight: 1.15,
+          background: "rgba(0,0,0,0.35)",
+          backdropFilter: "blur(4px)",
+          WebkitBackdropFilter: "blur(4px)",
+          userSelect: "none",
+          whiteSpace: "nowrap",
+          // subtle inner shadow for depth
+          boxShadow: `inset 0 0 0 1px ${hex}44`,
+        }}>
+          {cfg.label}
+        </div>
+      </div>
+    </>
   );
 }
 
