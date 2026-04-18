@@ -953,6 +953,7 @@ export default function RecommendationsView({
           isOpen={!!activeMovie}
           onClose={() => setActiveMovie(null)}
           movie={activeMovie}
+          sessionId={session.session_id}
           onAction={(action) => {
               if (activeMovie) {
                   handleAction(activeMovie, action);

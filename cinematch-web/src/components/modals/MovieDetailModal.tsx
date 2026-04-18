@@ -30,9 +30,10 @@ interface Props {
   movie: DetailMovie | null;
   onAction?: (action: "like" | "okay" | "dislike" | "watchlist" | "watched") => void;
   onMovieSelect?: (movie: DetailMovie) => void;
+  sessionId?: string | null;
 }
 
-export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onMovieSelect }: Props) {
+export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onMovieSelect, sessionId }: Props) {
   const [successAction, setSuccessAction] = useState<string | null>(null);
   const [similar, setSimilar] = useState<Recommendation[]>([]);
   const [similarLoading, setSimilarLoading] = useState(false);
@@ -57,11 +58,11 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
     if (!isOpen || !id) { setSimilar([]); return; }
     setSimilarLoading(true);
     setSimilar([]);
-    apiSimilarMovies(id, 10)
+    apiSimilarMovies(id, sessionId ?? null, 10)
       .then(setSimilar)
       .catch(() => setSimilar([]))
       .finally(() => setSimilarLoading(false));
-  }, [movie?.id, movie?.tmdb_id, isOpen]);
+  }, [movie?.id, movie?.tmdb_id, isOpen, sessionId]);
 
   const handleActionClick = (action: any) => {
     if (!onAction) return;

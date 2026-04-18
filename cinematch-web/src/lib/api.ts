@@ -384,9 +384,15 @@ export async function apiUpdatePreferences(
   });
 }
 
-export async function apiSimilarMovies(tmdbId: number, n = 10): Promise<Recommendation[]> {
+export async function apiSimilarMovies(
+  tmdbId: number,
+  sessionId?: string | null,
+  n = 10
+): Promise<Recommendation[]> {
+  const params = new URLSearchParams({ tmdb_id: String(tmdbId), n: String(n) });
+  if (sessionId) params.set("session_id", sessionId);
   const data = await request<{ results: Recommendation[] }>(
-    `/api/movies/similar?tmdb_id=${tmdbId}&n=${n}`
+    `/api/movies/similar?${params.toString()}`
   );
   return data.results ?? [];
 }
