@@ -58,7 +58,7 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
     if (!isOpen || !id) { setSimilar([]); return; }
     setSimilarLoading(true);
     setSimilar([]);
-    apiSimilarMovies(id, sessionId ?? null, 10)
+    apiSimilarMovies(id, sessionId ?? null, 15)
       .then(setSimilar)
       .catch(() => setSimilar([]))
       .finally(() => setSimilarLoading(false));
