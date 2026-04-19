@@ -58,7 +58,7 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
     if (!isOpen || !id) { setSimilar([]); return; }
     setSimilarLoading(true);
     setSimilar([]);
-    apiSimilarMovies(id, sessionId ?? null, 15)
+    apiSimilarMovies(id, sessionId ?? null, 20)
       .then(setSimilar)
       .catch(() => setSimilar([]))
       .finally(() => setSimilarLoading(false));
@@ -369,7 +369,7 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                   {!similarLoading && similar.length > 0 && (
                     <div style={{ display: "flex", gap: "6px" }}>
                       <button
-                        onClick={() => similarRowRef.current?.scrollBy({ left: -300, behavior: "smooth" })}
+                        onClick={() => similarRowRef.current?.scrollBy({ left: -600, behavior: "smooth" })}
                         style={{
                           width: "28px", height: "28px", borderRadius: "50%",
                           border: "1px solid var(--color-border-subtle)",
@@ -383,7 +383,7 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                         </svg>
                       </button>
                       <button
-                        onClick={() => similarRowRef.current?.scrollBy({ left: 300, behavior: "smooth" })}
+                        onClick={() => similarRowRef.current?.scrollBy({ left: 600, behavior: "smooth" })}
                         style={{
                           width: "28px", height: "28px", borderRadius: "50%",
                           border: "1px solid var(--color-border-subtle)",
