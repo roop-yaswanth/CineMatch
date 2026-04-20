@@ -65,9 +65,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(() => {
     localStorage.removeItem(STORAGE_KEY);
     setSession(null);
-    // Hard redirect to clear SPA history and prevent back cycling through trap entries
+    // Use replace to prevent back button from returning to protected routes.
+    // This perfectly restores standard routing (going back from the new login screen drops them out of the app).
     if (typeof window !== 'undefined') {
-      window.location.href = '/login';
+      window.location.replace('/login');
     }
   }, []);
 
