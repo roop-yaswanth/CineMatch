@@ -82,7 +82,7 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
 
   if (!movie) return null;
 
-  const poster = posterUrl(movie.poster_path, "w780");
+  const poster = posterUrl(movie.poster_path, "w500");
   const lang = movie.original_language ? languageLabel(movie.original_language) : "";
   const year = movie.year || "";
   const genres = movie.genres?.join(", ") || movie.primary_genre || "";

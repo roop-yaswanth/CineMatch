@@ -447,6 +447,16 @@ export default function RecommendationsView({
   );
 
   useEffect(() => {
+    // Trap back button so users don't drop out of active sessions
+    window.history.pushState(null, "", window.location.href);
+    const handlePopState = () => {
+      window.history.pushState(null, "", window.location.href);
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  useEffect(() => {
     if (!initialLoad) return;
     void generate(preferences);
     setInitialLoad(false);
@@ -1360,8 +1370,8 @@ function PosterCard({
   showFullInfo?: boolean;
   onClick?: () => void;
 }) {
-  const poster = usePoster(movie.poster_path, recommendationId(movie), "w500");
-  const backdrop = usePoster(movie.backdrop_path || movie.poster_path, recommendationId(movie), "w780");
+  const poster = usePoster(movie.poster_path, recommendationId(movie), "w342");
+  const backdrop = usePoster(movie.backdrop_path || movie.poster_path, recommendationId(movie), "w500");
   const hasBackdrop = !!movie.backdrop_path;
 
   const [showActions, setShowActions] = useState(false);

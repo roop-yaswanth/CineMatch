@@ -190,6 +190,16 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
   );
 
   useEffect(() => {
+    // Trap the back button so users don't accidentally leave the site during onboarding
+    window.history.pushState(null, "", window.location.href);
+    const handlePopState = (e: PopStateEvent) => {
+      window.history.pushState(null, "", window.location.href);
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  useEffect(() => {
     const handleKeyboard = (e: KeyboardEvent) => {
       if (!state?.movie || loading) return;
       if (e.key === "l" || e.key === "L") handleRate("like");
@@ -234,7 +244,7 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          style={{ width: "100%", maxWidth: "520px", textAlign: "center" }}
+          style={{ width: "100%", maxWidth: "700px", textAlign: "center" }}
         >
           <p style={{ fontSize: "11px", color: "var(--color-text-muted)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "6px" }}>
             Step 1
@@ -355,7 +365,7 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
     }}>
       {/* Header */}
       <div style={{
-        width: "100%", maxWidth: "500px",
+        width: "100%", maxWidth: "700px",
         display: "flex", alignItems: "center", justifyContent: "space-between",
         flexShrink: 0,
       }}>
@@ -372,7 +382,7 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
 
       {/* Progress Horizontal */}
       {state && (
-        <div style={{ width: "100%", maxWidth: "420px", marginTop: "12px", flexShrink: 0 }}>
+        <div style={{ width: "100%", maxWidth: "700px", marginTop: "12px", flexShrink: 0 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "6px" }}>
             <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-text-primary)", letterSpacing: "0.02em", textTransform: "uppercase" }}>
               Taste Profile
@@ -397,7 +407,7 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
         className="onboarding-card-zone"
         style={{
           width: "100%",
-          maxWidth: "420px",
+          maxWidth: "800px",
           flex: 1,
           display: "flex",
           alignItems: "center",
@@ -419,7 +429,7 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
                 custom={lastSwipe}
                 variants={cardVariants}
                 initial="enter" animate="center" exit="exit"
-                style={{ width: "clamp(220px, 70vw, 320px)", maxWidth: "100%", cursor: "grab", touchAction: "none", position: "relative", borderRadius: "var(--radius-poster)", boxShadow: cardGlow }}
+                style={{ width: "clamp(260px, min(75vw, 55vh), 540px)", maxWidth: "100%", cursor: "grab", touchAction: "none", position: "relative", borderRadius: "var(--radius-poster)", boxShadow: cardGlow }}
                 drag
                 dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
                 dragElastic={0.65}
@@ -583,7 +593,7 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
       </div>
 
       {/* Action buttons — fixed at bottom */}
-      <div className="onboarding-actions" style={{ width: "100%", maxWidth: "600px", flexShrink: 0, paddingTop: "4px", paddingBottom: "2px" }}>
+      <div className="onboarding-actions" style={{ width: "100%", maxWidth: "700px", flexShrink: 0, paddingTop: "4px", paddingBottom: "2px" }}>
         {state?.movie && (
           <>
             <p style={{ marginBottom: "10px", textAlign: "center", fontSize: "11px", color: "var(--color-text-muted)", fontWeight: 500, letterSpacing: "0.01em" }}>
