@@ -9,6 +9,7 @@ interface MobileMenuProps {
   onRefresh?: () => void;
   onReset?: () => void;
   onPreferences?: () => void;
+  onYourLikes?: () => void;
 }
 
 const IconRefresh = () => (
@@ -51,6 +52,7 @@ export default function MobileMenu({
   onRefresh,
   onReset,
   onPreferences,
+  onYourLikes,
 }: MobileMenuProps) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
@@ -187,7 +189,7 @@ export default function MobileMenu({
 
               <div className="menu-divider" />
 
-              <button className="menu-btn" onClick={() => handleAction(() => router.push("/your-ratings"))}>
+              <button className="menu-btn" onClick={() => handleAction(onYourLikes ? onYourLikes : () => router.push("/your-ratings"))}>
                 <span className="menu-btn-icon"><IconHeart /></span>
                 Your Collection
               </button>

@@ -1442,7 +1442,7 @@ function PosterCard({
     };
   }, [isExpanded]);
 
-  const lang = languageLabel(movie.original_language);
+  const lang = languageLabel(movie.original_language || "");
   const imdb = movie.imdb_rating ? movie.imdb_rating.toFixed(1) : movie.vote_average ? movie.vote_average.toFixed(1) : null;
   const genreList = (movie.genres && movie.genres.length > 0) ? movie.genres.slice(0, 3) : (movie.primary_genre ? [movie.primary_genre] : []);
   
