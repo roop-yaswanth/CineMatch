@@ -553,22 +553,32 @@ export default function RecommendationsView({
       }}
     >
       <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", minHeight: "100dvh" }}>
-      {/* Header */}
+        {/* Main Page Content Wrapper — Fades out when Detail View opens */}
+        <div 
+          style={{ 
+            display: "flex", 
+            flexDirection: "column", 
+            flex: 1, 
+            opacity: activeStack ? 0 : 1, 
+            transition: "opacity 0.25s ease", 
+            pointerEvents: activeStack ? "none" : "auto",
+            transform: activeStack ? "scale(0.98)" : "scale(1)",
+            transitionProperty: "opacity, transform",
+          }}
+        >
+        {/* Header */}
       <header
+        className="glass"
         style={{
           position: "sticky",
           top: 0,
           zIndex: 40,
-          background: "rgba(9, 9, 11, 0.4)",
-          backdropFilter: "blur(20px)",
-          WebkitBackdropFilter: "blur(20px)",
-          borderBottom: "1px solid rgba(255, 255, 255, 0.05)",
         }}
       >
         <div
           style={{
             width: "100%",
-            padding: "10px 20px",
+            padding: "12px 20px 10px",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
@@ -577,12 +587,13 @@ export default function RecommendationsView({
           <div style={{ width: "40px", flexShrink: 0 }} />
 
           <h1
+            className="heading-display"
             style={{
               flex: 1,
-              fontSize: "20px",
+              fontSize: "21px",
               fontWeight: 700,
-              letterSpacing: "-0.03em",
-              background: "linear-gradient(135deg, #ffffff 30%, #a78bfa 100%)",
+              letterSpacing: "-0.035em",
+              background: "linear-gradient(180deg, #ffffff 0%, #a0a0a0 100%)",
               WebkitBackgroundClip: "text",
               WebkitTextFillColor: "transparent",
               backgroundClip: "text",
@@ -607,22 +618,38 @@ export default function RecommendationsView({
         </div>
         
         {/* Search Bar */}
-        <div style={{ padding: "0 20px 12px", position: "relative" }}>
+        <div style={{ padding: "0 20px 14px", position: "relative" }}>
           <div style={{ position: "relative" }}>
             <input
               type="text"
-              placeholder="Search movies..."
+              placeholder="Search movies, directors, languages..."
               value={searchQuery}
               onChange={(e) => handleSearch(e.target.value)}
               style={{
                 width: "100%",
-                padding: "10px 16px 10px 40px",
-                borderRadius: "12px",
-                border: "1px solid var(--color-border-subtle)",
-                background: "var(--color-surface)",
+                padding: "12px 40px 12px 42px",
+                borderRadius: "14px",
+                border: "1px solid rgba(255,255,255,0.1)",
+                background: "rgba(255,255,255,0.04)",
+                backdropFilter: "blur(24px) saturate(1.5)",
+                WebkitBackdropFilter: "blur(24px) saturate(1.5)",
                 color: "var(--color-text-primary)",
-                fontSize: "16px",  // 16px prevents iOS zoom on focus
+                fontSize: "15px",
+                fontWeight: 400,
+                letterSpacing: "-0.005em",
                 outline: "none",
+                boxShadow: "0 1px 0 0 rgba(255,255,255,0.05) inset, 0 2px 8px rgba(0,0,0,0.2)",
+                transition: "border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease",
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = "rgba(255,255,255,0.35)";
+                e.currentTarget.style.background = "rgba(255,255,255,0.07)";
+                e.currentTarget.style.boxShadow = "0 1px 0 0 rgba(255,255,255,0.05) inset, 0 0 0 3px rgba(255,255,255,0.12)";
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)";
+                e.currentTarget.style.background = "rgba(255,255,255,0.04)";
+                e.currentTarget.style.boxShadow = "0 1px 0 0 rgba(255,255,255,0.05) inset, 0 2px 8px rgba(0,0,0,0.2)";
               }}
             />
             <svg
@@ -669,18 +696,16 @@ export default function RecommendationsView({
           {/* Search Results Dropdown */}
           {showSearch && (
             <div
+              className="glass-card"
               style={{
                 position: "absolute",
-                top: "100%",
+                top: "calc(100% + 4px)",
                 left: "20px",
                 right: "20px",
-                background: "var(--color-surface)",
-                border: "1px solid var(--color-border-subtle)",
-                borderRadius: "12px",
-                maxHeight: "400px",
+                maxHeight: "420px",
                 overflowY: "auto",
                 zIndex: 50,
-                boxShadow: "0 8px 32px rgba(0,0,0,0.3)",
+                padding: "4px",
               }}
             >
               {searchLoading ? (
@@ -698,10 +723,13 @@ export default function RecommendationsView({
                     style={{
                       display: "flex",
                       gap: "12px",
-                      padding: "12px 16px",
-                      borderBottom: "1px solid var(--color-border-subtle)",
+                      padding: "10px 12px",
+                      borderRadius: "10px",
                       cursor: "pointer",
+                      transition: "background 0.15s ease",
                     }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
                     onClick={() => {
                       setActiveMovie({ ...movie, id: movie.tmdb_id });
                       setShowSearch(false);
@@ -854,6 +882,7 @@ export default function RecommendationsView({
           </div>
         )}
       </div>
+        </div>
 
       {/* Stack detail overlay */}
       <AnimatePresence>
@@ -986,6 +1015,14 @@ function StackDetailView({
   onMovieClick: (movie: Recommendation) => void;
   disabled: boolean;
 }) {
+  useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, []);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -996,40 +1033,37 @@ function StackDetailView({
         position: "fixed",
         inset: 0,
         zIndex: 50,
-        background: "var(--color-bg)",
+        background: "transparent",
         overflowY: "auto",
         overflowX: "hidden",
       }}
     >
       {/* Detail header */}
       <div
+        className="glass"
         style={{
           position: "sticky",
           top: 0,
           zIndex: 10,
-          background: "var(--color-bg)",
-          borderBottom: "1px solid var(--color-border-subtle)",
-          padding: "calc(20px + env(safe-area-inset-top, 0px)) 16px 14px",
+          padding: "calc(18px + env(safe-area-inset-top, 0px)) clamp(20px, 4vw, 40px) 14px",
           display: "flex",
           alignItems: "center",
-          gap: "16px",
+          gap: "14px",
         }}
       >
         <button
+          className="glass-button"
           onClick={onBack}
           style={{
             fontSize: "13px",
-            fontWeight: 500,
+            fontWeight: 600,
             color: "var(--color-text-primary)",
             cursor: "pointer",
-            background: "var(--color-surface)",
-            border: "1px solid var(--color-border-subtle)",
-            borderRadius: "var(--radius-pill)",
             display: "flex",
             alignItems: "center",
             gap: "6px",
-            padding: "6px 14px",
-            boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
+            padding: "8px 14px 8px 12px",
+            letterSpacing: "-0.005em",
           }}
         >
           <span style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -1039,19 +1073,20 @@ function StackDetailView({
             </svg>
           </span> Back
         </button>
-        <div>
+        <div style={{ minWidth: 0 }}>
           <h2
+            className="heading-section"
             style={{
-              fontSize: "16px",
-              fontWeight: 600,
-              letterSpacing: "-0.02em",
+              fontSize: "20px",
+              fontWeight: 700,
+              letterSpacing: "-0.03em",
               margin: 0,
               color: "var(--color-text-primary)",
             }}
           >
             {stack.label}
           </h2>
-          <p style={{ fontSize: "12px", color: "var(--color-text-muted)", marginTop: "2px" }}>
+          <p style={{ fontSize: "12px", color: "var(--color-text-muted)", marginTop: "3px", fontWeight: 500, letterSpacing: "-0.005em" }}>
             {stack.movies.length > 50
               ? `Top 50 of ${stack.movies.length} movies`
               : `${stack.movies.length} movie${stack.movies.length !== 1 ? "s" : ""}`}
@@ -1061,12 +1096,12 @@ function StackDetailView({
 
       {/* Grid */}
       <div
-        className="stack-detail-grid"
+        className="stack-detail-grid app-container"
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
-          gap: "16px",
-          padding: "16px 16px 40px",
+          gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+          gap: "24px",
+          padding: "24px clamp(20px, 4vw, 40px) 80px",
         }}
       >
         <AnimatePresence initial={false}>
@@ -1143,40 +1178,42 @@ function StackRow({
   const { canLeft, canRight } = scrollInfo;
 
   return (
-    <section style={{ width: "100%", overflow: "hidden" }}>
+    <section className="stack-section" style={{ width: "100%", overflow: "hidden" }}>
       {/* Stack header */}
       <div
         style={{
           padding: "0 20px",
-          marginBottom: "12px",
+          marginBottom: "14px",
           display: "flex",
-          alignItems: "center",
+          alignItems: "flex-end",
           justifyContent: "space-between",
+          gap: "12px",
         }}
       >
         <button
           className="stack-name-btn"
           onClick={onOpenDetail}
-          style={{ background: "none", border: "none", padding: "10px 8px 10px 0", cursor: "pointer", textAlign: "left" }}
+          style={{ background: "none", border: "none", padding: "8px 4px 4px 0", cursor: "pointer", textAlign: "left", minWidth: 0 }}
         >
           <h3
+            className="heading-section"
             style={{
-              fontSize: "11px",
+              fontSize: "clamp(1.1rem, 2.4vw, 1.35rem)",
               fontWeight: 600,
-              letterSpacing: "0.07em",
-              textTransform: "uppercase",
-              color: "var(--color-text-secondary)",
+              letterSpacing: "-0.025em",
+              color: "var(--color-text-primary)",
               margin: 0,
               display: "flex",
               alignItems: "center",
-              gap: "4px",
+              gap: "8px",
+              textTransform: "none",
             }}
           >
             {stack.label}
             <svg
               className="chevron-icon"
-              width="10"
-              height="10"
+              width="14"
+              height="14"
               viewBox="0 0 14 14"
               fill="none"
               aria-hidden="true"
@@ -1184,23 +1221,38 @@ function StackRow({
               <path d="M5 3L9 7L5 11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </h3>
+          {stack.subtitle && (
+            <p style={{
+              margin: "2px 0 0",
+              fontSize: "12px",
+              fontWeight: 500,
+              color: "var(--color-text-muted)",
+              letterSpacing: "-0.005em",
+            }}>
+              {stack.subtitle}
+            </p>
+          )}
         </button>
 
         <button
+          className="glass-pill"
           onClick={onOpenDetail}
           style={{
-            background: "none",
-            border: "none",
             cursor: "pointer",
-            fontSize: "11px",
-            fontWeight: 500,
-            color: "var(--color-text-muted)",
-            padding: "6px 0",
-            letterSpacing: "0.02em",
+            fontSize: "12px",
+            fontWeight: 600,
+            padding: "6px 12px",
+            letterSpacing: "-0.005em",
             flexShrink: 0,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "4px",
           }}
         >
           View All
+          <svg width="11" height="11" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+            <path d="M5 3L9 7L5 11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
         </button>
       </div>
 
@@ -1342,12 +1394,10 @@ function PosterCard({
     return (
       <motion.article
         ref={cardRef}
-        layout
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.88, transition: { duration: 0.25, ease: "easeIn" } }}
+        exit={{ opacity: 0, scale: 0.88, transition: { duration: 0.2, ease: "easeIn" } }}
         transition={{
-          layout: { type: "spring", stiffness: 400, damping: 36 },
           opacity: { duration: 0.2 },
           scale: { duration: 0.2 },
         }}
@@ -1395,12 +1445,10 @@ function PosterCard({
                 right: "12px",
                 padding: "4px 8px",
                 borderRadius: "8px",
-                background: "rgba(0,0,0,0.75)",
-                backdropFilter: "blur(4px)",
-                WebkitBackdropFilter: "blur(4px)",
+                background: "rgba(0,0,0,0.82)",
                 fontSize: "10px",
                 fontWeight: 600,
-                color: "#fbbf24",
+                color: "#e8c84a",
                 pointerEvents: "none",
               }}
             >
@@ -1419,10 +1467,10 @@ function PosterCard({
               alignContent: "center",
               justifyContent: "center",
               gap: "8px",
-              background: "linear-gradient(160deg, rgba(10,10,18,0.72) 0%, rgba(0,0,0,0.92) 100%)",
-              backdropFilter: "blur(6px)",
-              WebkitBackdropFilter: "blur(6px)",
-              padding: "24px 12px 12px", // Increased top padding to push buttons down
+              background: "rgba(6,6,10,0.7)",
+              backdropFilter: "blur(8px)",
+              WebkitBackdropFilter: "blur(8px)",
+              padding: "24px 12px 12px",
             }}
           >
             {CARD_ACTIONS.map((btn) => (
@@ -1515,12 +1563,10 @@ function PosterCard({
   return (
     <motion.article
       ref={cardRef}
-      layout
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.88, transition: { duration: 0.25, ease: "easeIn" } }}
+      exit={{ opacity: 0, scale: 0.88, transition: { duration: 0.2, ease: "easeIn" } }}
       transition={{
-        layout: { type: "spring", stiffness: 400, damping: 36 },
         opacity: { duration: 0.2 },
         scale: { duration: 0.2 },
       }}
@@ -1530,6 +1576,7 @@ function PosterCard({
         minWidth: "130px",
         flexShrink: 0,
         scrollSnapAlign: "start",
+        paddingBottom: "8px", /* space for shadow to breathe */
       }}
     >
       {/* Poster with overlays */}
@@ -1565,19 +1612,24 @@ function PosterCard({
             className={`rating-badge ${showActions ? "hidden-by-actions" : ""}`}
             style={{
               position: "absolute",
-              top: "6px",
-              right: "6px",
-              padding: "3px 6px",
-              borderRadius: "6px",
-              background: "rgba(0,0,0,0.75)",
-              backdropFilter: "blur(4px)",
-              WebkitBackdropFilter: "blur(4px)",
+              top: "8px",
+              right: "8px",
+              padding: "4px 8px",
+              borderRadius: "8px",
+              background: "rgba(0,0,0,0.82)",
               fontSize: "10px",
-              fontWeight: 600,
-              color: "#fbbf24",
+              fontWeight: 700,
+              color: "#e8c84a",
+              letterSpacing: "0.01em",
               pointerEvents: "none",
+              display: "flex",
+              alignItems: "center",
+              gap: "3px",
             }}
           >
+            <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+            </svg>
             {imdb}
           </div>
         )}
@@ -1588,18 +1640,17 @@ function PosterCard({
             className={showActions ? "hidden-by-actions" : ""}
             style={{
               position: "absolute",
-              top: "6px",
-              left: "6px",
-              padding: "3px 7px",
-              borderRadius: "6px",
-              background: movie.score >= 0.85 ? "rgba(34,197,94,0.85)" : "rgba(234,179,8,0.85)",
-              backdropFilter: "blur(4px)",
-              WebkitBackdropFilter: "blur(4px)",
+              top: "8px",
+              left: "8px",
+              padding: "4px 8px",
+              borderRadius: "8px",
+              background: movie.score >= 0.85 ? "rgba(20,160,60,0.9)" : "rgba(180,145,0,0.9)",
               fontSize: "10px",
               fontWeight: 700,
               color: "#fff",
               pointerEvents: "none",
               letterSpacing: "0.01em",
+              textShadow: "0 1px 2px rgba(0,0,0,0.4)",
             }}
           >
             {Math.round(movie.score * 100)}% Match
@@ -1616,21 +1667,19 @@ function PosterCard({
             onTouchEnd={(e) => { e.stopPropagation(); e.preventDefault(); setShowReason((v) => !v); }}
           >
             <div style={{
-              background: "rgba(255,255,255,0.15)",
-              backdropFilter: "blur(6px)",
-              WebkitBackdropFilter: "blur(6px)",
-              border: "1px solid rgba(255,255,255,0.25)",
+              background: "rgba(30,30,36,0.9)",
+              border: "1px solid rgba(255,255,255,0.18)",
               borderRadius: "20px",
-              padding: "2px 8px",
+              padding: "3px 10px",
               fontSize: "10px",
-              fontWeight: 500,
+              fontWeight: 600,
               color: "rgba(255,255,255,0.9)",
               display: "flex",
               alignItems: "center",
-              gap: "3px",
+              gap: "4px",
               userSelect: "none",
             }}>
-              <span style={{ fontSize: "9px" }}>ⓘ</span> Why?
+              <span style={{ fontSize: "10px" }}>ⓘ</span> Why?
             </div>
             {showReason && (
               <div style={{
@@ -1638,16 +1687,14 @@ function PosterCard({
                 bottom: "calc(100% + 6px)",
                 left: 0,
                 width: "180px",
-                background: "rgba(10,10,18,0.95)",
-                backdropFilter: "blur(12px)",
-                WebkitBackdropFilter: "blur(12px)",
-                border: "1px solid rgba(255,255,255,0.12)",
+                background: "rgba(18,18,22,0.98)",
+                border: "1px solid rgba(255,255,255,0.1)",
                 borderRadius: "10px",
                 padding: "10px 12px",
                 fontSize: "11px",
                 lineHeight: 1.5,
                 color: "rgba(255,255,255,0.85)",
-                boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
+                boxShadow: "0 8px 24px rgba(0,0,0,0.6)",
                 zIndex: 10,
                 pointerEvents: "none",
               }}>
@@ -1703,9 +1750,9 @@ function PosterCard({
             alignContent: "center",
             justifyContent: "center",
             gap: "8px",
-            background: "linear-gradient(160deg, rgba(10,10,18,0.72) 0%, rgba(0,0,0,0.92) 100%)",
-            backdropFilter: "blur(6px)",
-            WebkitBackdropFilter: "blur(6px)",
+            background: "rgba(6,6,10,0.75)",
+            backdropFilter: "blur(8px)",
+            WebkitBackdropFilter: "blur(8px)",
             padding: "12px",
           }}
         >

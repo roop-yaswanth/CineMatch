@@ -70,6 +70,7 @@ export default function MobileMenu({
   return (
     <div style={{ position: "relative" }}>
       <button
+        className="glass-button"
         onClick={() => setIsOpen(true)}
         style={{
           width: "40px",
@@ -77,14 +78,13 @@ export default function MobileMenu({
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "none",
-          border: "none",
           cursor: "pointer",
           color: "var(--color-text-primary)",
+          padding: 0,
         }}
         aria-label="Open menu"
       >
-        <svg width="20" height="14" viewBox="0 0 20 14" fill="none">
+        <svg width="18" height="13" viewBox="0 0 20 14" fill="none">
           <rect width="20" height="2" rx="1" fill="currentColor" />
           <rect y="6" width="14" height="2" rx="1" fill="currentColor" />
           <rect y="12" width="20" height="2" rx="1" fill="currentColor" />
@@ -101,32 +101,54 @@ export default function MobileMenu({
               style={{
                 position: "fixed",
                 inset: 0,
-                background: "rgba(0,0,0,0.4)",
-                backdropFilter: "blur(4px)",
+                background: "rgba(0,0,0,0.25)",
+                backdropFilter: "blur(8px) saturate(1.2)",
+                WebkitBackdropFilter: "blur(8px) saturate(1.2)",
                 zIndex: 99,
               }}
               onClick={handleClose}
             />
 
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: -10 }}
+              initial={{ opacity: 0, scale: 0.92, y: -6 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: -10 }}
+              exit={{ opacity: 0, scale: 0.92, y: -6 }}
+              transition={{ type: "spring", damping: 24, stiffness: 300 }}
               style={{
                 position: "absolute",
-                top: "48px",
+                top: "50px",
                 right: "0",
-                width: "230px",
-                background: "var(--color-bg)",
-                border: "1px solid var(--color-border-subtle)",
-                borderRadius: "var(--radius-lg)",
-                boxShadow: "0 12px 48px rgba(0,0,0,0.6)",
+                width: "245px",
+                padding: "6px",
                 overflow: "hidden",
                 zIndex: 100,
                 display: "flex",
                 flexDirection: "column",
+                /* True liquid glass — as close as possible to Apple */
+                background: "linear-gradient(145deg, rgba(36,36,52,0.62) 0%, rgba(20,20,32,0.72) 100%)",
+                backdropFilter: "blur(60px) saturate(2.2) brightness(1.1)",
+                WebkitBackdropFilter: "blur(60px) saturate(2.2) brightness(1.1)",
+                borderRadius: "20px",
+                boxShadow: `
+                  0 24px 60px -12px rgba(0,0,0,0.7),
+                  0 8px 20px rgba(0,0,0,0.45),
+                  0 0 0 0.5px rgba(255,255,255,0.14) inset,
+                  0 1px 0 0 rgba(255,255,255,0.22) inset
+                `,
               }}
             >
+              {/* Grayscale hairline edge */}
+              <div style={{
+                position: "absolute",
+                inset: 0,
+                borderRadius: "20px",
+                padding: "1px",
+                background: "linear-gradient(135deg, rgba(255,255,255,0.32) 0%, rgba(200,200,200,0.18) 40%, rgba(140,140,140,0.10) 70%, rgba(100,100,100,0.04) 100%)",
+                WebkitMask: "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
+                WebkitMaskComposite: "xor",
+                maskComposite: "exclude",
+                pointerEvents: "none",
+              }} />
               {onRefresh && (
                 <button className="menu-btn" onClick={() => handleAction(onRefresh)}>
                   <span className="menu-btn-icon"><IconRefresh /></span>
@@ -195,20 +217,25 @@ export default function MobileMenu({
         .menu-btn {
           width: 100%;
           text-align: left;
-          padding: 12px 16px;
+          padding: 10px 12px;
           background: none;
           border: none;
+          border-radius: 10px;
           cursor: pointer;
           color: var(--color-text-primary);
           font-size: 14px;
           font-weight: 500;
-          transition: background 0.15s;
+          letter-spacing: -0.005em;
+          transition: background 0.15s ease;
           display: flex;
           align-items: center;
-          gap: 12px;
+          gap: 10px;
         }
         .menu-btn:hover {
-          background: rgba(255,255,255,0.05);
+          background: rgba(255,255,255,0.08);
+        }
+        .menu-btn:active {
+          background: rgba(255,255,255,0.12);
         }
         .menu-btn-icon {
           width: 20px;
@@ -220,8 +247,8 @@ export default function MobileMenu({
         }
         .menu-divider {
           height: 1px;
-          background: var(--color-border-subtle);
-          margin: 4px 0;
+          background: rgba(255,255,255,0.08);
+          margin: 6px 4px;
         }
         .menu-confirm-btn {
           flex: 1;

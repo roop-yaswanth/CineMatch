@@ -24,10 +24,10 @@ interface Props {
 }
 
 const RATING_OPTIONS = [
-  { value: "like", label: "Like", shortcut: "L", color: "var(--color-like)" },
-  { value: "okay", label: "Okay", shortcut: "O", color: "var(--color-okay)" },
-  { value: "dislike", label: "Dislike", shortcut: "D", color: "var(--color-dislike)" },
-  { value: "not_watched", label: "Skip", shortcut: "S", color: "var(--color-skip)" },
+  { value: "like", label: "Like", shortcut: "L", color: "var(--color-like)", variant: "like" },
+  { value: "okay", label: "Okay", shortcut: "O", color: "var(--color-okay)", variant: "okay" },
+  { value: "dislike", label: "Dislike", shortcut: "D", color: "var(--color-dislike)", variant: "dislike" },
+  { value: "not_watched", label: "Skip", shortcut: "S", color: "var(--color-skip)", variant: "skip" },
 ] as const;
 
 const ease = [0.25, 0.1, 0.25, 1] as [number, number, number, number];
@@ -587,21 +587,34 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
       <div className="onboarding-actions" style={{ width: "100%", maxWidth: "600px", flexShrink: 0, paddingTop: "4px", paddingBottom: "2px" }}>
         {state?.movie && (
           <>
-            <p style={{ marginBottom: "6px", textAlign: "center", fontSize: "10px", color: "var(--color-text-muted)", fontWeight: 300 }}>
+            <p style={{ marginBottom: "10px", textAlign: "center", fontSize: "11px", color: "var(--color-text-muted)", fontWeight: 500, letterSpacing: "0.01em" }}>
               Swipe right to like, left to dislike, down for okay, up to skip.
             </p>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "6px", justifyContent: "center" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "10px", justifyContent: "center" }}>
               {RATING_OPTIONS.map((opt) => (
-                <motion.button key={opt.value} whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
-                  onClick={() => handleRate(opt.value)} disabled={loading} className="glass-button"
+                <motion.button
+                  key={opt.value}
+                  whileTap={{ scale: 0.94 }}
+                  onClick={() => handleRate(opt.value)}
+                  disabled={loading}
+                  className={`rating-btn rating-btn--${opt.variant}`}
                   style={{
-                    padding: "10px 0", borderRadius: "var(--radius-pill)",
-                    fontSize: "13px", fontWeight: 500, color: opt.color,
-                    cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.4 : 1,
-                    display: "flex", alignItems: "center", justifyContent: "center", gap: "4px",
-                  }}>
+                    cursor: loading ? "not-allowed" : "pointer",
+                    opacity: loading ? 0.4 : 1,
+                    padding: "12px 6px",
+                    fontSize: "13px",
+                  }}
+                >
                   <span>{opt.label}</span>
-                  <span style={{ fontSize: "9px", opacity: 0.4 }}>{opt.shortcut}</span>
+                  <span style={{
+                    fontSize: "10px",
+                    opacity: 0.55,
+                    fontWeight: 500,
+                    padding: "2px 6px",
+                    borderRadius: "4px",
+                    background: "rgba(255,255,255,0.08)",
+                    border: "1px solid rgba(255,255,255,0.08)",
+                  }}>{opt.shortcut}</span>
                 </motion.button>
               ))}
             </div>
@@ -610,14 +623,20 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
 
         {/* Generate button — ONLY when is_ready (enough likes AND all rated) */}
         {state?.is_ready && (
-          <motion.button initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-            whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}
-            onClick={() => onComplete(state.session)} className="glass-button"
+          <motion.button
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => onComplete(state.session)}
+            className="primary-button"
             style={{
-              marginTop: "8px", width: "100%", padding: "11px 0",
-              background: "rgba(255,255,255,0.12)", color: "var(--color-text-primary)",
-              fontSize: "13px", fontWeight: 500, borderRadius: "var(--radius-pill)", cursor: "pointer",
-            }}>
+              marginTop: "12px",
+              width: "100%",
+              padding: "14px 0",
+              fontSize: "14px",
+              cursor: "pointer",
+            }}
+          >
             Generate recommendations →
           </motion.button>
         )}

@@ -145,9 +145,10 @@ export default function LoginScreen({ onLogin }: Props) {
     >
       {/* Background Mosaic */}
       <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, overflow: "hidden", zIndex: 0 }}>
-        {/* Subtle gradient overlay to darken background */}
-        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(10,10,18,0.45), rgba(0,0,0,0.75))", zIndex: 2 }} />
-        <div style={{ position: "absolute", inset: "-10%", width: "120%", height: "120%", display: "flex", flexWrap: "wrap", gap: "24px", transform: "rotate(-10deg) scale(1.2)", opacity: 0.55, zIndex: 1 }}>
+        {/* Layered scrim — colored ambience + darker vignette for legibility */}
+        <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse at 50% 50%, rgba(10,10,18,0.3), rgba(0,0,0,0.85))", zIndex: 3 }} />
+        <div style={{ position: "absolute", inset: 0, backdropFilter: "blur(2px)", WebkitBackdropFilter: "blur(2px)", zIndex: 2 }} />
+        <div style={{ position: "absolute", inset: "-10%", width: "120%", height: "120%", display: "flex", flexWrap: "wrap", gap: "24px", transform: "rotate(-10deg) scale(1.2)", opacity: 0.45, zIndex: 1 }}>
           <motion.div
             animate={{
               y: [0, -1000],
@@ -189,31 +190,43 @@ export default function LoginScreen({ onLogin }: Props) {
         transition={{ duration: 0.7, delay: 0.1, ease: [0.25, 0.1, 0.25, 1] }}
         style={{
           textAlign: "center",
-          marginBottom: "6vh",
+          marginBottom: "5vh",
         }}
       >
+        <style>{`
+          @keyframes title-shimmer {
+            0% { background-position: 200% center; }
+            100% { background-position: -200% center; }
+          }
+        `}</style>
         <h1
+          className="heading-display"
           style={{
-            fontSize: "clamp(4rem, 12vw, 7.2rem)",
+            fontSize: "clamp(3.5rem, 11vw, 6.5rem)",
             lineHeight: 0.95,
-            fontWeight: 300,
-            letterSpacing: "-0.05em",
-            color: "var(--color-text-primary)",
+            fontWeight: 700,
+            letterSpacing: "-0.055em",
+            background: "linear-gradient(90deg, #888892 0%, #ffffff 30%, #d8d8e0 55%, #ffffff 70%, #888892 100%)",
+            backgroundSize: "200% auto",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            backgroundClip: "text",
             margin: 0,
+            animation: "title-shimmer 6s linear infinite",
           }}
         >
           CineMatch
         </h1>
         <p
           style={{
-            marginTop: "12px",
-            fontSize: "clamp(1.05rem, 2.5vw, 1.5rem)",
-            color: "var(--color-text-muted)",
-            fontWeight: 300,
-            letterSpacing: "0.04em",
+            marginTop: "14px",
+            fontSize: "clamp(0.95rem, 2vw, 1.2rem)",
+            color: "var(--color-text-secondary)",
+            fontWeight: 400,
+            letterSpacing: "-0.005em",
           }}
         >
-          Discover movies you&apos;ll love
+          Discover movies you&apos;ll love.
         </p>
       </motion.div>
 
@@ -223,10 +236,7 @@ export default function LoginScreen({ onLogin }: Props) {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.7, delay: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
         onSubmit={handleSubmit}
-        style={{
-          width: "100%",
-          maxWidth: "420px",
-        }}
+        style={{ width: "100%", maxWidth: "420px" }}
       >
         <div style={{ position: "relative" }}>
           <input
@@ -244,7 +254,7 @@ export default function LoginScreen({ onLogin }: Props) {
               padding: "16px 0",
               background: "transparent",
               border: "none",
-              borderBottom: "1px solid var(--color-border)",
+              borderBottom: "1px solid rgba(255,255,255,0.2)",
               fontSize: "clamp(1.1rem, 2.5vw, 1.4rem)",
               fontWeight: 300,
               color: "var(--color-text-primary)",
@@ -253,12 +263,8 @@ export default function LoginScreen({ onLogin }: Props) {
               opacity: loading ? 0.4 : 1,
               transition: "border-color 0.3s ease",
             }}
-            onFocus={(e) => {
-              e.currentTarget.style.borderBottomColor = "var(--color-text-secondary)";
-            }}
-            onBlur={(e) => {
-              e.currentTarget.style.borderBottomColor = "var(--color-border)";
-            }}
+            onFocus={(e) => { e.currentTarget.style.borderBottomColor = "rgba(255,255,255,0.7)"; }}
+            onBlur={(e) => { e.currentTarget.style.borderBottomColor = "rgba(255,255,255,0.2)"; }}
           />
         </div>
 
@@ -266,12 +272,7 @@ export default function LoginScreen({ onLogin }: Props) {
           <motion.p
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
-            style={{
-              marginTop: "16px",
-              fontSize: "12px",
-              color: "var(--color-danger)",
-              fontWeight: 300,
-            }}
+            style={{ marginTop: "12px", fontSize: "13px", color: "var(--color-danger)", fontWeight: 400 }}
           >
             {error}
           </motion.p>
@@ -280,29 +281,14 @@ export default function LoginScreen({ onLogin }: Props) {
         <motion.button
           type="submit"
           disabled={loading}
-          whileHover={{ scale: 1.01 }}
-          whileTap={{ scale: 0.99 }}
+          whileTap={{ scale: 0.98 }}
+          className="primary-button"
           style={{
-            marginTop: "40px",
+            marginTop: "36px",
             width: "100%",
-            padding: "16px 0",
-            backgroundColor: "var(--color-text-primary)",
-            color: "var(--color-bg)",
-            fontSize: "clamp(1rem, 2vw, 1.25rem)",
-            fontWeight: 500,
-            letterSpacing: "0.02em",
-            borderRadius: "9999px",
-            border: "none",
+            padding: "15px 0",
+            fontSize: "15px",
             cursor: loading ? "not-allowed" : "pointer",
-            opacity: loading ? 0.4 : 1,
-            transition: "background-color 0.2s ease",
-            fontFamily: "inherit",
-          }}
-          onMouseEnter={(e) => {
-            if (!loading) e.currentTarget.style.backgroundColor = "var(--color-accent)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = "var(--color-text-primary)";
           }}
         >
           {loading ? (
@@ -312,24 +298,13 @@ export default function LoginScreen({ onLogin }: Props) {
                 viewBox="0 0 24 24"
                 fill="none"
               >
-                <circle
-                  style={{ opacity: 0.25 }}
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="3"
-                />
-                <path
-                  style={{ opacity: 0.75 }}
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                />
+                <circle style={{ opacity: 0.25 }} cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                <path style={{ opacity: 0.75 }} fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
               Connecting
             </span>
           ) : (
-            "Continue"
+            "Login"
           )}
         </motion.button>
       </motion.form>

@@ -262,7 +262,7 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                         </h4>
                         <div style={{ display: "flex", flexWrap: "wrap", gap: "12px" }}>
                             {/* Like */}
-                            <button className="glass-button" onClick={() => handleActionClick("like")} style={{ flex: 1, padding: "12px", fontWeight: 600, display: "flex", justifyContent: "center", alignItems: "center", height: "46px" }}>
+                            <button className="rating-btn rating-btn--like" onClick={() => handleActionClick("like")} style={{ flex: 1, padding: "12px", fontWeight: 600, height: "48px" }}>
                                 <AnimatePresence mode="wait">
                                     {successAction === "like" ? (
                                         <motion.div key="done" initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.5, opacity: 0 }} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
@@ -278,7 +278,7 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                                 </AnimatePresence>
                             </button>
                             {/* Okay */}
-                            <button className="glass-button" onClick={() => handleActionClick("okay")} style={{ flex: 1, padding: "12px", fontWeight: 600, display: "flex", justifyContent: "center", alignItems: "center", height: "46px" }}>
+                            <button className="rating-btn rating-btn--okay" onClick={() => handleActionClick("okay")} style={{ flex: 1, padding: "12px", fontWeight: 600, height: "48px" }}>
                                 <AnimatePresence mode="wait">
                                     {successAction === "okay" ? (
                                         <motion.div key="done" initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.5, opacity: 0 }} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
@@ -294,7 +294,7 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                                 </AnimatePresence>
                             </button>
                             {/* Dislike */}
-                            <button className="glass-button" onClick={() => handleActionClick("dislike")} style={{ flex: 1, padding: "12px", fontWeight: 600, display: "flex", justifyContent: "center", alignItems: "center", height: "46px" }}>
+                            <button className="rating-btn rating-btn--dislike" onClick={() => handleActionClick("dislike")} style={{ flex: 1, padding: "12px", fontWeight: 600, height: "48px" }}>
                                 <AnimatePresence mode="wait">
                                     {successAction === "dislike" ? (
                                         <motion.div key="done" initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.5, opacity: 0 }} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
