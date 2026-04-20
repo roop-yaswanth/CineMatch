@@ -17,12 +17,9 @@ const ALL_POSTERS = [
   "62HCnUTziyWcpDaBO2i1DX17ljH.jpg", // Top Gun: Maverick
   "8tZYtuWezp8JbcsvHYO0O46tFbo.jpg", // Mad Max: Fury Road
   "q6y0Go1tsGEsmtFryDOJo3dEmqu.jpg", // The Shawshank Redemption
-  "3bhkrj58Vtu7enYsLegHnDmZggO.jpg", // The Godfather
   "d5iIlFn5s0ImszYzBPb8JPIfbXD.jpg", // Pulp Fiction
-  "gEU2QlsUUHXjNpeastMBqVjX5vO.jpg", // Blade Runner 2049
   "7IiTTgloJzvGI1TAYymCfbfl3vT.jpg", // Parasite
   "rCzpDGLbOoPwLjy3OAm5NUPOTrC.jpg", // Venom
-  "1XddDAi1q7y01iQ2F2eZ4W2Q1e4.jpg", // Spider-Man 3
   "uxzzxijgPIY7slzFvMotPv8wjKA.jpg", // Black Panther
   "5Av0uOmsji4IZWrUHa6CnVZBULL.jpg", // Gravity
   "uzr65Z3xDCjuMW7fw8Whm5curr7.jpg", // 1917
@@ -143,12 +140,11 @@ export default function LoginScreen({ onLogin }: Props) {
         fontFamily: "var(--font-sans)",
       }}
     >
-      {/* Background Mosaic */}
-      <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, overflow: "hidden", zIndex: 0 }}>
-        {/* Layered scrim — colored ambience + darker vignette for legibility */}
-        <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse at 50% 50%, rgba(10,10,18,0.3), rgba(0,0,0,0.85))", zIndex: 3 }} />
-        <div style={{ position: "absolute", inset: 0, backdropFilter: "blur(2px)", WebkitBackdropFilter: "blur(2px)", zIndex: 2 }} />
-        <div style={{ position: "absolute", inset: "-10%", width: "120%", height: "120%", display: "flex", flexWrap: "wrap", gap: "24px", transform: "rotate(-10deg) scale(1.2)", opacity: 0.45, zIndex: 1 }}>
+      {/* Background Mosaic (Optimized) */}
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, overflow: "hidden", zIndex: 0, background: "#0a0a12" }}>
+        {/* Simplified scrim to reduce compositing costs. Avoid backdropFilter blur on large moving areas! */}
+        <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse at 50% 50%, rgba(10,10,18,0.15) 0%, rgba(0,0,0,0.85) 100%)", zIndex: 3, pointerEvents: "none" }} />
+        <div style={{ position: "absolute", inset: "-20%", width: "140%", height: "140%", display: "flex", flexWrap: "wrap", gap: "16px", transform: "rotate(-10deg) scale(1.2)", opacity: 0.55, zIndex: 1, willChange: "transform" }}>
           <motion.div
             animate={{
               y: [0, -1000],
@@ -158,23 +154,23 @@ export default function LoginScreen({ onLogin }: Props) {
               duration: 60,
               ease: "linear",
             }}
-            style={{ display: "flex", flexWrap: "wrap", gap: "24px", justifyContent: "center" }}
+            style={{ display: "flex", flexWrap: "wrap", gap: "16px", justifyContent: "center", willChange: "transform" }}
           >
+            {/* Restored full visual density, optimized via async decoding, lazy loading, and no-blur */}
             {[...posters, ...posters, ...posters].map((path, i) => (
-              <motion.img
+              <img
                 key={i}
                 src={`${BASE}${path}`}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 1.2, delay: (i % posters.length) * 0.04 }}
+                loading="lazy"
+                decoding="async"
                 onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
                 style={{
-                  width: "160px",
-                  height: "240px",
-                  borderRadius: "16px",
+                  width: "130px",
+                  height: "195px",
+                  borderRadius: "12px",
                   objectFit: "cover",
-                  boxShadow: "0 10px 30px rgba(0,0,0,0.5)",
                   flexShrink: 0,
+                  opacity: 1,
                 }}
               />
             ))}

@@ -13,7 +13,7 @@
 
   /* ─── Base Canvas ────────────────────────────── */
   /* Warm obsidian — not cold blue-black, not flat grey */
-  --color-bg: #0C0A07;
+  --color-bg: #1D1D1F;
   --color-bg-raised: #141109;
 
   /* Ambient tint — Obsidian & Gold palette */
@@ -840,7 +840,8 @@ input[type="number"]::-webkit-inner-spin-button {
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
   scroll-padding-left: 20px;
-  padding: 4px 20px 16px;
+  padding: 60px 20px;
+  margin: -60px 0;
   overscroll-behavior-x: contain;
 }
 

@@ -45,7 +45,8 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "auto";
-      setSuccessAction(null);
+      // Use setTimeout to avoid synchronous setState warning inside effect
+      setTimeout(() => setSuccessAction(null), 0);
     }
     return () => {
       document.body.style.overflow = "auto";
@@ -55,16 +56,24 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
   // Fetch similar movies whenever the movie changes
   useEffect(() => {
     const id = movie?.tmdb_id ?? movie?.id;
-    if (!isOpen || !id) { setSimilar([]); return; }
-    setSimilarLoading(true);
-    setSimilar([]);
+    if (!isOpen || !id) { 
+      setTimeout(() => setSimilar([]), 0); // Async state update to avoid cascading re-renders
+      return; 
+    }
+    
+    // Defer the setSimilarLoading to escape the synchronous commit phase
+    setTimeout(() => {
+      setSimilarLoading(true);
+      setSimilar([]);
+    }, 0);
+    
     apiSimilarMovies(id, sessionId ?? null, 20)
       .then(setSimilar)
       .catch(() => setSimilar([]))
       .finally(() => setSimilarLoading(false));
   }, [movie?.id, movie?.tmdb_id, isOpen, sessionId]);
 
-  const handleActionClick = (action: any) => {
+  const handleActionClick = (action: "like" | "okay" | "dislike" | "watchlist" | "watched") => {
     if (!onAction) return;
     onAction(action);
     setSuccessAction(action);
@@ -152,8 +161,14 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                   flex: "1 1 240px",
                   position: "relative",
                   aspectRatio: "2/3",
-                  minHeight: "320px",
+                  minHeight: "220px",
+                  maxHeight: "50vh",
+                  maxWidth: "340px",
+                  margin: "0 auto",
+                  width: "100%",
                   background: "var(--color-surface)",
+                  borderRadius: "8px",
+                  overflow: "hidden"
                 }}
               >
                   <Image

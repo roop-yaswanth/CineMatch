@@ -367,7 +367,6 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
         )}
         <MobileMenu
           onLogout={onLogout}
-          onPreferences={() => setShowPrefs(true)}
         />
       </div>
 
@@ -670,17 +669,17 @@ type SwipeDir = keyof typeof SWIPE_CONFIGS;
 function SwipeGlowOverlay({ dragX, dragY }: { dragX: MotionValue<number>; dragY: MotionValue<number> }) {
   const [state, setState] = useState<{ dir: SwipeDir; op: number } | null>(null);
 
-  useMotionValueEvent(dragX, "change", (x) => update(x, dragY.get()));
-  useMotionValueEvent(dragY, "change", (y) => update(dragX.get(), y));
-
-  function update(x: number, y: number) {
+  const update = (x: number, y: number) => {
     const ax = Math.abs(x), ay = Math.abs(y);
     if (ax < 16 && ay < 16) { setState(null); return; }
     const horizontal = ax >= ay;
     const dir: SwipeDir = horizontal ? (x > 0 ? "right" : "left") : (y > 0 ? "down" : "up");
     const raw = (horizontal ? ax : ay) - 16;
     setState({ dir, op: Math.min(1, raw / 80) });
-  }
+  };
+
+  useMotionValueEvent(dragX, "change", (x) => update(x, dragY.get()));
+  useMotionValueEvent(dragY, "change", (y) => update(dragX.get(), y));
 
   if (!state) return null;
   const { dir, op } = state;
