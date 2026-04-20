@@ -447,8 +447,6 @@ export default function RecommendationsView({
   );
 
   useEffect(() => {
-
-  useEffect(() => {
     if (!initialLoad) return;
     void generate(preferences);
     setInitialLoad(false);

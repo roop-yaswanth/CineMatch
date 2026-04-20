@@ -190,8 +190,6 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
   );
 
   useEffect(() => {
-
-  useEffect(() => {
     const handleKeyboard = (e: KeyboardEvent) => {
       if (!state?.movie || loading) return;
       if (e.key === "l" || e.key === "L") handleRate("like");
