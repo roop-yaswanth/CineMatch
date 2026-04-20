@@ -8,6 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import Image from "next/image";
@@ -199,11 +200,11 @@ export default function RecommendationsView({
   onBackToOnboarding,
   onLogout,
 }: Props) {
+  const router = useRouter();
   const [stacks, setStacks] = useState<Stack[]>([]);
   const [movies, setMovies] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState(false);
   const [initialLoad, setInitialLoad] = useState(true);
-  const [showYourLikes, setShowYourLikes] = useState(false);
   const [showPrefs, setShowPrefs] = useState(false);
   const [showUpdateToast, setShowUpdateToast] = useState(false);
   const [activeStack, setActiveStack] = useState<StackId | null>(null);
@@ -628,6 +629,8 @@ export default function RecommendationsView({
                     onLogout={onLogout}
                     onRefresh={() => void generate(preferences)}
                     onReset={onBackToOnboarding}
+                    onPreferences={() => setShowPrefs(true)}
+                    onYourLikes={() => router.push('/your-ratings')}
                   />
                 </div>
               </div>
@@ -908,20 +911,16 @@ export default function RecommendationsView({
 
         {/* Stack detail overlay */}
         <AnimatePresence>
-          {activeStack && (() => {
-            const activeStackData = stacks.find((s) => s.id === activeStack);
-            if (!activeStackData) return null;
-            return (
-              <StackDetailView
-                key={activeStack}
-                stack={activeStackData}
-                onBack={() => setActiveStack(null)}
-                onAction={handleAction}
-                onMovieClick={(m) => setActiveMovie(m as any)}
-                disabled={loading}
-              />
-            );
-          })()}
+          {activeStack && stacks.find((s) => s.id === activeStack) && (
+            <StackDetailView
+              key={`detail-${activeStack}`}
+              stack={stacks.find((s) => s.id === activeStack)!}
+              onBack={() => setActiveStack(null)}
+              onAction={handleAction}
+              onMovieClick={(m) => setActiveMovie(m as any)}
+              disabled={loading}
+            />
+          )}
         </AnimatePresence>
 
 
@@ -983,13 +982,6 @@ export default function RecommendationsView({
             </motion.div>
           )}
         </AnimatePresence>
-
-        {showYourLikes && (
-          <YourLikesView
-            sessionId={session.session_id}
-            onClose={() => setShowYourLikes(false)}
-          />
-        )}
 
         {showPrefs && (
           <PreferencesModal
@@ -1216,7 +1208,18 @@ function StackRow({
         <button
           className="stack-name-btn"
           onClick={onOpenDetail}
-          style={{ background: "none", border: "none", padding: "8px 4px 4px 0", cursor: "pointer", textAlign: "left", minWidth: 0, marginTop: "-4px" }}
+          style={{ 
+            background: "transparent", 
+            border: "none", 
+            padding: "8px 12px 8px 0", 
+            cursor: "pointer", 
+            textAlign: "left", 
+            minWidth: 0, 
+            marginTop: "-4px",
+            display: "block",
+            flexGrow: 1, /* Allow clicking the empty space between the name and view all button */
+            userSelect: "none"
+          }}
         >
           <h3
             className="heading-section"
