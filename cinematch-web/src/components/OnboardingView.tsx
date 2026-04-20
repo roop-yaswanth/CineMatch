@@ -190,14 +190,6 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
   );
 
   useEffect(() => {
-    // Trap the back button so users don't accidentally leave the site during onboarding
-    window.history.pushState(null, "", window.location.href);
-    const handlePopState = (e: PopStateEvent) => {
-      window.history.pushState(null, "", window.location.href);
-    };
-    window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
-  }, []);
 
   useEffect(() => {
     const handleKeyboard = (e: KeyboardEvent) => {

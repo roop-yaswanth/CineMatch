@@ -447,14 +447,6 @@ export default function RecommendationsView({
   );
 
   useEffect(() => {
-    // Trap back button so users don't drop out of active sessions
-    window.history.pushState(null, "", window.location.href);
-    const handlePopState = () => {
-      window.history.pushState(null, "", window.location.href);
-    };
-    window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
-  }, []);
 
   useEffect(() => {
     if (!initialLoad) return;
@@ -925,6 +917,7 @@ export default function RecommendationsView({
             if (!activeStackData) return null;
             return (
               <StackDetailView
+                key={activeStack}
                 stack={activeStackData}
                 onBack={() => setActiveStack(null)}
                 onAction={handleAction}
@@ -1217,17 +1210,22 @@ function StackRow({
       <div
         style={{
           padding: "0 20px",
-          marginBottom: "14px",
+          marginBottom: "16px",
           display: "flex",
-          alignItems: "flex-end",
+          alignItems: "center",
           justifyContent: "space-between",
           gap: "12px",
+          position: "relative",
+          zIndex: 10,
         }}
       >
-        <button
+        <div
           className="stack-name-btn"
           onClick={onOpenDetail}
-          style={{ background: "none", border: "none", padding: "8px 4px 4px 0", cursor: "pointer", textAlign: "left", minWidth: 0 }}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => { if(e.key === "Enter" || e.key === " ") onOpenDetail(); }}
+          style={{ background: "none", border: "none", cursor: "pointer", textAlign: "left", minWidth: 0, outline: "none", display: "flex", flexDirection: "column", justifyContent: "center" }}
         >
           <h3
             className="heading-section"
@@ -1266,7 +1264,7 @@ function StackRow({
               {stack.subtitle}
             </p>
           )}
-        </button>
+        </div>
 
         <button
           className="glass-pill"
