@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState, useRef } from "react";
 import Image from "next/image";
+import { createPortal } from "react-dom";
 import { posterUrl, languageLabel, apiSimilarMovies, type Recommendation } from "@/lib/api";
 
 export interface DetailMovie {
@@ -92,8 +93,9 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
   const matchPct = movie.score !== undefined && movie.score >= 0.70 ? Math.round(movie.score * 100) : null;
   const matchColor = movie.score !== undefined && movie.score >= 0.85 ? "#22c55e" : "#eab308";
 
+  if (typeof document === 'undefined') return null;
 
-  return (
+  return createPortal(
     <AnimatePresence>
       {isOpen && (
         <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -477,7 +479,8 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
           </motion.div>
         </div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }
 
