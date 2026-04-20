@@ -1391,7 +1391,7 @@ function PosterCard({
     setHoverPortalPos({ rect: sourceRect });
   }, []);
 
-  const scheduleHoverOpen = useCallback((rect?: DOMRect) => {
+  const scheduleHoverOpen = useCallback(() => {
     if (disabled || showFullInfo || !isDesktopHoverEnabled()) return;
     if (hoverCloseTimeoutRef.current) {
       clearTimeout(hoverCloseTimeoutRef.current);
@@ -1399,7 +1399,7 @@ function PosterCard({
     }
     if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
     hoverTimeoutRef.current = setTimeout(() => {
-      openHoverPreview(rect);
+      openHoverPreview();
     }, 180);
   }, [disabled, isDesktopHoverEnabled, openHoverPreview, showFullInfo]);
 
@@ -1673,8 +1673,8 @@ function PosterCard({
       {/* Poster with overlays */}
       <div
         className="poster-container"
-        onMouseEnter={(e) => {
-          scheduleHoverOpen(e.currentTarget.getBoundingClientRect());
+        onMouseEnter={() => {
+          scheduleHoverOpen();
         }}
         onMouseLeave={() => {
           scheduleHoverClose(90);
@@ -1900,13 +1900,8 @@ function PosterCard({
             const targetHeight = posterTargetHeight + detailsHeight;
             const viewportPadding = 16;
 
-            let targetLeft = sourceRect.left - (targetWidth - sourceRect.width) / 2;
-            const maxLeft = window.innerWidth - targetWidth - viewportPadding;
-            targetLeft = Math.max(viewportPadding, Math.min(targetLeft, maxLeft));
-
-            let targetTop = sourceRect.top - 34;
-            const maxTop = window.innerHeight - targetHeight - viewportPadding;
-            targetTop = Math.max(viewportPadding, Math.min(targetTop, maxTop));
+            const targetLeft = sourceRect.left - (targetWidth - sourceRect.width) / 2;
+            const targetTop = sourceRect.top - (targetHeight - sourceRect.height) / 2;
 
             const releaseYear = movie.year ? String(movie.year) : "--";
             const imdbValue = movie.imdb_rating
