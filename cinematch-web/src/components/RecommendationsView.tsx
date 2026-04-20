@@ -626,8 +626,6 @@ export default function RecommendationsView({
                 <div>
                   <MobileMenu
                     onLogout={onLogout}
-                    onPreferences={() => setShowPrefs(true)}
-                    onYourLikes={() => setShowYourLikes(true)}
                     onRefresh={() => void generate(preferences)}
                     onReset={onBackToOnboarding}
                   />
@@ -1208,22 +1206,17 @@ function StackRow({
       <div
         style={{
           padding: "0 20px",
-          marginBottom: "16px",
+          marginBottom: "14px",
           display: "flex",
-          alignItems: "center",
+          alignItems: "flex-end",
           justifyContent: "space-between",
           gap: "12px",
-          position: "relative",
-          zIndex: 10,
         }}
       >
-        <div
+        <button
           className="stack-name-btn"
           onClick={onOpenDetail}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => { if(e.key === "Enter" || e.key === " ") onOpenDetail(); }}
-          style={{ background: "none", border: "none", cursor: "pointer", textAlign: "left", minWidth: 0, outline: "none", display: "flex", flexDirection: "column", justifyContent: "center" }}
+          style={{ background: "none", border: "none", padding: "8px 4px 4px 0", cursor: "pointer", textAlign: "left", minWidth: 0, marginTop: "-4px" }}
         >
           <h3
             className="heading-section"
@@ -1262,7 +1255,7 @@ function StackRow({
               {stack.subtitle}
             </p>
           )}
-        </div>
+        </button>
 
         <button
           className="glass-pill"
