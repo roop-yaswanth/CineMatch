@@ -13,8 +13,8 @@
 
   /* ─── Base Canvas ────────────────────────────── */
   /* Warm obsidian — not cold blue-black, not flat grey */
-  --color-bg: #1D1D1F;
-  --color-bg-raised: #141109;
+  --color-bg: #1f1f1f;
+  --color-bg-raised: #1f1f1f;
 
   /* Ambient tint — Obsidian & Gold palette */
   /* Antique Gold */
@@ -151,41 +151,19 @@ body {
     env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
-/* ─── Ambient backdrop: Obsidian & Gold ─────────────── */
+/* ─── Ambient Light ─────────────── */
 body::before {
   content: "";
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: 0;
-  background:
-    /* Antique Gold — top-left whisper */
-    radial-gradient(ellipse 65% 55% at 5% 0%,
-      rgba(var(--tint-gold), 0.09), transparent 65%),
-    /* Bronze — top-right glow */
-    radial-gradient(ellipse 50% 45% at 98% 3%,
-      rgba(var(--tint-bronze), 0.07), transparent 60%),
-    /* Warm charcoal depth — bottom fill */
-    radial-gradient(ellipse 80% 60% at 50% 100%,
-      rgba(var(--tint-charcoal), 0.35), transparent 70%),
-    /* Gold — bottom-left rim */
-    radial-gradient(ellipse 45% 40% at 2% 98%,
-      rgba(var(--tint-gold), 0.07), transparent 60%),
-    /* Bronze centre warmth */
-    radial-gradient(ellipse 35% 30% at 50% 45%,
-      rgba(var(--tint-bronze), 0.04), transparent 70%);
-  filter: blur(70px);
-}
-
-body::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  opacity: 0.35;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.06 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  mix-blend-mode: overlay;
+  /* Amplified spotlight bleeding from the top center for a pronounced glossy sheen */
+  background: 
+    radial-gradient(140% 120% at 50% -15%, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.06) 45%, transparent 85%),
+    /* Stronger hairline gloss along the very top screen edge */
+    linear-gradient(180deg, rgba(255, 255, 255, 0.15) 0%, transparent 12%);
+  mix-blend-mode: screen;
 }
 
 main,
@@ -840,8 +818,8 @@ input[type="number"]::-webkit-inner-spin-button {
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
   scroll-padding-left: 20px;
-  padding: 60px 20px;
-  margin: -60px 0;
+  padding: 8px 20px;
+  margin: 0;
   overscroll-behavior-x: contain;
 }
 

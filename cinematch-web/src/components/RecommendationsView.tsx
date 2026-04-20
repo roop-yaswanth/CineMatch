@@ -205,7 +205,9 @@ export default function RecommendationsView({
   const [movies, setMovies] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState(false);
   const [initialLoad, setInitialLoad] = useState(true);
+  const [showYourLikes, setShowYourLikes] = useState(false);
   const [showPrefs, setShowPrefs] = useState(false);
+  
   const [showUpdateToast, setShowUpdateToast] = useState(false);
   const [activeStack, setActiveStack] = useState<StackId | null>(null);
   const [preferences, setPreferences] = useState<RecommendationPreferences>(
@@ -222,7 +224,46 @@ export default function RecommendationsView({
   // Detail Modal state
   const [activeMovie, setActiveMovie] = useState<DetailMovie | null>(null);
 
-  // Overlay state for taste-profile auto-rerun (keeps stacks visible while updating)
+  // Back-button trap: push a sentinel entry on mount and re-push it on every popstate
+  // so the user can't navigate out of the dashboard via the browser back button.
+  // Modal entries sit on top of the trap; popping them closes the overlay.
+  useEffect(() => {
+    window.history.replaceState({ isApp: true, trap: true }, "", "/dashboard");
+  }, []);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      // Close whichever overlay was most recently opened
+      if (activeStack) { setActiveStack(null); return; }
+      if (showYourLikes) { setShowYourLikes(false); return; }
+      if (showPrefs) { setShowPrefs(false); return; }
+      if (activeMovie) { setActiveMovie(null); return; }
+
+      // If no modal is open, we're at dashboard level — trap the back button
+      window.history.go(1);
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [showYourLikes, showPrefs, activeMovie, activeStack]);
+
+  const openYourLikes = () => {
+    window.history.pushState({ isApp: true, modal: "yourLikes" }, "", "/your-ratings");
+    setShowYourLikes(true);
+  };
+  const closeYourLikes = () => {
+    // Pop the modal entry — popstate handler will close state + re-trap
+    window.history.back();
+  };
+
+  const openPrefs = () => {
+    setShowPrefs(true);
+  };
+  const closePrefs = () => {
+    setShowPrefs(false);
+  };
+  
+
   const [isUpdating, setIsUpdating] = useState(false);
 
 
@@ -447,6 +488,8 @@ export default function RecommendationsView({
     [applyBucketResponse, onSessionUpdate, preferences, session.session_id]
   );
 
+  
+
   useEffect(() => {
     if (!initialLoad) return;
     void generate(preferences);
@@ -629,8 +672,8 @@ export default function RecommendationsView({
                     onLogout={onLogout}
                     onRefresh={() => void generate(preferences)}
                     onReset={onBackToOnboarding}
-                    onPreferences={() => setShowPrefs(true)}
-                    onYourLikes={() => router.push('/your-ratings')}
+                    onPreferences={openPrefs}
+                    onYourLikes={openYourLikes}
                   />
                 </div>
               </div>
@@ -900,7 +943,10 @@ export default function RecommendationsView({
                     stack={stack}
                     disabled={loading}
                     onAction={handleAction}
-                    onOpenDetail={() => setActiveStack(stack.id)}
+                    onOpenDetail={() => {
+                      window.history.pushState({ isApp: true, modal: "stack" }, "");
+                      setActiveStack(stack.id);
+                    }}
                     onMovieClick={(m) => setActiveMovie(m as any)}
                   />
                 ))}
@@ -913,9 +959,12 @@ export default function RecommendationsView({
         <AnimatePresence>
           {activeStack && stacks.find((s) => s.id === activeStack) && (
             <StackDetailView
-              key={`detail-${activeStack}`}
+              key={"detail-view-" + activeStack}
               stack={stacks.find((s) => s.id === activeStack)!}
-              onBack={() => setActiveStack(null)}
+              onBack={() => {
+                window.history.replaceState({ isApp: true }, "", "/dashboard");
+                setActiveStack(null);
+              }}
               onAction={handleAction}
               onMovieClick={(m) => setActiveMovie(m as any)}
               disabled={loading}
@@ -983,11 +1032,18 @@ export default function RecommendationsView({
           )}
         </AnimatePresence>
 
+        {showYourLikes && (
+          <YourLikesView
+            sessionId={session.session_id}
+            onClose={closeYourLikes}
+          />
+        )}
+
         {showPrefs && (
           <PreferencesModal
             preferences={preferences}
             onUpdate={handlePreferenceUpdate}
-            onClose={() => setShowPrefs(false)}
+            onClose={closePrefs}
             mode="recommendations"
           />
         )}
@@ -1006,8 +1062,8 @@ export default function RecommendationsView({
           onMovieSelect={(m) => setActiveMovie(m)}
         />
         {/* <BottomNav 
-        onYourLikes={() => setShowYourLikes(true)}
-        onPreferences={() => setShowPrefs(true)}
+        onYourLikes={openYourLikes}
+        onPreferences={openPrefs}
         onRefresh={() => void generate(preferences)}
       /> */}
       </div>
@@ -1038,7 +1094,7 @@ function StackDetailView({
     };
   }, []);
 
-  return (
+  const content = (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
@@ -1140,6 +1196,9 @@ function StackDetailView({
       </div>
     </motion.div>
   );
+
+  if (typeof document === "undefined") return null;
+  return createPortal(content, document.body);
 }
 
 /* ─── Stack Row — Paged Carousel ───────────────── */
@@ -1193,7 +1252,7 @@ function StackRow({
   const { canLeft, canRight } = scrollInfo;
 
   return (
-    <section className="stack-section" style={{ width: "100%", overflow: "hidden" }}>
+    <section className="stack-section" style={{ width: "100%", overflow: "hidden", position: "relative" }}>
       {/* Stack header */}
       <div
         style={{
@@ -1203,22 +1262,28 @@ function StackRow({
           alignItems: "flex-end",
           justifyContent: "space-between",
           gap: "12px",
+          position: "relative",
+          zIndex: 3,
+          pointerEvents: "auto",
         }}
       >
-        <button
+        <div
           className="stack-name-btn"
-          onClick={onOpenDetail}
-          style={{ 
-            background: "transparent", 
-            border: "none", 
-            padding: "8px 12px 8px 0", 
-            cursor: "pointer", 
-            textAlign: "left", 
-            minWidth: 0, 
-            marginTop: "-4px",
-            display: "block",
-            flexGrow: 1, /* Allow clicking the empty space between the name and view all button */
-            userSelect: "none"
+          onClick={(e) => { e.stopPropagation(); onOpenDetail(); }}
+          role="button"
+          tabIndex={0}
+          style={{
+            cursor: "pointer",
+            textAlign: "left",
+            padding: "4px 8px 4px 0",
+            minWidth: 0,
+            flex: 1,
+            margin: "-4px 0 -4px -4px",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            position: "relative",
+            zIndex: 3,
           }}
         >
           <h3
@@ -1258,11 +1323,12 @@ function StackRow({
               {stack.subtitle}
             </p>
           )}
-        </button>
+        </div>
 
         <button
+          type="button"
           className="glass-pill"
-          onClick={onOpenDetail}
+          onClick={(e) => { e.stopPropagation(); onOpenDetail(); }}
           style={{
             cursor: "pointer",
             fontSize: "12px",
@@ -1273,6 +1339,8 @@ function StackRow({
             display: "inline-flex",
             alignItems: "center",
             gap: "4px",
+            position: "relative",
+            zIndex: 3,
           }}
         >
           View All

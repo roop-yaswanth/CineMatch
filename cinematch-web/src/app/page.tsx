@@ -12,12 +12,12 @@ export default function HomePage() {
     if (!isLoading) {
       if (session) {
         if (session.onboarding_complete) {
-          router.push("/dashboard");
+          router.replace("/dashboard");
         } else {
-          router.push("/onboarding");
+          router.replace("/onboarding");
         }
       } else {
-        router.push("/login");
+        router.replace("/login");
       }
     }
   }, [session, isLoading, router]);

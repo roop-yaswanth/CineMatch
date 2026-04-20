@@ -64,24 +64,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(() => {
     localStorage.removeItem(STORAGE_KEY);
-    
-    // Flag to tell the Dashboard trap to let us pop the state cleanly
-    (window as any).__isLoggingOut = true;
-    
-    if (window.history.state && window.history.state.isApp) {
-      // 1. Pop the fake 'isApp' history state silently
-      window.history.back();
-
-      // 2. Wait a tick for the pop to finish, then clear session and replace the underlying state
-      setTimeout(() => {
-        setSession(null);
-        window.location.replace("/login");
-        setTimeout(() => { (window as any).__isLoggingOut = false; }, 100);
-      }, 50);
-    } else {
-      setSession(null);
-      window.location.replace("/login");
-      (window as any).__isLoggingOut = false;
+    setSession(null);
+    // Hard redirect to clear SPA history and prevent back cycling through trap entries
+    if (typeof window !== 'undefined') {
+      window.location.href = '/login';
     }
   }, []);
 
