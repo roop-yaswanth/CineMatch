@@ -468,38 +468,50 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
 
 /* ── Similar Movie Mini-Card ─────────────────────── */
 function SimilarCard({ movie, onClick }: { movie: Recommendation; onClick: () => void }) {
-  const src = movie.poster_path
-    ? posterUrl(movie.poster_path, "w185")
-    : "/poster_placeholder.svg";
+  const fallbackSrc = "/poster_placeholder.svg";
+  const initialSrc = movie.poster_path ? posterUrl(movie.poster_path, "w185") : fallbackSrc;
+  const [imgSrc, setImgSrc] = useState(initialSrc);
+
+  useEffect(() => {
+    setImgSrc(initialSrc);
+  }, [initialSrc]);
 
   return (
     <button
       onClick={onClick}
       style={{
-        flexShrink: 0,
+        flex: "0 0 90px",
         width: "90px",
+        minWidth: "90px",
+        maxWidth: "90px",
         scrollSnapAlign: "start",
         background: "none",
         border: "none",
         padding: 0,
         cursor: "pointer",
         textAlign: "left",
+        display: "flex",
+        flexDirection: "column",
       }}
     >
       <div style={{
-        width: "90px",
-        height: "135px",
+        width: "100%",
+        aspectRatio: "2 / 3",
         borderRadius: "10px",
         overflow: "hidden",
         background: "var(--color-surface)",
         position: "relative",
       }}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={src}
+        <Image
+          src={imgSrc}
           alt={movie.title}
-          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-          onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = "0"; }}
+          fill
+          sizes="90px"
+          style={{ objectFit: "cover" }}
+          unoptimized
+          onError={() => {
+            if (imgSrc !== fallbackSrc) setImgSrc(fallbackSrc);
+          }}
         />
         {movie.imdb_rating && (
           <div style={{
@@ -524,6 +536,7 @@ function SimilarCard({ movie, onClick }: { movie: Recommendation; onClick: () =>
         fontWeight: 500,
         color: "var(--color-text-secondary)",
         lineHeight: 1.3,
+        minHeight: "26px",
         display: "-webkit-box",
         WebkitLineClamp: 2,
         WebkitBoxOrient: "vertical",

@@ -39,7 +39,7 @@ export default function RootLayout({
     <html lang="en" className={`${inter.variable}`} suppressHydrationWarning>
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-        <meta name="theme-color" content="#0a0a0a" />
+        <meta name="theme-color" content="#1C1C1E" />
       </head>
       <body className="bg-[var(--color-bg)] text-[var(--color-text-primary)] antialiased">
         {children}

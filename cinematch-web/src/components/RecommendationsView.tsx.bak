@@ -8,7 +8,6 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import Image from "next/image";
 import YourLikesView from "@/components/YourLikesView";
@@ -1168,6 +1167,7 @@ function StackRow({
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [scrollInfo, setScrollInfo] = useState({ canLeft: false, canRight: false });
+    const [isRowHovered, setIsRowHovered] = useState(false);
 
   const updateScroll = useCallback(() => {
     const t = trackRef.current;
@@ -1202,7 +1202,7 @@ function StackRow({
   const { canLeft, canRight } = scrollInfo;
 
   return (
-    <section className="stack-section" style={{ width: "100%", overflow: "hidden" }}>
+    <section className="stack-section" style={{ width: "100%", overflow: "visible" }}>
       {/* Stack header */}
       <div
         style={{
@@ -1359,19 +1359,17 @@ function PosterCard({
   const poster = usePoster(movie.poster_path, recommendationId(movie), "w500");
   const [showActions, setShowActions] = useState(false);
   const [showReason, setShowReason] = useState(false);
+  const [isHoverExpanded, setIsHoverExpanded] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const touchStartXRef = useRef<number | null>(null);
 
   const overlayJustShownRef = useRef(false);
-
-  // Hover Portal State
-  const [hoverPortalPos, setHoverPortalPos] = useState<{ rect: DOMRect } | null>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hoverCloseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const isDesktopHoverEnabled = useCallback(() => {
     if (typeof window === "undefined") return false;
-    return window.matchMedia("(min-width: 1024px) and (hover: hover) and (pointer: fine)").matches;
+    return window.matchMedia("(hover: hover) and (pointer: fine)").matches;
   }, []);
 
   const clearHoverTimers = useCallback(() => {
@@ -1385,13 +1383,7 @@ function PosterCard({
     }
   }, []);
 
-  const openHoverPreview = useCallback((rect?: DOMRect) => {
-    const sourceRect = rect ?? cardRef.current?.getBoundingClientRect();
-    if (!sourceRect) return;
-    setHoverPortalPos({ rect: sourceRect });
-  }, []);
-
-  const scheduleHoverOpen = useCallback((rect?: DOMRect) => {
+  const scheduleHoverOpen = useCallback(() => {
     if (disabled || showFullInfo || !isDesktopHoverEnabled()) return;
     if (hoverCloseTimeoutRef.current) {
       clearTimeout(hoverCloseTimeoutRef.current);
@@ -1399,18 +1391,19 @@ function PosterCard({
     }
     if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
     hoverTimeoutRef.current = setTimeout(() => {
-      openHoverPreview(rect);
-    }, 180);
-  }, [disabled, isDesktopHoverEnabled, openHoverPreview, showFullInfo]);
+      setIsHoverExpanded(true);
+    }, 80);
+  }, [disabled, isDesktopHoverEnabled, showFullInfo]);
 
-  const scheduleHoverClose = useCallback((delay = 90) => {
+  const scheduleHoverClose = useCallback((delay = 110) => {
     if (hoverTimeoutRef.current) {
       clearTimeout(hoverTimeoutRef.current);
       hoverTimeoutRef.current = null;
     }
     if (hoverCloseTimeoutRef.current) clearTimeout(hoverCloseTimeoutRef.current);
     hoverCloseTimeoutRef.current = setTimeout(() => {
-      setHoverPortalPos(null);
+      setIsHoverExpanded(false);
+      setShowReason(false);
     }, delay);
   }, []);
 
@@ -1421,15 +1414,9 @@ function PosterCard({
   }, [clearHoverTimers]);
 
   useEffect(() => {
-    if (!hoverPortalPos) return;
-    const hide = () => setHoverPortalPos(null);
-    window.addEventListener("scroll", hide, true);
-    window.addEventListener("resize", hide);
-    return () => {
-      window.removeEventListener("scroll", hide, true);
-      window.removeEventListener("resize", hide);
-    };
-  }, [hoverPortalPos]);
+    if (!disabled && !showFullInfo) return;
+    setIsHoverExpanded(false);
+  }, [disabled, showFullInfo]);
 
   // Dismiss overlay when tapping/clicking outside this card
   useEffect(() => {
@@ -1447,7 +1434,7 @@ function PosterCard({
     };
   }, [showActions]);
 
-  // Touch handler — suppresses ghost click after touchend.
+  // Touch handler - suppresses ghost click after touchend.
   const handleContainerTouchStart = (e: React.TouchEvent) => {
     touchStartXRef.current = e.touches[0].clientX;
   };
@@ -1456,18 +1443,19 @@ function PosterCard({
       ? Math.abs(e.changedTouches[0].clientX - touchStartXRef.current)
       : 0;
     touchStartXRef.current = null;
-    if (dx > 10) return; // swipe gesture, not a tap
+    if (dx > 10) return;
     e.preventDefault();
     if (!showActions) {
       overlayJustShownRef.current = true;
       setShowActions(true);
-      setTimeout(() => { overlayJustShownRef.current = false; }, 400);
+      setTimeout(() => {
+        overlayJustShownRef.current = false;
+      }, 400);
     } else {
       setShowActions(false);
     }
   };
 
-  // Mouse-only click
   const handleContainerClick = () => {
     onClick?.();
   };
@@ -1480,7 +1468,21 @@ function PosterCard({
       : "";
   const genres = movie.genres?.slice(0, 2).join(", ") || movie.primary_genre || "";
 
-  // showFullInfo = stack detail view — render info BELOW poster (like YourLikes)
+  const releaseYear = movie.year ? String(movie.year) : "--";
+  const imdbValue = movie.imdb_rating
+    ? movie.imdb_rating.toFixed(1)
+    : movie.vote_average
+      ? movie.vote_average.toFixed(1)
+      : "NA";
+  const genreList = (movie.genres && movie.genres.length > 0)
+    ? movie.genres.slice(0, 3)
+    : (movie.primary_genre ? [movie.primary_genre] : []);
+  const synopsis = movie.overview?.trim() || "No synopsis available yet.";
+
+  const hoverExpanded = isHoverExpanded && isDesktopHoverEnabled() && !showActions && !showFullInfo;
+  const hidePosterOverlay = showActions || hoverExpanded;
+
+  // showFullInfo = stack detail view - render info BELOW poster (like YourLikes)
   if (showFullInfo) {
     return (
       <motion.article
@@ -1502,7 +1504,6 @@ function PosterCard({
           overflow: "hidden",
         }}
       >
-        {/* Poster */}
         <div
           className="poster-container"
           onTouchStart={handleContainerTouchStart}
@@ -1511,7 +1512,7 @@ function PosterCard({
           style={{
             position: "relative",
             aspectRatio: "2 / 3",
-            borderRadius: "0", // Let parent handle rounding
+            borderRadius: "0",
             overflow: "hidden",
             background: "transparent",
             cursor: "pointer",
@@ -1527,7 +1528,6 @@ function PosterCard({
             priority={priority}
           />
 
-          {/* IMDb badge top-right — always visible */}
           {imdb && (
             <div
               style={{
@@ -1547,7 +1547,6 @@ function PosterCard({
             </div>
           )}
 
-          {/* Action overlay */}
           <div
             className={`action-overlay ${showActions ? "active" : ""}`}
             style={{
@@ -1600,7 +1599,6 @@ function PosterCard({
           </div>
         </div>
 
-        {/* Info BELOW poster — Click for Full Details */}
         <div
           onClick={(e) => {
             e.stopPropagation();
@@ -1609,7 +1607,7 @@ function PosterCard({
           style={{
             padding: "10px 8px 12px",
             cursor: "pointer",
-            background: "transparent" // Ensure click area is solid
+            background: "transparent",
           }}
         >
           <p
@@ -1632,15 +1630,17 @@ function PosterCard({
               {[movie.year, lang].filter(Boolean).join(" · ")}
             </p>
             {genres && (
-              <p style={{
-                fontSize: "9px",
-                color: "var(--color-text-muted)",
-                opacity: 0.6,
-                margin: 0,
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis"
-              }}>
+              <p
+                style={{
+                  fontSize: "9px",
+                  color: "var(--color-text-muted)",
+                  opacity: 0.6,
+                  margin: 0,
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
                 {genres}
               </p>
             )}
@@ -1650,16 +1650,26 @@ function PosterCard({
     );
   }
 
-  // Default carousel card — info overlaid on poster
   return (
     <motion.article
       ref={cardRef}
       initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
+      animate={{
+        opacity: 1,
+        scale: hoverExpanded ? 1.18 : 1,
+        y: hoverExpanded ? -10 : 0,
+      }}
       exit={{ opacity: 0, scale: 0.88, transition: { duration: 0.2, ease: "easeIn" } }}
       transition={{
         opacity: { duration: 0.2 },
-        scale: { duration: 0.2 },
+        scale: { type: "spring", stiffness: 330, damping: 26, mass: 0.74 },
+        y: { type: "spring", stiffness: 320, damping: 26, mass: 0.74 },
+      }}
+      onMouseEnter={() => {
+        scheduleHoverOpen();
+      }}
+      onMouseLeave={() => {
+        scheduleHoverClose(140);
       }}
       className="poster-card"
       style={{
@@ -1667,160 +1677,267 @@ function PosterCard({
         minWidth: "130px",
         flexShrink: 0,
         scrollSnapAlign: "start",
-        paddingBottom: "8px", /* space for shadow to breathe */
+        paddingBottom: "8px",
+        position: "relative",
+        overflow: "visible",
+        transformOrigin: "top center",
+        zIndex: hoverExpanded ? 90 : 1,
       }}
     >
-      {/* Poster with overlays */}
-      <div
-        className="poster-container"
-        onMouseEnter={(e) => {
-          scheduleHoverOpen(e.currentTarget.getBoundingClientRect());
-        }}
-        onMouseLeave={() => {
-          scheduleHoverClose(90);
-        }}
-        onTouchStart={handleContainerTouchStart}
-        onTouchEnd={handleContainerTouchEnd}
-        onClick={handleContainerClick}
-        style={{
-          position: "relative",
-          aspectRatio: "2 / 3",
-          borderRadius: "var(--radius-poster)",
-          overflow: "hidden",
-          background: "transparent",
-          cursor: "pointer",
-          border: "1px solid transparent",
-          transition: "border-color 0.22s ease",
-        }}
-      >
-        <Image
-          src={poster}
-          alt={movie.title}
-          fill
-          sizes="(max-width: 640px) 48vw, 180px"
-          style={{ objectFit: "cover" }}
-          unoptimized
-          priority={priority}
-        />
-
-        {/* Rating badge top-right */}
-        {imdb && (
-          <div
-            className={`rating-badge ${showActions ? "hidden-by-actions" : ""}`}
-            style={{
-              position: "absolute",
-              top: "8px",
-              right: "8px",
-              padding: "4px 8px",
-              borderRadius: "8px",
-              background: "rgba(0,0,0,0.82)",
-              fontSize: "10px",
-              fontWeight: 700,
-              color: "#e8c84a",
-              letterSpacing: "0.01em",
-              pointerEvents: "none",
-              display: "flex",
-              alignItems: "center",
-              gap: "3px",
-            }}
-          >
-            <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-            </svg>
-            {imdb}
-          </div>
-        )}
-
-        {/* Match score badge top-left */}
-        {movie.score !== undefined && movie.score >= 0.70 && (
-          <div
-            className={showActions ? "hidden-by-actions" : ""}
-            style={{
-              position: "absolute",
-              top: "8px",
-              left: "8px",
-              padding: "4px 8px",
-              borderRadius: "8px",
-              background: movie.score >= 0.85 ? "rgba(20,160,60,0.9)" : "rgba(180,145,0,0.9)",
-              fontSize: "10px",
-              fontWeight: 700,
-              color: "#fff",
-              pointerEvents: "none",
-              letterSpacing: "0.01em",
-              textShadow: "0 1px 2px rgba(0,0,0,0.4)",
-            }}
-          >
-            {Math.round(movie.score * 100)}% Match
-          </div>
-        )}
-
-        {/* "Why?" reason chip */}
-        {movie.reason && (
-          <div
-            className={showActions ? "hidden-by-actions" : ""}
-            style={{ position: "absolute", bottom: "8px", left: "8px", zIndex: 3, cursor: "pointer" }}
-            onMouseEnter={() => setShowReason(true)}
-            onMouseLeave={() => setShowReason(false)}
-            onTouchEnd={(e) => { e.stopPropagation(); e.preventDefault(); setShowReason((v) => !v); }}
-          >
-            <div style={{
-              background: "rgba(30,30,36,0.9)",
-              border: "1px solid rgba(255,255,255,0.18)",
-              borderRadius: "20px",
-              padding: "3px 10px",
-              fontSize: "10px",
-              fontWeight: 600,
-              color: "rgba(255,255,255,0.9)",
-              display: "flex",
-              alignItems: "center",
-              gap: "4px",
-              userSelect: "none",
-            }}>
-              <span style={{ fontSize: "10px" }}>ⓘ</span> Why?
-            </div>
-            {showReason && (
-              <div style={{
-                position: "absolute",
-                bottom: "calc(100% + 6px)",
-                left: 0,
-                width: "180px",
-                background: "rgba(18,18,22,0.98)",
-                border: "1px solid rgba(255,255,255,0.1)",
-                borderRadius: "10px",
-                padding: "10px 12px",
-                fontSize: "11px",
-                lineHeight: 1.5,
-                color: "rgba(255,255,255,0.85)",
-                boxShadow: "0 8px 24px rgba(0,0,0,0.6)",
-                zIndex: 10,
-                pointerEvents: "none",
-              }}>
-                {movie.reason}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Persistent bottom info overlay */}
+      <div style={{ position: "relative", overflow: "visible" }}>
         <div
-          className={`poster-bottom-info ${showActions ? "hidden-by-actions" : ""}`}
+          className="poster-container"
+          onTouchStart={handleContainerTouchStart}
+          onTouchEnd={handleContainerTouchEnd}
+          onClick={handleContainerClick}
           style={{
-            position: "absolute",
-            bottom: 0,
-            left: 0,
-            right: 0,
-            background: "linear-gradient(to top, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.5) 55%, transparent 100%)",
-            padding: "40px 8px 8px",
-            pointerEvents: "none",
+            position: "relative",
+            aspectRatio: "2 / 3",
+            borderRadius: "var(--radius-poster)",
+            overflow: "hidden",
+            background: "transparent",
+            cursor: "pointer",
+            border: hoverExpanded ? "1px solid rgba(255,255,255,0.2)" : "1px solid transparent",
+            boxShadow: hoverExpanded
+              ? "0 16px 36px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.08) inset"
+              : "none",
+            transition: "border-color 0.22s ease, box-shadow 0.22s ease",
           }}
         >
-          <p
+          <Image
+            src={poster}
+            alt={movie.title}
+            fill
+            sizes="(max-width: 640px) 48vw, 180px"
+            style={{ objectFit: "cover" }}
+            unoptimized
+            priority={priority}
+          />
+
+          {imdb && (
+            <div
+              className={`rating-badge ${hidePosterOverlay ? "hidden-by-actions" : ""}`}
+              style={{
+                position: "absolute",
+                top: "8px",
+                right: "8px",
+                padding: "4px 8px",
+                borderRadius: "8px",
+                background: "rgba(0,0,0,0.82)",
+                fontSize: "10px",
+                fontWeight: 700,
+                color: "#e8c84a",
+                letterSpacing: "0.01em",
+                pointerEvents: "none",
+                display: "flex",
+                alignItems: "center",
+                gap: "3px",
+              }}
+            >
+              <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+              </svg>
+              {imdb}
+            </div>
+          )}
+
+          {movie.score !== undefined && movie.score >= 0.70 && (
+            <div
+              className={hidePosterOverlay ? "hidden-by-actions" : ""}
+              style={{
+                position: "absolute",
+                top: "8px",
+                left: "8px",
+                padding: "4px 8px",
+                borderRadius: "8px",
+                background: movie.score >= 0.85 ? "rgba(20,160,60,0.9)" : "rgba(180,145,0,0.9)",
+                fontSize: "10px",
+                fontWeight: 700,
+                color: "#fff",
+                pointerEvents: "none",
+                letterSpacing: "0.01em",
+                textShadow: "0 1px 2px rgba(0,0,0,0.4)",
+              }}
+            >
+              {Math.round(movie.score * 100)}% Match
+            </div>
+          )}
+
+          {movie.reason && (
+            <div
+              className={hidePosterOverlay ? "hidden-by-actions" : ""}
+              style={{ position: "absolute", bottom: "8px", left: "8px", zIndex: 3, cursor: "pointer" }}
+              onMouseEnter={() => setShowReason(true)}
+              onMouseLeave={() => setShowReason(false)}
+              onTouchEnd={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                setShowReason((v) => !v);
+              }}
+            >
+              <div
+                style={{
+                  background: "rgba(30,30,36,0.9)",
+                  border: "1px solid rgba(255,255,255,0.18)",
+                  borderRadius: "20px",
+                  padding: "3px 10px",
+                  fontSize: "10px",
+                  fontWeight: 600,
+                  color: "rgba(255,255,255,0.9)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "4px",
+                  userSelect: "none",
+                }}
+              >
+                <span style={{ fontSize: "10px" }}>ⓘ</span> Why?
+              </div>
+              {showReason && (
+                <div
+                  style={{
+                    position: "absolute",
+                    bottom: "calc(100% + 6px)",
+                    left: 0,
+                    width: "180px",
+                    background: "rgba(18,18,22,0.98)",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                    borderRadius: "10px",
+                    padding: "10px 12px",
+                    fontSize: "11px",
+                    lineHeight: 1.5,
+                    color: "rgba(255,255,255,0.85)",
+                    boxShadow: "0 8px 24px rgba(0,0,0,0.6)",
+                    zIndex: 10,
+                    pointerEvents: "none",
+                  }}
+                >
+                  {movie.reason}
+                </div>
+              )}
+            </div>
+          )}
+
+          <div
+            className={`poster-bottom-info ${hidePosterOverlay ? "hidden-by-actions" : ""}`}
             style={{
-              fontSize: "11px",
-              fontWeight: 600,
-              color: "#fff",
+              position: "absolute",
+              bottom: 0,
+              left: 0,
+              right: 0,
+              background: "linear-gradient(to top, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.5) 55%, transparent 100%)",
+              padding: "40px 8px 8px",
+              pointerEvents: "none",
+            }}
+          >
+            <p
+              style={{
+                fontSize: "11px",
+                fontWeight: 600,
+                color: "#fff",
+                margin: 0,
+                lineHeight: 1.3,
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+              }}
+            >
+              {movie.title}
+            </p>
+            {(movie.year || lang || imdb) && (
+              <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.55)", margin: "2px 0 0", lineHeight: 1.3 }}>
+                {[movie.year, lang].filter(Boolean).join(" · ")}
+              </p>
+            )}
+          </div>
+
+          <div
+            className={`action-overlay ${showActions ? "active" : ""}`}
+            style={{
+              position: "absolute",
+              inset: 0,
+              display: "flex",
+              flexWrap: "wrap",
+              alignContent: "center",
+              justifyContent: "center",
+              gap: "8px",
+              background: "rgba(6,6,10,0.75)",
+              backdropFilter: "blur(8px)",
+              WebkitBackdropFilter: "blur(8px)",
+              padding: "12px",
+              opacity: showActions ? 1 : 0,
+              visibility: showActions ? "visible" : "hidden",
+              pointerEvents: showActions ? "auto" : "none",
+            }}
+          >
+            {CARD_ACTIONS.map((btn) => (
+              <button
+                key={btn.action}
+                onTouchEnd={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (disabled || overlayJustShownRef.current) return;
+                  setShowActions(false);
+                  onAction(movie, btn.action);
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (disabled) return;
+                  setShowActions(false);
+                  onAction(movie, btn.action);
+                }}
+                disabled={disabled}
+                className="action-btn"
+                style={{
+                  width: "calc(50% - 4px)",
+                  color: btn.color,
+                  opacity: disabled ? 0.4 : 1,
+                  cursor: disabled ? "not-allowed" : "pointer",
+                }}
+              >
+                <span style={{ display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}>
+                  {btn.icon}
+                </span>
+                <span style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                  {btn.label}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div
+          style={{
+            position: "absolute",
+            top: "calc(100% - 2px)",
+            left: 0,
+            right: 0,
+            borderRadius: "0 0 var(--radius-poster) var(--radius-poster)",
+            border: "1px solid rgba(255,255,255,0.16)",
+            borderTop: "none",
+            background: "linear-gradient(180deg, rgba(20,22,30,0.96) 0%, rgba(12,13,18,0.98) 100%)",
+            boxShadow: "0 14px 32px rgba(0,0,0,0.55)",
+            padding: "10px 10px 12px",
+            display: "flex",
+            flexDirection: "column",
+            gap: "7px",
+            opacity: hoverExpanded ? 1 : 0,
+            transform: hoverExpanded ? "translateY(0)" : "translateY(-10px)",
+            pointerEvents: hoverExpanded ? "auto" : "none",
+            transition: "opacity var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out)",
+          }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onClick?.();
+          }}
+        >
+          <h3
+            style={{
               margin: 0,
-              lineHeight: 1.3,
+              fontSize: "13px",
+              fontWeight: 700,
+              color: "#fff",
+              lineHeight: 1.25,
               display: "-webkit-box",
               WebkitLineClamp: 2,
               WebkitBoxOrient: "vertical",
@@ -1828,248 +1945,58 @@ function PosterCard({
             }}
           >
             {movie.title}
-          </p>
-          {(movie.year || lang || imdb) && (
-            <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.55)", margin: "2px 0 0", lineHeight: 1.3 }}>
-              {[movie.year, lang].filter(Boolean).join(" · ")}
-            </p>
-          )}
-        </div>
+          </h3>
 
-        {/* Action overlay */}
-        <div
-          className={`action-overlay ${showActions ? "active" : ""}`}
-          style={{
-            position: "absolute",
-            inset: 0,
-            display: "flex",
-            flexWrap: "wrap",
-            alignContent: "center",
-            justifyContent: "center",
-            gap: "8px",
-            background: "rgba(6,6,10,0.75)",
-            backdropFilter: "blur(8px)",
-            WebkitBackdropFilter: "blur(8px)",
-            padding: "12px",
-          }}
-        >
-          {CARD_ACTIONS.map((btn) => (
-            <button
-              key={btn.action}
-              onTouchEnd={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                if (disabled || overlayJustShownRef.current) return;
-                setShowActions(false);
-                onAction(movie, btn.action);
-              }}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (disabled) return;
-                setShowActions(false);
-                onAction(movie, btn.action);
-              }}
-              disabled={disabled}
-              className="action-btn"
-              style={{
-                width: "calc(50% - 4px)",
-                color: btn.color,
-                opacity: disabled ? 0.4 : 1,
-                cursor: disabled ? "not-allowed" : "pointer",
-              }}
-            >
-              <span style={{ display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}>
-                {btn.icon}
-              </span>
-              <span style={{ fontSize: "9px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>
-                {btn.label}
-              </span>
-            </button>
-          ))}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+            <span style={{ color: "#fbbf24", background: "rgba(0,0,0,0.52)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "999px", padding: "3px 8px", fontSize: "10px", fontWeight: 700 }}>
+              IMDb {imdbValue}
+            </span>
+            <span style={{ color: "rgba(255,255,255,0.86)", background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "999px", padding: "3px 8px", fontSize: "10px", fontWeight: 600 }}>
+              {releaseYear}
+            </span>
+            <span style={{ color: "rgba(255,255,255,0.86)", background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "999px", padding: "3px 8px", fontSize: "10px", fontWeight: 600 }}>
+              {lang || "Unknown"}
+            </span>
+          </div>
+
+          {genreList.length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+              {genreList.map((genre) => (
+                <span
+                  key={genre}
+                  style={{
+                    color: "rgba(255,255,255,0.82)",
+                    background: "rgba(255,255,255,0.06)",
+                    border: "1px solid rgba(255,255,255,0.14)",
+                    borderRadius: "999px",
+                    padding: "2px 8px",
+                    fontSize: "10px",
+                    fontWeight: 600,
+                    lineHeight: 1.3,
+                  }}
+                >
+                  {genre}
+                </span>
+              ))}
+            </div>
+          )}
+
+          <p
+            style={{
+              margin: 0,
+              fontSize: "11px",
+              color: "rgba(255,255,255,0.8)",
+              lineHeight: 1.35,
+              display: "-webkit-box",
+              WebkitLineClamp: 3,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden",
+            }}
+          >
+            {synopsis}
+          </p>
         </div>
       </div>
-
-      {/* ── Desktop Hover Expand Preview ── */}
-      {typeof document !== "undefined" && createPortal(
-        <AnimatePresence>
-          {hoverPortalPos && isDesktopHoverEnabled() && (() => {
-            const sourceRect = hoverPortalPos.rect;
-            const targetWidth = Math.min(300, Math.max(220, sourceRect.width * 1.36));
-            const posterTargetHeight = targetWidth * 1.5;
-            const detailsHeight = 168;
-            const targetHeight = posterTargetHeight + detailsHeight;
-            const viewportPadding = 16;
-
-            let targetLeft = sourceRect.left - (targetWidth - sourceRect.width) / 2;
-            const maxLeft = window.innerWidth - targetWidth - viewportPadding;
-            targetLeft = Math.max(viewportPadding, Math.min(targetLeft, maxLeft));
-
-            let targetTop = sourceRect.top - 34;
-            const maxTop = window.innerHeight - targetHeight - viewportPadding;
-            targetTop = Math.max(viewportPadding, Math.min(targetTop, maxTop));
-
-            const releaseYear = movie.year ? String(movie.year) : "--";
-            const imdbValue = movie.imdb_rating
-              ? movie.imdb_rating.toFixed(1)
-              : movie.vote_average
-                ? movie.vote_average.toFixed(1)
-                : "NA";
-            const genreList = (movie.genres && movie.genres.length > 0)
-              ? movie.genres.slice(0, 3)
-              : (movie.primary_genre ? [movie.primary_genre] : []);
-            const synopsis = movie.overview?.trim() || "No synopsis available yet.";
-
-            return (
-              <motion.div
-                key={`hover-preview-${recommendationId(movie)}`}
-                initial={{
-                  top: sourceRect.top,
-                  left: sourceRect.left,
-                  width: sourceRect.width,
-                  height: sourceRect.height,
-                  opacity: 0.15,
-                  borderRadius: "var(--radius-poster)",
-                }}
-                animate={{
-                  top: targetTop,
-                  left: targetLeft,
-                  width: targetWidth,
-                  height: targetHeight,
-                  opacity: 1,
-                  borderRadius: "16px",
-                }}
-                exit={{
-                  top: sourceRect.top,
-                  left: sourceRect.left,
-                  width: sourceRect.width,
-                  height: sourceRect.height,
-                  opacity: 0,
-                  borderRadius: "var(--radius-poster)",
-                }}
-                transition={{ type: "spring", stiffness: 360, damping: 30, mass: 0.75 }}
-                style={{
-                  position: "fixed",
-                  zIndex: 99999,
-                  overflow: "hidden",
-                  display: "flex",
-                  flexDirection: "column",
-                  boxShadow: "0 24px 56px rgba(0,0,0,0.75), 0 0 0 1px rgba(255,255,255,0.12) inset",
-                  background: "rgba(16, 18, 24, 0.96)",
-                  backdropFilter: "blur(30px)",
-                  WebkitBackdropFilter: "blur(30px)",
-                  pointerEvents: "auto",
-                }}
-                onMouseEnter={() => {
-                  if (hoverCloseTimeoutRef.current) {
-                    clearTimeout(hoverCloseTimeoutRef.current);
-                    hoverCloseTimeoutRef.current = null;
-                  }
-                }}
-                onMouseLeave={() => {
-                  scheduleHoverClose(60);
-                }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setHoverPortalPos(null);
-                  onClick?.();
-                }}
-              >
-                <div style={{ position: "relative", width: "100%", height: `${posterTargetHeight}px`, flexShrink: 0 }}>
-                  <Image
-                    src={poster}
-                    alt={movie.title}
-                    fill
-                    sizes="300px"
-                    style={{ objectFit: "cover" }}
-                    unoptimized
-                    priority
-                  />
-                  <div
-                    style={{
-                      position: "absolute",
-                      bottom: 0,
-                      left: 0,
-                      right: 0,
-                      height: "110px",
-                      background: "linear-gradient(to top, rgba(16, 18, 24, 0.98) 0%, rgba(16,18,24,0.65) 45%, transparent 100%)",
-                      pointerEvents: "none",
-                    }}
-                  />
-                </div>
-
-                <div style={{ padding: "0 14px 14px", marginTop: "-26px", display: "flex", flexDirection: "column", gap: "8px" }}>
-                  <h3
-                    style={{
-                      margin: 0,
-                      fontSize: "15px",
-                      fontWeight: 700,
-                      color: "#fff",
-                      textShadow: "0 2px 8px rgba(0,0,0,0.75)",
-                      lineHeight: 1.25,
-                      display: "-webkit-box",
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: "vertical",
-                      overflow: "hidden",
-                    }}
-                  >
-                    {movie.title}
-                  </h3>
-
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-                    <span style={{ color: "#fbbf24", background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "999px", padding: "3px 8px", fontSize: "10px", fontWeight: 700 }}>
-                      IMDb {imdbValue}
-                    </span>
-                    <span style={{ color: "rgba(255,255,255,0.85)", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "999px", padding: "3px 8px", fontSize: "10px", fontWeight: 600 }}>
-                      {releaseYear}
-                    </span>
-                    <span style={{ color: "rgba(255,255,255,0.85)", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "999px", padding: "3px 8px", fontSize: "10px", fontWeight: 600 }}>
-                      {lang || "Unknown"}
-                    </span>
-                  </div>
-
-                  {genreList.length > 0 && (
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-                      {genreList.map((genre) => (
-                        <span
-                          key={genre}
-                          style={{
-                            color: "rgba(255,255,255,0.82)",
-                            background: "rgba(255,255,255,0.06)",
-                            border: "1px solid rgba(255,255,255,0.14)",
-                            borderRadius: "999px",
-                            padding: "2px 8px",
-                            fontSize: "10px",
-                            fontWeight: 600,
-                            lineHeight: 1.3,
-                          }}
-                        >
-                          {genre}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-
-                  <p
-                    style={{
-                      margin: 0,
-                      fontSize: "11px",
-                      color: "rgba(255,255,255,0.78)",
-                      lineHeight: 1.35,
-                      display: "-webkit-box",
-                      WebkitLineClamp: 3,
-                      WebkitBoxOrient: "vertical",
-                      overflow: "hidden",
-                    }}
-                  >
-                    {synopsis}
-                  </p>
-                </div>
-              </motion.div>
-            );
-          })()}
-        </AnimatePresence>,
-        document.body
-      )}
     </motion.article>
   );
 }
