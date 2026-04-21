@@ -15,11 +15,10 @@ The CineMatch system operates through a multi-stage pipeline:
 - Merges MovieLens 32M, TMDB (~1.37M titles), and IMDb (~738K movies) into a unified catalog.
 - Constructs a structured `movieDoc` per movie from title, year, language, genres, keywords, tagline, and plot overviews.
 
-**2. Dual-Embedding Pipelines**
+**2. Semantic Embedding Pipeline**
 
-- **Symmetric Retrieval**: TMDB catalog encoded with **Qwen3-Embedding-4B** (1536-dim).
-- **Asymmetric Retrieval**: IMDb catalog encoded with **BAAI/bge-m3** (1024-dim, natively supporting 100+ languages).
-- All embeddings are normalized for cosine similarity via inner product using **FAISS**.
+- **Semantic Retrieval**: TMDB catalog (fused with IMDb quality data) encoded with **BAAI/bge-m3** (1024-dim, natively supporting 100+ languages).
+- All embeddings are normalized for cosine similarity via inner product using exact **FAISS** (IndexFlatIP).
 
 **3. Collaborative Filtering (XSimGCL)**
 
@@ -29,8 +28,8 @@ The CineMatch system operates through a multi-stage pipeline:
 
 **4. Hybrid Retrieval & Late Fusion**
 
-- Combines semantic similarity scores with collaborative filtering predictions.
-- Applies **Maximal Marginal Relevance (MMR)** and language diversity filters to ensure high-quality, diverse recommendation stacks.
+- Combines semantic similarity scores with collaborative filtering predictions via a **Late-Fusion Linear Aggregation** ensemble.
+- Applies **Determinantal Point Process (DPP)** diversity reranking to explicitly break echo chambers and provide a global diversity guarantee.
 
 **5. Web Application & API**
 
@@ -82,6 +81,11 @@ CineMatch/
 │       └── lib/
 │           ├── api.ts                # FastAPI backend client
 │           └── usePoster.ts          # TMDB poster hook
+├── cinematchproapi/                  # Dedicated FastAPI Backend Service
+│   ├── app.py                        # Main FastAPI server application
+│   ├── cooccurrence.py               # Co-occurrence logic
+│   ├── Dockerfile                    # Docker configuration for API deployment
+│   └── requirements.txt              # Backend-specific dependencies
 ├── Data/
 │   ├── ml-32m/                       # MovieLens 32M dataset
 │   ├── TMDB_movie_dataset_v11.csv    # Raw TMDB catalog (~1.37M titles)
@@ -91,10 +95,10 @@ CineMatch/
 │       ├── movielens_tmdb_merged.csv                           # Merged MovieLens + TMDB (87,585 movies)
 │       └── tmdb_semantic_catalog_alllangs_with_new_movies.csv  # Full TMDB semantic catalog (~1.37M) with imdb votings and ratings
 ├── models/                           # Model artifacts
-│   ├── imdbbge/                      # IMDb FAISS index & BGE-M3 embeddings
-│   ├── tmdbbge/                      # TMDB FAISS index (BGE-M3)
-│   ├── tmdbqwen/                     # TMDB FAISS index (Qwen3-Embedding-4B)
-│   └── xsimgcl/                      # XSimGCL model weights & user/item vectors
+│   ├── tmdbbge/                      # TMDB + IMDb Fused FAISS index (BGE-M3)
+│   ├── xsimgcl/                      # XSimGCL model weights & user/item vectors
+│   ├── imdbbge/                      # [Legacy] IMDb FAISS index & embeddings
+│   └── tmdbqwen/                     # [Legacy] TMDB FAISS index (Qwen3)
 ├── src/
 │   ├── 1)DataSet_Inspection.ipynb    # Exploratory dataset analysis
 │   ├── 2)Data_Pipeline.ipynb         # MovieLens × TMDB × IMDb merge pipeline
@@ -112,7 +116,7 @@ CineMatch/
 │   │   ├── 1)IMDB_01_Prep.ipynb      # IMDb data cleaning & filtering
 │   │   └── 2)IMDB_02_BGE_M3_Embeddings_FAISS.ipynb  # IMDb FAISS index construction
 │   └── ui/
-│       ├── api_server.ipynb          # FastAPI backend
+│       ├── api_server.ipynb          # Legacy FastAPI backend
 │       └── gradio_app.ipynb          # Legacy Gradio demo interface
 ├── RecBole-GNN/                      # RecBole-GNN submodule (XSimGCL dependency)
 ├── docs/
@@ -137,7 +141,11 @@ CineMatch/
    pip install fastapi uvicorn sentence-transformers faiss-gpu-cu12 pymongo python-dotenv
    ```
 2. Set up `.env` with `CINEMATCH_MONGO_URI` and `TMDB_BEARER_TOKEN`.
-3. Launch the API server via `src/ui/api_server.ipynb`.
+3. Navigate to the API directory and launch the server:
+   ```bash
+   cd cinematchproapi
+   python app.py
+   ```
 
 ### 2. Web Application (Frontend)
 

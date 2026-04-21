@@ -1,0 +1,984 @@
+% =============================================================
+%  CineMatch — Final Report (IEEE Conference Format)
+%  EGN6933 Applied Data Science — University of Florida
+%  Student: Roop Yaswanth Nagabhairava (45439754)
+% =============================================================
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{url}
+\usepackage{hyperref}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{tikz}
+\usepackage{placeins}
+\usetikzlibrary{shapes.geometric,arrows.meta,positioning,calc,fit,backgrounds,patterns}
+
+\hypersetup{colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue}
+\renewcommand{\arraystretch}{1.15}
+
+% ─────────────────────────────────────────────────────────────
+\begin{document}
+
+\title{CineMatch: A Cross-Cultural Movie Recommender via\\
+Late-Fusion of Graph Neural Networks,\\Dense Multilingual Retrieval,
+and Bayesian Quality Reranking}
+
+\author{
+  \IEEEauthorblockN{Roop Yaswanth Nagabhairava}
+  \IEEEauthorblockA{M.S.\ Applied Data Science, University of Florida\\
+    Student ID:~45439754 \quad egn6933@ufl.edu}
+  \and
+  \IEEEauthorblockN{Advisor: Dr.\ Yu Wang\quad Instructor: Dr.\ Edwin Marte}
+  \IEEEauthorblockA{EGN6933: Applied Data Science, University of Florida}
+}
+\maketitle
+
+% ─────────────────────────────────────────────────────────────
+\begin{abstract}
+Current recommendation platforms create \emph{cultural filter bubbles}:
+collaborative filtering (CF) models produce no cross-cultural signal when
+users' viewing histories are disjoint, and genre-tag content systems cannot
+capture the narrative similarities that unite films across language boundaries.
+CineMatch addresses this through a five-stage inference pipeline:
+(1)~a multilingual BGE-M3 dense retrieval index (0.6\,B params, 1024-dim)
+over 1.37\,M movies---merged from TMDB and IMDb metadata, refreshed
+monthly via the TMDB API---indexed in a FAISS \texttt{IndexIDMap2(FlatIP)};
+(2)~an XSimGCL graph neural network trained on MovieLens-32M (20.2\,M
+positive interactions); both signals blended by (3)~an MLP routing gate
+conditioned on five user-activity features producing mixture weights
+$(\alpha,\beta,\gamma)$; candidates then pass through (4)~a
+language-specific Bayesian quality filter and a genre-dominance reranker;
+and (5)~a two-stage Determinantal Point Process (DPP) that enforces
+cross-cultural diversity.
+A state-of-the-art Qwen3-Embedding (4\,B) encoder was evaluated in
+development but its 14\,GB index exceeded deployment constraints; BGE-M3
+(5.6\,GB) was selected for production.
+The XSimGCL backbone achieved \textbf{NDCG@10\,=\,0.7299},
+\textbf{Recall@10\,=\,0.7277}, and \textbf{MRR@10\,=\,0.8045} on
+979 held-out users (paired $t$-test vs.\ LightGCN: $t\!=\!12.65$,
+$p\!<\!0.001$).
+The full system is deployed at \url{onlymovies.app}---a Next.js frontend
+on Vercel with a Dockerised FastAPI backend on Hugging Face Spaces---and
+a live user study showed increase in
+cross-cultural recommendation exposure over CF-only.
+\end{abstract}
+
+\begin{IEEEkeywords}
+recommendation systems, graph neural networks, multilingual embeddings,
+contrastive learning, Bayesian quality scoring, cross-cultural discovery,
+determinantal point process, late fusion
+\end{IEEEkeywords}
+
+% ─────────────────────────────────────────────────────────────
+\section{Problem Statement}
+
+
+Most people's movie discovery is bounded by the language of their existing
+watch history.
+Streaming platforms optimise for engagement within familiar cultural
+territory, reinforcing the standard CF paradigm: when users share no
+cross-cultural viewing history, the model learns no cross-cultural signal.
+Content-based genre tags compound the problem---``Action/Thriller'' does
+not encode narrative structure, so a system cannot infer that a viewer
+who loved \emph{The Dark Knight} might equally enjoy \emph{Vikram Vedha},
+or that a Hayao Miyazaki fan might resonate with the structural language of
+Guillermo del Toro.
+Beyond content, the problem is structural: IMDb vote counts for regional
+films are typically 10--100$\times$ lower than equivalent English-language
+titles, so any quality filter using a flat vote threshold ($\geq3{,}000$
+votes) silently suppresses the majority of world cinema before retrieval
+even begins.
+
+The global streaming market is projected to exceed \$230\,B by 2028, with
+the majority of new subscribers coming from non-English-speaking markets.
+Yet recommendation infrastructure overwhelmingly defaults to English-first
+quality signals and English-centric interaction data.
+A system capable of cross-cultural movie discovery---without requiring users
+to already know what they are looking for---has both commercial value
+(content monetisation across language barriers) and cultural impact
+(preserving discoverability of non-dominant cinema).
+Fifteen weeks of development were required to integrate three independently
+deep research areas---graph contrastive learning, dense multilingual
+retrieval, and probabilistic diversity---into a single production pipeline;
+each required domain-specific engineering decisions documented here.
+
+\textbf{The refined scope of CineMatch involves:}
+building a hybrid retrieval system that identifies semantically similar
+films across language and cultural boundaries; personalises for users
+at every activity level from cold-start to power user via adaptive MLP
+gating; applies language-aware quality scoring that treats regional cinema
+equitably; enforces cross-cultural diversity via principled probabilistic
+reranking; and operates at production latency in a fully deployed web
+application.
+
+% ─────────────────────────────────────────────────────────────
+\section{Related Work}
+
+\textbf{Matrix Factorisation foundations.}
+ALS and SVD decompose the user-item rating matrix into latent factors
+modelling only \emph{first-order} connectivity~\cite{movielens}.
+They assign zero vectors to unrated items, lack any mechanism for
+high-order neighbourhood signals, and embed popularity bias directly
+into factor norms, trapping users in genre filter bubbles.
+CineMatch includes ALS as a historical baseline to quantify the gap
+(ALS: NDCG@10\,=\,0.4821; XSimGCL: 0.7299---a 51\% improvement).
+
+\textbf{Graph neural network CF: LightGCN.}
+LightGCN~\cite{lightgcn} simplified GCN-based CF by eliminating
+non-linear transformations and learning only weighted neighbour
+aggregation over the bipartite user-item graph.
+While achieving strong recall on standard benchmarks, LightGCN suffers
+from representation collapse on long-tail items: films with few
+interactions receive weak propagation and converge to near-zero embeddings.
+For cross-cultural recommenders, where non-English films are structurally
+under-represented in training data, this is a critical failure mode
+that CineMatch's contrastive backbone directly addresses.
+
+\textbf{Graph contrastive learning: SimGCL and NCL.}
+SimGCL~\cite{xsimgcl} addressed long-tail collapse by replacing
+graph-topology augmentation with uniform noise perturbations on embeddings,
+training with an InfoNCE contrastive loss; NCL~\cite{ncl} augments
+contrastive learning with prototype-based neighbourhood signals.
+Both significantly improve long-tail recall; however, SimGCL's approach
+still applies noise through the full graph at training time.
+CineMatch reproduces both as direct baselines
+(SimGCL: NDCG@10\,=\,0.6920; NCL: 0.6890 on ML-32M).
+
+\textbf{XSimGCL: our CF selection.}
+Yu~et~al.~\cite{xsimgcl} showed that applying uniform noise to a
+\emph{single} intermediate GCN layer---without any message-passing in
+the contrastive view---achieves superior NDCG at lower training cost
+than SimGCL.
+CineMatch adopts XSimGCL as its CF backbone, confirmed by our
+ML-32M results (NDCG@10\,=\,0.7299 vs.\ SimGCL 0.6920).
+
+\textbf{Multilingual dense retrieval: Qwen3-Embedding and BGE-M3.}
+Qwen3-Embedding (4\,B params) leads current multilingual retrieval
+benchmarks (MTEB).
+We encoded the full 1.37\,M-movie catalog with Qwen3, producing a
+14\,GB FAISS index that outperformed BGE-M3 on niche semantic queries;
+however, it exceeded Hugging Face Spaces' memory tier.
+BGE-M3~\cite{bgem3} (0.6\,B params, 1024-dim, 100+ languages) was
+selected for production: a 5.6\,GB index with comparable multilingual
+alignment.
+
+
+\textbf{Sequential / session-based models: SASRec and BERT4Rec.}
+SASRec~\cite{sasrec} applies causal (left-to-right) self-attention
+over a user's interaction sequence to predict the immediately \emph{next}
+item, while BERT4Rec~\cite{bert4rec} uses bidirectional masked-item
+prediction as a pre-training objective, allowing every past interaction
+to attend to every other.
+Both models excel when the \emph{current session context}---what the
+user is in the mood for right now---differs meaningfully from their
+long-run preferences.
+CineMatch's goal is \emph{general taste exploration} rather than
+next-item prediction within a bounded session; users visit the platform
+to discover films across languages and eras, not to queue the next
+autoplayed episode.
+SASRec and BERT4Rec are therefore evaluated as related work but rejected
+as the primary CF backbone: their sequential inductive bias would
+discard historical preferences older than the session window and would
+not leverage the long-tail cross-cultural signals captured by
+XSimGCL's graph-level propagation.
+
+\textbf{LLM + RAG hybrid retrieval.}
+RAG-based recommenders combine a dense retrieval index (the ``retrieval''
+stage) with a large language model that re-reads retrieved context to
+produce either ranked scores or natural-language explanations~\cite{rag}.
+For cold-start scenarios the LLM can synthesise a recommendation
+from minimal profile text, and the approach inherently produces
+human-readable rationales (``because you liked \emph{Parasite}, here
+is \emph{The Wailing}'').
+CineMatch's BGE-M3 path is architecturally equivalent to the
+retrieval stage of an LLM+RAG pipeline: a query embedding is matched
+against a pre-built dense index.
+
+\textbf{Feature interaction models: DeepFM.}
+DeepFM~\cite{deepfm} fuses a factorisation machine (FM) component for
+low-order feature interactions with a deep neural network for
+high-order interactions, operating over a rich tabular feature set:
+user age, explicit genre tags, genome tag scores, and interaction
+counts.
+FM-family models excel on feature-rich datasets or proprietary platforms with
+demographic metadata.
+CineMatch trains and evaluates on MovieLens-32M, which intentionally
+ships \emph{only} user–item rating triples without genome scores,
+user demographics, or structured tag vectors.
+Applying DeepFM would require imputing the absent tabular metadata,
+introducing fabricated features that would corrupt ground-truth
+correlations and make offline metrics unreliable.
+
+\textbf{DPP for recommendation diversity.}
+Chen~et~al.~\cite{dpp} demonstrated fast greedy MAP inference for
+Determinantal Point Processes in recommendation, providing \emph{global}
+diversity guarantees by maximising the determinant (geometric volume)
+of the selected item set in $O(K^2n)$ time.
+Compared to Maximal Marginal Relevance (MMR), which is a greedy
+sequential heuristic prone to local optima, DPP accounts for all
+pairwise item interactions simultaneously.
+CineMatch extends this with a two-stage pipeline (categorical DPP
+then embedding DPP), a novel design not present in prior work.
+
+% ─────────────────────────────────────────────────────────────
+\section{Objectives}
+
+The architecture underwent four significant pivots.
+
+\textit{(1) ALS $\to$ LightGCN (Weeks 4--7).}
+Initial CF used ALS on MovieLens-1M.
+Profiling showed ALS assigned near-zero vectors to items with fewer than
+15 interactions---covering $>$60\% of non-English films---making it
+unsuitable for cross-cultural objectives.
+GNNs propagate neighbourhood signals over multiple hops, amplifying
+long-tail items.
+
+\textit{(2) LightGCN $\to$ UltraGCN $\to$ XSimGCL (Weeks 7--9).}
+After LightGCN's NDCG@10\,=\,0.6410 on ML-32M, UltraGCN was evaluated
+(0.6987); its constraint loss skips message-passing efficiently but
+loses multi-hop signals on dense ML-32M.
+XSimGCL (0.7299) was selected.
+
+\textit{(3) Hard genre filter $\to$ soft dominance reranking (Week 11).}
+Live users reported genre collapse after $\approx$40 interactions.
+Root cause: a hard genre filter combined with a flat 3,000-vote floor
+exhausted the candidate pool.
+Genre preference was redesigned as a soft dominance score; vote thresholds
+were made language-specific.
+
+\textit{(4) Qwen3-4B $\to$ BGE-M3 for production (Week 12).}
+The 14\,GB Qwen3 index exceeded Hugging Face Spaces' memory tier.
+BGE-M3 (5.6\,GB) was deployed; Qwen3 remains available for future
+infrastructure upgrades.
+
+
+\begin{table}[h]
+\caption{Project Objectives}
+\label{tab:objectives}
+\centering\small
+\begin{tabular}{p{5.4cm}c}
+\toprule
+\textbf{Objective} & \textbf{Status} \\
+\midrule
+MovieLens-32M training & \checkmark \\
+TMDB+IMDb merged catalog (1.37M movies) & \checkmark \\
+Hybrid recommender (semantic + CF + reranking) & \checkmark \\
+Cross-lingual discovery via multilingual embeddings & \checkmark \\
+Bayesian quality scoring for regional cinema & \checkmark \\
+Two-stage DPP diversity reranking & \checkmark \\
+Live co-occurrence graph from user interactions & \checkmark \\
+Deployed production web application & \checkmark \\
+Statistical validation over baselines & \checkmark \\
+Qwen3-4B encoder (SOTA) & Dev only* \\
+RAG ``why this movie'' explanation layer & Descoped** \\
+\bottomrule
+\multicolumn{2}{l}{\small *14\,GB index exceeds production memory.}\\
+\multicolumn{2}{l}{\small ** Listed as future work.}
+\end{tabular}
+\end{table}
+
+
+% ─────────────────────────────────────────────────────────────
+\section{Final Deliverables}
+
+\begin{enumerate}
+  \item \textbf{XSimGCL model}: trained on ML-32M; exported 512-dim
+    user/item embeddings (200,807 and 65,023 rows respectively).
+  \item \textbf{FAISS indexes}: BGE-M3 1024-dim, 1,366,255 movies
+    (\texttt{IndexIDMap2(IndexFlatIP)}, 5.6\,GB, deployed);
+    Qwen3-4B 14\,GB index (dev).
+  \item \textbf{Python inference backend} (\texttt{app.py},
+    $\approx$5,800 lines): initially validated via Gradio
+    prototype; refactored to a \textbf{Dockerised FastAPI container}
+    on Hugging Face Spaces.
+    Implements the full pipeline: BGE-M3 retrieval, XSimGCL CF
+    dot-product scoring, MLP gating, co-occurrence lookup,
+    Bayesian quality filtering, language/genre reranking, two-stage DPP.
+  \item \textbf{Next.js frontend} (\texttt{cinematch-web/}): deployed
+    at \url{onlymovies.app} via Vercel; mobile-optimised swipe-based
+    interaction logging to MongoDB.
+  \item \textbf{MongoDB Atlas}: user profiles, session state,
+    interaction logs ($\in\{\text{like,dislike,skip}\}$),
+    \texttt{item\_cooccurrence} collection updated nightly.
+  \item \textbf{GitHub}: \url{https://github.com/roop-yaswanth/CineMatch}\\
+    (\texttt{README.md}, \texttt{requirements.txt}, training notebooks,
+    FAISS build manifests, architecture reference).
+\end{enumerate}
+
+% ─────────────────────────────────────────────────────────────
+\section{System Architecture}
+
+The CineMatch inference pipeline is structured as a five-layer adaptive retrieval-reranking system (Fig.~\ref{fig:arch}). The logic moves from initial multi-path retrieval to adaptive modality fusion, followed by a multi-stage sequential reranking layer that enforces quality, diversity, and cultural alignment.
+
+\begin{figure}[!t]
+\raggedright
+\includegraphics[width=0.48\textwidth]{architecture.jpg}
+\caption{CineMatch five-layer inference architecture. The end-to-end pipeline begins when a request arrives as either a user identifier or a natural-language query. Layer~2 contains three parallel retrieval paths gated by an MLP that reads five user-activity features and outputs mixture weights $(\alpha,\beta,\gamma)$, blending BGE-M3 semantic search ($\alpha$), XSimGCL collaborative filtering ($\beta$), and live co-occurrence ($\gamma$). Cold-start users force $(\alpha,\beta,\gamma)\!=\!(1,0,0)$, while warm users receive an adaptive blend. The fused candidate pool then passes through Layer~4, which applies sequential Bayesian quality filtering, language-aware reranking, genre-dominance reranking, and a two-stage DPP diversity pass before final output.}
+\label{fig:arch}
+\end{figure}
+
+
+
+% ─────────────────────────────────────────────────────────────
+\FloatBarrier
+\section{Methodology}
+\label{sec:methodology}
+
+\subsection{Data Pipeline}
+
+\textbf{TMDB Catalog.}
+A Kaggle-mirrored TMDB dump (1,367,793 entries) was filtered to remove
+short films (runtime $<60$\,min) and TV episodes.
+Final embeddable catalog: 1,366,255 records.
+TMDB's \texttt{vote\_count} is unreliable for non-English films.
+\texttt{merge\_imdb\_ratings.py} joined IMDb \texttt{numVotes} and
+\texttt{averageRating} on \texttt{imdb\_id}, covering $\approx$738K titles.
+A \texttt{best\_rating}/\texttt{best\_votes} composite column chooses
+the more credible source per film.
+The catalog is refreshed monthly via the TMDB API.
+
+\textbf{MovieDoc Construction.}
+Each movie becomes a structured text document fed to BGE-M3.
+The \texttt{movieDoc} schema consists of:
+\begin{itemize}
+  \item \textbf{Title}: Primary film name.
+  \item \textbf{Release date}: Calendar premiere date.
+  \item \textbf{Year}: Release year (numeric).
+  \item \textbf{IMDb ID}: IMDB identifier.
+  \item \textbf{Original language}: Source cultural code.
+  \item \textbf{Genres}: Categorical thematic tags.
+  \item \textbf{IMDb rating}: Crowd-sourced score.
+  \item \textbf{IMDb votes}: User interaction volume.
+  \item \textbf{Best rating}: Merged quality signal.
+  \item \textbf{Best votes}: Merged density signal.
+  \item \textbf{Vote average}: TMDB-specific scoring.
+  \item \textbf{Vote count}: TMDB interaction count.
+  \item \textbf{Popularity}: Relative traffic score.
+  \item \textbf{Tagline}: Condensed marketing hook.
+  \item \textbf{Plot}: Deep narrative summary.
+\end{itemize}
+The \texttt{Best\_rating}/\texttt{Best\_votes} composite selects the
+more credible source per film (IMDb where available, TMDB otherwise).
+Combining the original language code, multiple vote signals, and full
+plot lets BGE-M3 capture both narrative content and cultural identity.
+
+\textbf{MovieLens-32M.}
+ML-32M~\cite{movielens} (32M raw ratings) was filtered at
+$\geq3.5$ stars to extract positive interactions:
+200,807 users $\times$ 65,023 items, 20,218,546 interactions
+(sparsity $= 99.85\%$).
+
+\subsection{Semantic Retrieval --- BGE-M3 and Encoder Selection}
+
+Three FAISS indexes were built and evaluated:
+(1)~\textbf{BGE-M3} (0.6\,B params, 1024-dim): 1.37M movies, 5.6\,GB,
+deployed in production.
+(2)~\textbf{IMDb-subset BGE-M3}: 738K high-quality titles only.
+(3)~\textbf{Qwen3-Embedding} (4\,B params): SOTA multilingual benchmark
+scores; 14\,GB FAISS index, exceeds Hugging Face Spaces' memory tier.
+BGE-M3 over the full catalog was selected as the optimal
+NDCG-vs-memory trade-off.
+
+BGE-M3 embeds each \texttt{movieDoc} to a 1024-dim $L_2$-normalised
+vector: $\mathbf{e}_i = \text{BGE-M3}(\text{movieDoc}_i)$.
+At query time, the user history is encoded with an instruction prefix:
+\emph{``Instruct: Given liked movies, recommend similar ones.
+Query: Title1 (Genre), Title2 (Genre)\ldots''}
+Retrieval uses FAISS \texttt{IndexIDMap2(IndexFlatIP)} via
+$s_\text{sem}(i)=\mathbf{q}^\top\mathbf{e}_i$ (cosine on normalised vectors).
+The IDMap2 wrapper stores TMDB integer IDs directly in the index,
+eliminating a secondary lookup and removing ID-mapping risks.
+FlatIP (exact search) was preferred over IVF/HNSW approximation
+to avoid accuracy loss from quantisation.
+Index construction took 420\,s on an NVIDIA A100.
+
+\subsection{Collaborative Filtering --- XSimGCL}
+
+\textbf{Architecture.}
+XSimGCL~\cite{xsimgcl} runs $L$ LightGCN propagation layers then
+creates contrastive views by injecting uniform noise into a single
+intermediate layer:
+\begin{equation}
+  \tilde{\mathbf{e}}_u^{(\ell)} = \mathbf{e}_u^{(\ell)} + \boldsymbol\delta_u,
+  \quad\boldsymbol\delta\sim\mathcal{U}[-\varepsilon,\varepsilon].
+\end{equation}
+The InfoNCE contrastive loss pulls perturbed views of the same node
+together while pushing apart different nodes:
+\begin{equation}
+  \mathcal{L}_\text{cl} = -\!\sum_u \log
+    \frac{e^{\mathrm{sim}(\mathbf{e}_u,\tilde{\mathbf{e}}_u)/\tau}}
+         {\sum_{u'\neq u}e^{\mathrm{sim}(\mathbf{e}_u,\tilde{\mathbf{e}}_{u'})/\tau}},
+\end{equation}
+\begin{equation}
+  \mathcal{L} = \mathcal{L}_\text{BPR} + \lambda_\text{cl}\mathcal{L}_\text{cl}
+              + \lambda_\text{reg}\|\Theta\|^2.
+\end{equation}
+The five training steps are: (1)~bipartite graph ingestion;
+(2)~LightGCN multi-hop message passing; (3)~uniform noise augmentation
+of one layer; (4)~BPR + InfoNCE loss computation; (5)~weighted sum for
+weight update.
+
+\textbf{Hyperparameters.}
+Embedding size 512; $L=3$; noise $\varepsilon=0.1$; CL rate
+$\lambda_\text{cl}=0.5$; temperature $\tau=0.2$;
+$\lambda_\text{reg}=10^{-4}$; Adam lr$=10^{-3}$; batch 262,144;
+mixed-precision on.
+Training ran 47 effective epochs (early stop on NDCG@20) in
+6,892\,s ($\approx$1.9\,h) on an NVIDIA B200 (HiPerGator cluster).
+
+\textbf{Inference.}
+$s_\text{CF}(i) = \mathbf{u}^\top\mathbf{e}_i$ via batched dot product
+over 65,023 item embeddings.
+
+\subsection{Cold-Start CF Embedding}
+
+For users with $d_u<5$ interactions, a proxy 512-dim embedding is
+synthesised by recency-weighted mean-pooling of liked items' XSimGCL
+embeddings:
+\begin{equation}
+  \mathbf{u}_\text{cold} =
+    \frac{\sum_{i\in\mathcal{L}} w(t_i)\,\mathbf{e}_i}
+         {\sum_{i\in\mathcal{L}} w(t_i)},\quad
+  w(t)=e^{-\lambda_d(T-t)},
+\end{equation}
+where $\lambda_d=\ln2/90$ (90-day half-life).
+This is blended with a demographic cluster centroid at weight
+$\gamma_d=0.30$:
+$\hat{\mathbf{u}} = 0.7\,\mathbf{u}_\text{cold} + 0.3\,\mathbf{c}_\text{demo}$.
+Centroids are looked up by hierarchical fallback:
+(age, gender, region) $\to$ (age, gender) $\to$ (age) $\to$ global.
+
+\subsection{MLP Gating and Late Fusion}
+
+Five user-activity features drive the gate:
+$\mathbf{f}_u = [\log d_u,\;\sigma^2_r,\;\rho,\;H_\ell,\;c_\ell]$
+(degree, rating variance, recent-interaction fraction, language
+entropy, cross-lingual ratio).
+A two-layer MLP maps these to mixture weights:
+\begin{equation}
+  (\alpha,\beta,\gamma) =
+  \mathrm{Softmax}(W_2\,\mathrm{ReLU}(W_1\mathbf{f}_u+b_1)+b_2).
+  \label{eq:gate}
+\end{equation}
+Weights were hand-initialised from ablation experiments; end-to-end
+gradient training is feasible once interaction logs accumulate.
+Cold-start users are hard-routed: $(\alpha,\beta,\gamma)=(1,0,0)$.
+
+\textbf{Modality Collapse Prevention.}
+The two towers never share vector space.
+BGE-M3 returns cosine scores; XSimGCL returns dot-product scores on
+different scales.
+MinMax normalisation maps each independently to $[0,1]$ before fusion;
+the MLP outputs only scalar weights---not a mixed vector.
+Linear aggregation is used instead of Softmax over final scores because
+Softmax would exponentially exaggerate small numeric differences and
+destroy inter-tower calibration.
+
+\textbf{Missing Graph Edge Handling.}
+When item $i$ has no learned XSimGCL embedding (added post-training),
+its CF score is set to 0.
+A warm user with $(\alpha,\beta)=(0.6,0.3)$ then obtains
+$s(i)=0.6\,s_\text{sem}(i)$---automatically falling back to
+semantic-only without any conditional branch in the code.
+
+The fused score is:
+$s(i) = \alpha\,\hat{s}_\text{sem}(i) + \beta\,\hat{s}_\text{CF}(i)
+       + \gamma\,\hat{s}_\text{cooc}(i)$,
+where $\hat{s}(\cdot)=\mathrm{minmax}(s(\cdot))$.
+
+\subsection{Item-Item Co-Occurrence}
+
+For every pair $(a,b)$ co-liked by at least $m_\text{min}=3$ distinct
+users:
+\begin{equation}
+  \mathrm{cooc}(a,b)=\frac{|\mathcal{U}_a\cap\mathcal{U}_b|}
+                          {\sqrt{|\mathcal{U}_a|\cdot|\mathcal{U}_b|}}.
+\end{equation}
+Top-50 neighbours per item are persisted in MongoDB and loaded in-memory
+at startup.
+This signal grows autonomously with the user base, providing a
+self-improving audience-taste channel that IMDb/TMDB cannot supply.
+
+\subsection{Bayesian Quality Filtering}
+
+Language-specific IMDb weighted rating with prior vote threshold $m_\ell$:
+\begin{equation}
+  \mathrm{WR}(i) = \frac{v_i}{v_i+m_\ell}R_i
+               + \frac{m_\ell}{v_i+m_\ell}C,
+  \label{eq:bayes}
+\end{equation}
+$C=7.0$ (global mean), $m_\ell$ per Table~\ref{tab:votethresh}.
+Scores are normalised \emph{within each language group} so regional films
+compete fairly against English titles.
+A stricter credibility penalty ($m=20{,}000$ regional; $m=50{,}000$
+global) further adjusts inflated low-vote ratings
+(e.g.\ a film rated 9.1 with 3,000 votes adjusts to $\approx$7.1).
+
+\begin{table}[h]
+\caption{Language-Specific Vote Thresholds for Eq.~(\ref{eq:bayes})}
+\label{tab:votethresh}
+\centering\small
+\begin{tabular}{ll|ll}
+\toprule
+\textbf{Language} & $m_\ell$ & \textbf{Language} & $m_\ell$ \\
+\midrule
+Telugu    & 300  & Japanese  & 1000 \\
+Tamil     & 500  & Korean    & 1000 \\
+Malayalam & 500  & European  & 2000 \\
+Hindi     & 800  & English   & 3000 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Genre-Dominance Reranking}
+
+Genre dominance:
+$D(i,G_u) = |G_i\cap G_u|/(|G_i|+1)$.
+Total genre-fit score:
+\begin{align}
+  f_\text{genre}(i) &= 0.35\,D(i,G_\text{sel}) \nonumber\\
+  &\quad + 0.25\,\sigma(n_\text{liked})\cdot\mathbf{1}[G_i\cap G_\text{liked}] \nonumber\\
+  &\quad + 0.08\cdot\mathbf{1}[G_i\cap G_\text{okay}] \nonumber\\
+  &\quad - 0.20\cdot\mathbf{1}[G_i\cap G_\text{disliked}] \nonumber\\
+  &\quad - 0.10\cdot\mathbf{1}[G_i\cap G_\text{skipped}],
+\end{align}
+$\sigma(n)=1/(1+0.3n)$ prevents a frequently-liked genre from dominating.
+Results interleave pure-genre ($D\geq0.70$) and mixed-genre items,
+and relax filtering when the pool drops below 30 candidates.
+
+\subsection{Two-Stage DPP Diversity Reranking}
+
+\textbf{Stage 1 --- Categorical DPP.}
+Feature matrix $F\in\mathbb{R}^{n\times(|G|+|L|)}$ of genre and language
+one-hot vectors (weights $w_g=0.6$, $w_l=0.4$; reduced to $w_g=0.1$
+when user has explicitly selected genres).
+Greedy MAP selects $K=90$ from top-200.
+
+\textbf{Stage 2 --- Embedding DPP.}
+Quality-similarity kernel:
+$L_{ij}=q_i q_j\,\mathbf{e}_i^\top\mathbf{e}_j$,
+$q_i=\sqrt{s(i)}\cdot\delta_\text{lang}(i)$,
+where $\delta_\text{lang}=1.3$ for non-dominant-language items.
+Greedy MAP iterates $i^*=\arg\max_i\det(L_{S\cup\{i\}})/\det(L_S)$,
+selecting $K=50$ from top-150.
+
+% ─────────────────────────────────────────────────────────────
+\section{System Design}
+
+\textbf{Frontend.}
+A Next.js application on Vercel (\url{onlymovies.app}) handles user
+authentication, a 24-movie onboarding slate (8 per page; 70\%
+MovieLens-linked, IMDb$\,\geq6.0$ / votes$\,\geq3{,}000$),
+swipe-based interaction logging, and the personalised recommendation feed.
+
+\textbf{Backend.}
+The system was initially validated via a Gradio prototype to confirm
+model inference correctness before engineering the production backend.
+The final backend is a \textbf{Dockerised FastAPI container} deployed on
+Hugging Face Spaces.
+At startup the container downloads FAISS indexes and XSimGCL embeddings
+from the \texttt{ml8r/cinematch} Hugging Face Dataset.
+FAISS \texttt{IndexFlatIP} was preferred over IVF/HNSW variants for
+correctness: exact inner-product search on $L_2$-normalised vectors
+equals cosine similarity with zero approximation error.
+The IDMap2 wrapper stores TMDB IDs directly, removing any secondary
+lookup table.
+
+\textbf{Database.}
+MongoDB Atlas stores: user documents (profile, \texttt{cf\_embedding},
+\texttt{is\_warm}), session state, and interaction logs
+(\texttt{user\_id}, \texttt{tmdb\_id}, \texttt{action},
+\texttt{context}, \texttt{timestamp}).
+The \texttt{item\_cooccurrence} collection is rebuilt nightly and
+loaded in-memory at container start.
+
+% ─────────────────────────────────────────────────────────────
+\section{Experimental Design}
+\label{sec:expdesign}
+
+\textbf{Hardware.}
+XSimGCL training: UF HiPerGator NVIDIA B200.
+Embedding generation and baseline runs: NVIDIA A100 40\,GB.
+
+\textbf{Framework.}
+RecBole-GNN~\cite{recbolegnn} (PyTorch 2.x) for all CF models.
+FAISS 1.7 for indexing.
+
+\textbf{Dataset Splits.}
+ML-32M split temporally (80/10/10 per user).
+Stratified held-out set: 979 test users across 5 activity bands
+(5--50 / 50--100 / 100--200 / 200--500 / 500+;
+183/196/200/200/200 users; 10 held-out items per user at $\geq4.0$\,stars;
+9,790 test pairs total).
+
+\textbf{Protocol.}
+RecBole \texttt{uni100}: each test item ranked against 100 sampled negatives.
+Metrics: NDCG@$K$, Recall@$K$, MRR@$K$, $K\in\{10,20,50\}$.
+
+\textbf{ML-1M Validation.}
+XSimGCL validated on ML-1M (6,040 users; 3,629 items; 836,478
+interactions; 96.18\% sparse) under full-rank evaluation to confirm
+implementation correctness before committing full ML-32M GPU hours.
+
+% ─────────────────────────────────────────────────────────────
+\section{Results and Analysis}
+\label{sec:results}
+
+\subsection{Main Comparison on ML-32M}
+
+\begin{table}[h]
+\caption{Test Performance --- MovieLens-32M (uni100, $n=979$ users)}
+\label{tab:main}
+\centering\small
+\begin{tabular}{lccccc}
+\toprule
+\textbf{Method} & \textbf{N@10} & \textbf{R@10} & \textbf{M@10}
+                & \textbf{N@20} & \textbf{R@20}\\
+\midrule
+LightGCN  & 0.6410 & 0.6124 & 0.7312 & 0.6687 & 0.7201\\
+NCL       & 0.6890 & 0.6754 & 0.7798 & 0.7143 & 0.7851\\
+SimGCL    & 0.6920 & 0.6802 & 0.7834 & 0.7181 & 0.7913\\
+\midrule
+\textbf{XSimGCL} & \textbf{0.7299} & \textbf{0.7277} & \textbf{0.8045}
+                 & \textbf{0.7564} & \textbf{0.8298}\\
+\midrule
+\multicolumn{6}{l}{\footnotesize $\Delta$ vs LightGCN:
+  $+13.9\%$ / $+18.8\%$ / $+10.0\%$ (N/R/M@10)}\\
+\multicolumn{6}{l}{\footnotesize $\Delta$ vs SimGCL:\quad
+  $+5.5\%$ / $+7.0\%$ / $+2.7\%$}\\
+\bottomrule
+\multicolumn{6}{l}{\footnotesize N=NDCG, R=Recall, M=MRR}
+\end{tabular}
+\end{table}
+
+XSimGCL's noise-contrastive augmentation consistently lifted all
+metrics above all baselines.
+The MRR@10 gain of $+10.0\%$ over LightGCN (0.8045 vs.\ 0.7312) is
+especially important for recommendation UIs where only the first few
+positions receive user attention.
+
+\subsection{CF Backbone Comparison on ML-1M}
+
+Table~\ref{tab:ml1m} confirms implementation correctness against nine
+baselines under full-rank evaluation (all items, no negative sampling).
+Full-rank scores are lower than uni100 by design and are not directly
+comparable to Table~\ref{tab:main}.
+
+\begin{table}[h]
+\caption{CF Backbone Comparison on ML-1M --- Full-Rank Evaluation}
+\label{tab:ml1m}
+\centering\scriptsize
+\begin{tabular}{lccccc}
+\toprule
+\textbf{Method} & \textbf{N@10} & \textbf{R@10} & \textbf{M@10}
+                & \textbf{Hit@10} & \textbf{P@10}\\
+\midrule
+BPR      & 0.2401 & 0.1776 & 0.4187 & 0.7199 & 0.1779\\
+NeuMF    & 0.2271 & 0.1651 & 0.4020 & 0.7029 & 0.1700\\
+NGCF     & 0.2508 & 0.1814 & 0.4354 & 0.7239 & 0.1850\\
+LightGCN & 0.2538 & 0.1861 & 0.4388 & 0.7330 & 0.1863\\
+LightGCL & 0.2479 & 0.1867 & 0.4283 & 0.7370 & 0.1815\\
+SGL      & 0.2505 & 0.1889 & 0.4315 & 0.7392 & 0.1843\\
+HMLET    & 0.2490 & 0.1847 & 0.4297 & 0.7305 & 0.1836\\
+NCL      & 0.2702 & 0.2021 & 0.4599 & 0.7565 & 0.1962\\
+SimGCL   & 0.2667 & 0.2029 & 0.4550 & 0.7640 & 0.1933\\
+\midrule
+\textbf{XSimGCL} & \textbf{0.2750} & \textbf{0.2116}
+  & \textbf{0.4638} & \textbf{0.7743} & \textbf{0.1987}\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Training Convergence}
+
+NDCG@20 improved from 0.7083 (epoch~2) to 0.7901 (epoch~47), with most
+gain in the first 20 epochs (0.7791).
+BPR loss: $40.66\to3.34$; contrastive loss: $0.001\to1.18$;
+regularisation: $89.27\to81.27$.
+
+\subsection{Statistical Significance}
+
+\begin{table}[h]
+\caption{Statistical Significance --- XSimGCL vs.\ Baselines
+(Paired $t$-test, one-sided, $n=979$, $\sigma_\Delta\approx0.22$)}
+\label{tab:stats}
+\centering\small
+\begin{tabular}{lccl}
+\toprule
+\textbf{Comparison} & $t$ & $p$ & \textbf{95\% CI}\\
+\midrule
+vs.\ LightGCN & 12.65 & $<0.001$ & $[+0.075,+0.103]$\\
+vs.\ NCL      & 5.82  & $<0.001$ & $[+0.027,+0.055]$\\
+vs.\ SimGCL   & 5.39  & $<0.001$ & $[+0.024,+0.052]$\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{CF Backbone Ablation}
+
+\begin{table}[h]
+\caption{CF Backbone Ablation (NDCG@10, ML-32M, uni100)}
+\label{tab:ablation}
+\centering\small
+\begin{tabular}{lcc}
+\toprule
+\textbf{Configuration} & \textbf{NDCG@10} & \textbf{R@10}\\
+\midrule
+ALS (Week 4, initial)    & 0.4821 & 0.4703\\
+LightGCN                 & 0.6410 & 0.6124\\
+UltraGCN (Week 8)        & 0.6987 & 0.6871\\
+SimGCL                   & 0.6920 & 0.6802\\
+BGE-M3 only (FAISS)      & 0.6341 & 0.6053\\
+\textbf{XSimGCL (final)} & \textbf{0.7299} & \textbf{0.7277}\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Removing the CF backbone entirely (BGE-M3 only) drops NDCG@10 by 9.0\%
+relative (0.7299$\to$0.6341), quantifying the value of collaborative
+signals.
+ALS's 51\% gap validates the GNN backbone choice.
+
+\subsection{Cross-Cultural Discovery Rate}
+
+\begin{table}[h]
+\caption{CCDR --- Live User Study ( English-history users)}
+\label{tab:ccdr}
+\centering\small
+\begin{tabular}{lcc}
+\toprule
+\textbf{System} & \textbf{CCDR} & \textbf{95\% CI}\\
+\midrule
+XSimGCL CF only (no DPP) &  9\% & $[6\%,12\%]$\\
+CineMatch Full (+ DPP)   & 34\% & $[26\%,42\%]$\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The 3.8$\times$ increase ($9\%\to34\%$) confirms the combined effect of
+BGE-M3's cross-lingual embedding alignment and the DPP's $1.3\times$
+language-diversity bonus.
+
+% ─────────────────────────────────────────────────────────────
+\section{Error Analysis \& Interpretability}
+\label{sec:erroranalysis}
+
+\textbf{Score Decomposition (XAI).}
+Every recommendation exposes three interpretable scores:
+$\hat{s}_\text{sem}$ (BGE-M3 content similarity),
+$\hat{s}_\text{CF}$ (XSimGCL behavioural match), and
+$s$ (final fused), alongside language, genre, and quality tags.
+This \emph{transparency-by-design} fulfils Microsoft HAI Guideline~G11
+(``Make clear why the system did what it did''):
+a user can inspect that a Korean thriller appeared because content
+similarity was 0.87 while CF was 0.21, indicating the system acted on
+narrative resemblance rather than population behaviour.
+
+\textbf{HAI Trust and Safety.}
+When the system's candidate pool falls below 30 items (indicating
+unusual taste profiles), genre and vote filters are relaxed and the
+system surfaces a diversity notice (G10: ``Scope services when in doubt'').
+Cold-start users are explicitly shown onboarding context:
+``Based on your 8 rated films, here are suggestions---rate more for
+personalised results.''
+
+\textbf{Failure 1 --- Genre Collapse (resolved).}
+After $\approx$40 interactions, users reported ``I only get action films.''
+\emph{Root cause}: hard genre filter plus flat 3,000-vote floor exhausted
+the non-action international film pool.
+\emph{Fix}: soft dominance scoring; language-specific vote floors; pool
+floor (min 30 candidates) dynamically relaxes both filters.
+
+\textbf{Failure 2 --- Cold-Start Irrelevance (resolved).}
+Users with $<5$ rated movies received inconsistent recommendations
+because single-movie BGE-M3 queries were insufficient context.
+\emph{Fix}: onboarding collects 8--24 ratings before personalised output.
+
+\textbf{Failure 3 --- Language Embedding Mismatch (partially resolved).}
+Korean films described entirely in English in TMDB embedded closer to
+English-language thrillers than to Korean-language cinema.
+\emph{Fix}: explicit language-aware reranking ($3\times$ boost target
+language; $0.3\times$ suppression for English items).
+
+\textbf{Limitations.}
+MLP gating is hand-initialised; gradient training is feasible as logs
+accumulate.
+XSimGCL is transductive: items added post-training receive no CF score.
+The BGE-M3 inductive path mitigates this; a Feature-Initialised GNN
+fold-in mechanism would close the gap permanently.
+
+% ─────────────────────────────────────────────────────────────
+\section{Challenges and Lessons}
+\label{sec:challenges}
+
+\textbf{Computational Scale.}
+Embedding 1.37M movies with BGE-M3 and training on 20M interactions
+both exceeded local machine memory.
+Checkpointing every 1,000 batches prevented costly restarts after
+HiPerGator pre-emptions.
+Validating on ML-1M first (each epoch $\approx$8\,s vs.\ $\approx$107\,s
+on ML-32M) saved $\approx$30\,GPU-hours.
+
+\textbf{TMDB Vote Sparsity.}
+Many acclaimed international films had zero TMDB votes.
+Joining IMDb crowd-sourced counts on \texttt{imdb\_id} resolved this
+for $\approx$738K titles, requiring careful deduplication by
+\texttt{imdb\_id} fuzzy match.
+
+\textbf{Encoder Index Selection.}
+The Qwen3-4B index (14\,GB) produced marginally higher NDCG on niche
+queries but was impractical at deployment.
+BGE-M3 (5.6\,GB) provided fast, accurate retrieval within budget.
+This trade-off was only discoverable by building and testing both indexes.
+
+\textbf{Offline-Online Gap.}
+Optimising NDCG@10 offline did not prevent genre collapse or cold-start
+degradation in live deployment.
+Real users surfaced failures (``it stops showing interesting movies
+after a while'') that held-out test sets could not detect, validating
+live deployment as a critical complement to offline metrics.
+
+% ─────────────────────────────────────────────────────────────
+\section{Conclusion}
+\label{sec:conclusion}
+
+CineMatch demonstrated that cross-cultural movie discovery is achievable
+without generative LLMs or synthetic data.
+A five-stage pipeline---late fusion of XSimGCL (NDCG@10\,=\,0.7299) and
+BGE-M3, MLP gating, Bayesian quality scoring, genre-dominance reranking,
+and two-stage DPP diversity---outperformed LightGCN by 13.9\% and
+SimGCL by 5.5\% on NDCG@10 (both $p<0.001$), and increased
+cross-cultural exposure 3.8$\times$ in live testing.
+The language-specific Bayesian vote prior and the two-stage DPP
+are the primary novelties over existing graph-CF pipelines; together
+they elevate regional cinema from invisible to discoverable.
+Real-user feedback drove two architecture corrections that no offline
+metric would have surfaced.
+
+\textbf{Future work:}
+(1)~\emph{Feature-Initialised Inductive GNN}: replace transductive
+\texttt{nn.Embedding} ID lookup with a fixed BGE-M3 feature matrix;
+train only graph aggregation weights so new movies are foldable at
+inference time without full graph retraining (user nodes initialised
+by mean-pooling their interacted item embeddings).
+(2)~End-to-end MLP gate training via REINFORCE once interaction logs
+are sufficient.
+(3)~RAG conversational layer: map natural-language queries through an
+LLM into BGE-M3 query vectors for dialogue-driven discovery.
+(4)~Empirical selection between the three built FAISS indexes as
+hosting infrastructure scales.
+
+% ─────────────────────────────────────────────────────────────
+\begin{thebibliography}{9}
+
+\bibitem{xsimgcl}
+J.~Yu, H.~Yin, X.~Xia, T.~Chen, L.~Cui, and Q.~V.~H.~Nguyen,
+``Are Graph Augmentations Necessary? Simple Graph Contrastive
+Learning for Recommendation,''
+\textit{Proc.\ ACM SIGIR}, 2022. arXiv:2209.02544.
+
+\bibitem{bgem3}
+J.~Chen, S.~Xiao, P.~Zhang, K.~Luo, D.~Lian, and Z.~Liu,
+``BGE M3-Embedding: Multi-Lingual, Multi-Functionality,
+Multi-Granularity Text Embeddings,''
+arXiv:2402.03216, 2024.
+
+\bibitem{lightgcn}
+X.~He, K.~Deng, X.~Wang, Y.~Li, Y.~Zhang, and M.~Wang,
+``LightGCN: Simplifying and Powering Graph Convolution
+Network for Recommendation,''
+\textit{Proc.\ ACM SIGIR}, pp.\ 639--648, 2020.
+
+\bibitem{ncl}
+Z.~Lin, C.~Tian, Y.~Hou, and W.~X.~Zhao,
+``Improving Graph Collaborative Filtering with
+Neighbourhood-Enriched Contrastive Learning,''
+\textit{Proc.\ WWW}, pp.\ 2320--2329, 2022.
+
+\bibitem{movielens}
+F.~M.~Harper and J.~A.~Konstan,
+``The MovieLens Datasets: History and Context,''
+\textit{ACM Trans.\ Interact.\ Intell.\ Syst.}, vol.~5, no.~4, 2015.
+
+\bibitem{dpp}
+L.~Chen, G.~Zhang, and E.~Zhou,
+``Fast Greedy MAP Inference for Determinantal Point Process
+to Improve Recommendation Diversity,''
+\textit{Proc.\ NeurIPS}, 2018.
+
+\bibitem{recbolegnn}
+Y.~Wang et al.,
+``Towards Unified Graph Neural Networks for Recommendation,''
+arXiv:2206.07089, 2022.
+
+\bibitem{qwen3}
+Qwen Team, Alibaba Cloud,
+``Qwen3 Technical Report,''
+arXiv:2505.09388, 2025.
+
+\bibitem{sasrec}
+W.~Kang and J.~McAuley,
+``Self-Attentive Sequential Recommendation,''
+\textit{Proc.\ IEEE ICDM}, pp.\ 197--206, 2018.
+
+\bibitem{bert4rec}
+F.~Sun, J.~Liu, J.~Wu, C.~Pei, X.~Lin, W.~Ou, and H.~Jiang,
+``BERT4Rec: Sequential Recommendation with
+Bidirectional Encoder Representations from Transformers,''
+\textit{Proc.\ ACM CIKM}, pp.\ 1441--1450, 2019.
+
+\bibitem{rag}
+P.~Lewis et al.,
+``Retrieval-Augmented Generation for
+Knowledge-Intensive NLP Tasks,''
+\textit{Proc.\ NeurIPS}, 2020.
+
+\bibitem{deepfm}
+H.~Guo, R.~Tang, Y.~Ye, Z.~Li, and X.~He,
+``DeepFM: A Factorization-Machine based Neural Network
+for CTR Prediction,''
+\textit{Proc.\ IJCAI}, pp.\ 1725--1731, 2017.
+
+\end{thebibliography}
+
+% ─────────────────────────────────────────────────────────────
+\appendix
+\section*{Appendices}
+
+\textbf{A. GitHub Repository.}\\
+\url{https://github.com/roop-yaswanth/CineMatch}\\
+\texttt{README.md}, \texttt{requirements.txt}, \texttt{app.py}
+($\approx$5,800 lines), \texttt{cinematch-web/} (Next.js),
+\texttt{RecBole-GNN/} (training), \texttt{models/} (FAISS manifests,
+XSimGCL config).
+
+\vspace{1mm}
+\textbf{B. Live Demo.}\\
+\url{https://onlymovies.app}
+(Next.js, Vercel; Docker FastAPI backend: Hugging Face Spaces).\\
+2-minute video walkthrough:
+\url{https://github.com/roop-yaswanth/CineMatch}
+
+\vspace{1mm}
+\textbf{C. Compute Resources.}\\
+Training: NVIDIA B200, UF HiPerGator (\texttt{egn6933/nagabhairava.r}).\\
+Embedding \& baselines: NVIDIA A100 40\,GB.\\
+Total GPU-hours (training + experimentation + indexing):
+$\approx$14\,h.
+
+\vspace{1mm}
+\textbf{D. Reproducibility.}\\
+Seed: 42 (RecBole \texttt{reproducibility: true};
+CUDA deterministic enabled).
+FAISS index construction is deterministic given fixed input order.
+
+\end{document}
