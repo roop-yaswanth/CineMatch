@@ -55,10 +55,7 @@ RecBole-GNN/
 
 
 #temp
-update_faiss.py
-update_gcl.py
 Cinematchapi/
 cinematchproapi/
 minimal *
-cinematch-poster*
-ui_ux*
+cinematch_final_report.tex
