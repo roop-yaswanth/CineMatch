@@ -41,7 +41,7 @@ interface Props {
   onLogout: () => void;
 }
 
-type RecommendationAction = "like" | "okay" | "dislike" | "remove" | "watchlist" | "watched";
+type RecommendationAction = "like" | "okay" | "dislike" | "remove" | "watchlist" | "skip";
 type StackId = "hollywood" | "matched" | "other";
 
 interface Stack {
@@ -558,7 +558,7 @@ export default function RecommendationsView({
       if (action === "like" || action === "okay") actionCountRef.current.positive++;
       if (action === "dislike") actionCountRef.current.negative++;
       // Skip = half-dislike: counts 0.5 toward negative threshold
-      if (action === "remove") actionCountRef.current.negative += 0.5;
+      if (action === "remove" || action === "skip") actionCountRef.current.negative += 0.5;
 
       const { positive, negative, total } = actionCountRef.current;
       const shouldAutoRerun = negative >= 10 || total >= 10 || positive >= 10;
