@@ -29,7 +29,7 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   movie: DetailMovie | null;
-  onAction?: (action: "like" | "okay" | "dislike" | "watchlist" | "watched") => void;
+  onAction?: (action: "like" | "okay" | "dislike" | "watchlist" | "skip") => void;
   onMovieSelect?: (movie: DetailMovie) => void;
   sessionId?: string | null;
 }
@@ -74,7 +74,7 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
       .finally(() => setSimilarLoading(false));
   }, [movie?.id, movie?.tmdb_id, isOpen, sessionId]);
 
-  const handleActionClick = (action: "like" | "okay" | "dislike" | "watchlist" | "watched") => {
+  const handleActionClick = (action: "like" | "okay" | "dislike" | "watchlist" | "skip") => {
     if (!onAction) return;
     onAction(action);
     setSuccessAction(action);
@@ -343,17 +343,17 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                                     )}
                                 </AnimatePresence>
                             </button>
-                            <button className="glass-button" onClick={() => handleActionClick("watched")} style={{ flex: 1, padding: "12px", color: "var(--color-text-primary)", fontSize: "14px", display: "flex", justifyContent: "center", alignItems: "center", height: "46px" }}>
+                            <button className="glass-button" onClick={() => handleActionClick("skip")} style={{ flex: 1, padding: "12px", color: "var(--color-text-primary)", fontSize: "14px", display: "flex", justifyContent: "center", alignItems: "center", height: "46px" }}>
                                 <AnimatePresence mode="wait">
-                                    {successAction === "watched" ? (
+                                    {successAction === "skip" ? (
                                         <motion.div key="check" initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.5, opacity: 0 }} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                                            <span style={{ color: "#22c55e", fontWeight: 700 }}>Done</span>
+                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                                            <span style={{ fontWeight: 700 }}>Skipped</span>
                                         </motion.div>
                                     ) : (
                                         <motion.div key="icon" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-                                            Watched
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" y1="5" x2="19" y2="19"></line></svg>
+                                            Skip
                                         </motion.div>
                                     )}
                                 </AnimatePresence>
