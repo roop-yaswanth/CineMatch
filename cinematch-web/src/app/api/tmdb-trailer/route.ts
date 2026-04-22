@@ -18,26 +18,61 @@ type RawVideo = {
 
 // Human-readable language labels for trailer language pills
 const LANG_LABELS: Record<string, string> = {
-  en: "English", te: "Telugu", hi: "Hindi", ta: "Tamil", ml: "Malayalam",
-  kn: "Kannada", bn: "Bengali",
-  ko: "Korean", ja: "Japanese", es: "Spanish", fr: "French", de: "German",
-  it: "Italian", pt: "Portuguese", zh: "Chinese", ar: "Arabic",
-  ru: "Russian", id: "Indonesian", tr: "Turkish",
+  // Indian
+  en: "English", hi: "Hindi",   te: "Telugu",    ta: "Tamil",  ml: "Malayalam",
+  kn: "Kannada", bn: "Bengali", mr: "Marathi",   pa: "Punjabi",
+  gu: "Gujarati",or: "Odia",
+  // East Asian
+  ko: "Korean",  ja: "Japanese", zh: "Chinese", th: "Thai",
+  vi: "Vietnamese", id: "Indonesian", ms: "Malay",
+  // European
+  es: "Spanish", fr: "French",  de: "German",  it: "Italian",
+  pt: "Portuguese", ru: "Russian", tr: "Turkish",
+  pl: "Polish",  nl: "Dutch",   sv: "Swedish",
+  // Middle Eastern
+  ar: "Arabic",  fa: "Persian",
 };
 
 // TMDB sometimes tags all videos as "en" even for dubbed regional trailers
-// (common for South Indian bilingual films like Salaar, KGF, RRR etc.).
+// (common for South Indian bilingual films like Salaar, KGF, international releases etc.).
 // Sniff the video title for language keywords and re-bucket accordingly.
+// Covers Indian regional + all major world languages.
 const TITLE_LANG_PATTERNS: Array<{ pattern: RegExp; lang: string }> = [
-  { pattern: /\b(hindi|हिन्दी)\b/i,       lang: "hi" },
-  { pattern: /\b(telugu|తెలుగు)\b/i,      lang: "te" },
-  { pattern: /\b(tamil|தமிழ்)\b/i,        lang: "ta" },
-  { pattern: /\b(malayalam|മലയാളം)\b/i,   lang: "ml" },
-  { pattern: /\b(kannada|ಕನ್ನಡ)\b/i,      lang: "kn" },
-  { pattern: /\b(bengali|বাংলা)\b/i,      lang: "bn" },
-  { pattern: /\b(korean|한국어)\b/i,       lang: "ko" },
-  { pattern: /\b(japanese|日本語)\b/i,     lang: "ja" },
+  // ── Indian ──────────────────────────────────────────────────────────────
+  { pattern: /\b(hindi|हिन्दी|हिंदी)\b/i,           lang: "hi" },
+  { pattern: /\b(telugu|తెలుగు)\b/i,                lang: "te" },
+  { pattern: /\b(tamil|தமிழ்)\b/i,                  lang: "ta" },
+  { pattern: /\b(malayalam|മലയാളം)\b/i,             lang: "ml" },
+  { pattern: /\b(kannada|ಕನ್ನಡ)\b/i,                lang: "kn" },
+  { pattern: /\b(bengali|বাংলা|bangla)\b/i,          lang: "bn" },
+  { pattern: /\b(marathi|मराठी)\b/i,                lang: "mr" },
+  { pattern: /\b(punjabi|ਪੰਜਾਬੀ)\b/i,               lang: "pa" },
+  { pattern: /\b(gujarati|ગુજરાતી)\b/i,             lang: "gu" },
+  { pattern: /\b(odia|ଓଡ଼ିଆ|oriya)\b/i,             lang: "or" },
+  // ── East Asian ──────────────────────────────────────────────────────────
+  { pattern: /\b(korean|한국어|한국판)\b/i,              lang: "ko" },
+  { pattern: /\b(japanese|日本語|日本版|日本語版)\b/i,   lang: "ja" },
+  { pattern: /\b(chinese|mandarin|cantonese|中文|普通话|国语|粤语)\b/i, lang: "zh" },
+  { pattern: /\b(thai|ภาษาไทย|ไทย)\b/i,              lang: "th" },
+  { pattern: /\b(vietnamese|tiếng việt)\b/i,         lang: "vi" },
+  { pattern: /\b(indonesian|bahasa indonesia)\b/i,   lang: "id" },
+  { pattern: /\b(malay|bahasa melayu|bahasa malaysia)\b/i, lang: "ms" },
+  // ── European ────────────────────────────────────────────────────────────
+  { pattern: /\b(spanish|español|castellano)\b/i,    lang: "es" },
+  { pattern: /\b(french|français|francais)\b/i,      lang: "fr" },
+  { pattern: /\b(german|deutsch)\b/i,                lang: "de" },
+  { pattern: /\b(italian|italiano)\b/i,              lang: "it" },
+  { pattern: /\b(portuguese|português|portugues)\b/i,lang: "pt" },
+  { pattern: /\b(russian|русский)\b/i,               lang: "ru" },
+  { pattern: /\b(turkish|türkçe|turkce)\b/i,         lang: "tr" },
+  { pattern: /\b(polish|polski)\b/i,                 lang: "pl" },
+  { pattern: /\b(dutch|nederlands)\b/i,              lang: "nl" },
+  { pattern: /\b(swedish|svenska)\b/i,               lang: "sv" },
+  // ── Middle Eastern ──────────────────────────────────────────────────────
+  { pattern: /\b(arabic|عربي|عربية)\b/i,             lang: "ar" },
+  { pattern: /\b(persian|farsi|فارسی)\b/i,           lang: "fa" },
 ];
+
 
 function sniffLang(video: RawVideo): string {
   for (const { pattern, lang } of TITLE_LANG_PATTERNS) {
