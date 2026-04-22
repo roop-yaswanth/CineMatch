@@ -1,12 +1,13 @@
 "use client";
 
+import { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect } from "react";
 import { useSession } from "@/context/SessionContext";
 import OnboardingView from "@/components/OnboardingView";
 import { LoadingScreen } from "@/components/LoadingScreen";
 
-export default function OnboardingPage() {
+function OnboardingPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { session, logout, updateSession, isLoading } = useSession();
@@ -63,5 +64,13 @@ export default function OnboardingPage() {
       onLogout={logout}
       forcePreferences={forcePreferences}
     />
+  );
+}
+
+export default function OnboardingPage() {
+  return (
+    <Suspense fallback={<LoadingScreen />}>
+      <OnboardingPageContent />
+    </Suspense>
   );
 }
