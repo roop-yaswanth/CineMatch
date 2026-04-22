@@ -146,6 +146,43 @@ const CACHE_REFETCH_THRESHOLD = 20; // trigger a silent API refetch when a stack
 type StackCache = Record<StackId, Recommendation[]>;
 const EMPTY_CACHE = (): StackCache => ({ hollywood: [], matched: [], other: [] });
 
+// ── Session-scoped recommendation cache ──────────────────────────────────
+// Survives navigations to /your-likes, /preferences etc. without re-fetching.
+const RECS_CACHE_KEY = "cinematch_recs_cache";
+const RECS_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+interface RecsCache {
+  stacks: Stack[];
+  movies: Recommendation[];
+  bucketCache: StackCache;
+  seenIds: number[];
+  displayedIds: number[];
+  ts: number;
+}
+
+function readRecsCache(sessionId: string): RecsCache | null {
+  try {
+    const raw = sessionStorage.getItem(`${RECS_CACHE_KEY}_${sessionId}`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as RecsCache;
+    if (!parsed || !Array.isArray(parsed.stacks) || Date.now() - parsed.ts > RECS_CACHE_TTL_MS) {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeRecsCache(sessionId: string, data: Omit<RecsCache, "ts">) {
+  try {
+    sessionStorage.setItem(
+      `${RECS_CACHE_KEY}_${sessionId}`,
+      JSON.stringify({ ...data, ts: Date.now() })
+    );
+  } catch { /* sessionStorage full — non-critical */ }
+}
+
 export default function RecommendationsView({
   session,
   onSessionUpdate,
@@ -154,10 +191,14 @@ export default function RecommendationsView({
 }: Props) {
   const router = useRouter();
 
-  const [stacks, setStacks] = useState<Stack[]>([]);
-  const [movies, setMovies] = useState<Recommendation[]>([]);
+  // ── Try to restore from navigation cache on mount ─────────────────────────
+  const cachedRef = useRef(readRecsCache(session.session_id));
+  const hadCache = cachedRef.current !== null;
+
+  const [stacks, setStacks] = useState<Stack[]>(() => cachedRef.current?.stacks ?? []);
+  const [movies, setMovies] = useState<Recommendation[]>(() => cachedRef.current?.movies ?? []);
   const [loading, setLoading] = useState(false);
-  const [initialLoad, setInitialLoad] = useState(true);
+  const [initialLoad, setInitialLoad] = useState(!hadCache);
   
   const [showUpdateToast] = useState(false);
   const [activeStack, setActiveStack] = useState<StackId | null>(null);
@@ -187,16 +228,22 @@ export default function RecommendationsView({
   const actionCountRef = useRef({ positive: 0, negative: 0, total: 0 });
 
   // Every movie ID the user has acted on — prevents re-showing after refresh
-  const seenIdsRef = useRef<Set<number>>(new Set());
+  const seenIdsRef = useRef<Set<number>>(
+    new Set(cachedRef.current?.seenIds ?? [])
+  );
 
   // All movie IDs ever displayed — sent to backend on auto-rerun so it generates truly new movies
-  const displayedIdsRef = useRef<Set<number>>(new Set());
+  const displayedIdsRef = useRef<Set<number>>(
+    new Set(cachedRef.current?.displayedIds ?? [])
+  );
 
   // ── Bucket cache ───────────────────────────────────────────────────────────
   // Stores the "reserve" movies (indices 50-100) that are not yet displayed.
   // When a displayed movie is acted on the stack is immediately topped back up
   // from here — no API call needed until the cache itself runs dry.
-  const bucketCacheRef = useRef<StackCache>(EMPTY_CACHE());
+  const bucketCacheRef = useRef<StackCache>(
+    cachedRef.current?.bucketCache ?? EMPTY_CACHE()
+  );
 
   // Search handler with debounce
   const handleSearch = useCallback(async (query: string) => {
@@ -411,6 +458,18 @@ export default function RecommendationsView({
     void generate(preferences);
     setInitialLoad(false);
   }, [generate, initialLoad, preferences]);
+
+  // Keep navigation cache in sync with optimistic stack updates (actions, etc.)
+  useEffect(() => {
+    if (stacks.length === 0) return; // Don't cache empty state
+    writeRecsCache(session.session_id, {
+      stacks,
+      movies,
+      bucketCache: bucketCacheRef.current,
+      seenIds: Array.from(seenIdsRef.current),
+      displayedIds: Array.from(displayedIdsRef.current),
+    });
+  }, [stacks, movies, session.session_id]);
 
   const handleAction = useCallback(
     async (movie: Recommendation | DetailMovie, action: RecommendationAction) => {
