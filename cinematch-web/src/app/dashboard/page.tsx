@@ -30,9 +30,13 @@ export default function DashboardPage() {
    */
   const handleBackToOnboarding = useCallback(async () => {
     if (!session) return;
-    // 1. Optimistically clear onboarding_complete in cache so route guard works
+    // 1. Clear the recs cache so fresh recommendations are fetched after re-onboarding
+    try {
+      sessionStorage.removeItem(`cinematch_recs_cache_${session.session_id}`);
+    } catch { /* non-critical */ }
+    // 2. Optimistically clear onboarding_complete in localStorage so route guard works
     updateSession({ ...session, onboarding_complete: false });
-    // 2. Ask backend to wipe session state in MongoDB
+    // 3. Ask backend to wipe session state in MongoDB
     try {
       await fetch("/api/reset", {
         method: "POST",
@@ -44,6 +48,7 @@ export default function DashboardPage() {
     }
     router.push("/onboarding");
   }, [session, updateSession, router]);
+
 
   if (isLoading || !session) return null;
 
