@@ -971,64 +971,67 @@ export default function RecommendationsView({
         </AnimatePresence>
 
 
-        <AnimatePresence>
-          {(showUpdateToast || isUpdating) && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.3 }}
-              style={{
-                position: "fixed",
-                inset: 0,
-                zIndex: 9999,
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                background: "rgba(0, 0, 0, 0.6)",
-                backdropFilter: "blur(16px)",
-                WebkitBackdropFilter: "blur(16px)",
-              }}
-            >
+        {typeof document !== 'undefined' && createPortal(
+          <AnimatePresence>
+            {(showUpdateToast || isUpdating) && (
               <motion.div
-                animate={{ y: [0, -18, 0] }}
-                transition={{ repeat: Infinity, duration: 0.7, ease: "easeInOut" }}
-                style={{ fontSize: "72px" }}
-              >
-                🍿
-              </motion.div>
-              <motion.p
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3, type: "spring", stiffness: 200, damping: 20 }}
-                style={{
-                  marginTop: "20px",
-                  color: "white",
-                  fontSize: "18px",
-                  fontWeight: 600,
-                  letterSpacing: "-0.02em",
-                  textShadow: "0 2px 12px rgba(0,0,0,0.5)",
-                }}
-              >
-                Updating Taste Profile...
-              </motion.p>
-              <motion.p
                 initial={{ opacity: 0 }}
-                animate={{ opacity: 0.6 }}
-                transition={{ delay: 0.6 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
                 style={{
-                  marginTop: "8px",
-                  color: "white",
-                  fontSize: "13px",
-                  fontWeight: 400,
+                  position: "fixed",
+                  inset: 0,
+                  zIndex: 10000000,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  background: "rgba(0, 0, 0, 0.6)",
+                  backdropFilter: "blur(16px)",
+                  WebkitBackdropFilter: "blur(16px)",
                 }}
               >
-                Rebuilding recommendations from your feedback
-              </motion.p>
-            </motion.div>
-          )}
-        </AnimatePresence>
+                <motion.div
+                  animate={{ y: [0, -18, 0] }}
+                  transition={{ repeat: Infinity, duration: 0.7, ease: "easeInOut" }}
+                  style={{ fontSize: "72px" }}
+                >
+                  🍿
+                </motion.div>
+                <motion.p
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3, type: "spring", stiffness: 200, damping: 20 }}
+                  style={{
+                    marginTop: "20px",
+                    color: "white",
+                    fontSize: "18px",
+                    fontWeight: 600,
+                    letterSpacing: "-0.02em",
+                    textShadow: "0 2px 12px rgba(0,0,0,0.5)",
+                  }}
+                >
+                  Updating Taste Profile...
+                </motion.p>
+                <motion.p
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 0.6 }}
+                  transition={{ delay: 0.6 }}
+                  style={{
+                    marginTop: "8px",
+                    color: "white",
+                    fontSize: "13px",
+                    fontWeight: 400,
+                  }}
+                >
+                  Rebuilding recommendations from your feedback
+                </motion.p>
+              </motion.div>
+            )}
+          </AnimatePresence>,
+          document.body
+        )}
 
 
 
