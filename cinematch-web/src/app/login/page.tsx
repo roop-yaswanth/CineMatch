@@ -39,7 +39,7 @@ export default function LoginPage() {
         if (session.is_returning && session.onboarding_complete) {
           router.replace("/dashboard");
         } else {
-          router.push("/onboarding");
+          router.replace("/onboarding");
         }
       }}
     />
