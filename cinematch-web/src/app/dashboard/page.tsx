@@ -27,7 +27,7 @@ export default function DashboardPage() {
   };
 
   const handleBackToOnboarding = () => {
-    router.replace("/onboarding");
+    router.push("/onboarding?reset=true");
   };
 
   return (

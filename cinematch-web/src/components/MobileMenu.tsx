@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 
@@ -57,6 +57,23 @@ export default function MobileMenu({
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent | TouchEvent) => {
+      if (isOpen && containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+        setShowResetConfirm(false);
+      }
+    };
+    document.addEventListener("mousedown", handleOutsideClick);
+    document.addEventListener("touchstart", handleOutsideClick, { passive: true });
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+      document.removeEventListener("touchstart", handleOutsideClick);
+    };
+  }, [isOpen]);
 
   const handleAction = (action?: () => void | Promise<void>) => {
     setIsOpen(false);
@@ -70,10 +87,13 @@ export default function MobileMenu({
   };
 
   return (
-    <div style={{ position: "relative" }}>
+    <div style={{ position: "relative" }} ref={containerRef}>
       <button
         className="glass-button"
-        onClick={() => setIsOpen(true)}
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen((prev) => !prev);
+        }}
         style={{
           width: "40px",
           height: "40px",

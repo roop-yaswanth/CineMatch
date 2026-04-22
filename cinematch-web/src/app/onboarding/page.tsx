@@ -11,6 +11,12 @@ export default function OnboardingPage() {
   const { session, logout, updateSession, isLoading } = useSession();
   const [forcePreferences, setForcePreferences] = useState(false);
 
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.location.search.includes("reset=true")) {
+      setForcePreferences(true);
+    }
+  }, []);
+
   // If not authenticated, redirect to login
   useEffect(() => {
     if (!isLoading && !session) {
@@ -20,10 +26,11 @@ export default function OnboardingPage() {
 
   // If user completes onboarding, redirect to dashboard (don't stay on onboarding)
   useEffect(() => {
-    if (session && session.onboarding_complete) {
+    const isReset = typeof window !== "undefined" && window.location.search.includes("reset=true");
+    if (session && session.onboarding_complete && !isReset && !forcePreferences) {
       router.replace("/dashboard");
     }
-  }, [session, router]);
+  }, [session, router, forcePreferences]);
 
   if (!session || isLoading) {
     return <LoadingScreen />;
