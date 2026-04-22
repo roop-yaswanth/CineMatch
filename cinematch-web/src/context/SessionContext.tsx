@@ -1,7 +1,7 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback, useRef } from "react";
+import { useRouter, usePathname } from "next/navigation";
 import { apiLogin, type UserSession } from "@/lib/api";
 
 interface SessionContextType {
@@ -17,11 +17,16 @@ const STORAGE_KEY = "cinematch_email";
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [session, setSession] = useState<UserSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const isRestoringRef = useRef(false);
 
   // Restore session on mount
   useEffect(() => {
+    if (isRestoringRef.current) return;
+    isRestoringRef.current = true;
+
     const restoreSession = async () => {
       const savedEmail = localStorage.getItem(STORAGE_KEY);
       if (savedEmail) {
@@ -45,7 +50,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     };
     
     restoreSession();
-  }, [router]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const login = useCallback(async (email: string) => {
     const newSession = await apiLogin(email);
@@ -65,16 +70,52 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(() => {
     localStorage.removeItem(STORAGE_KEY);
     setSession(null);
-    // Use replace to prevent back button from returning to protected routes.
-    // This perfectly restores standard routing (going back from the new login screen drops them out of the app).
-    if (typeof window !== 'undefined') {
-      window.location.replace('/login');
-    }
-  }, []);
+    // Use router.replace to stay in the SPA — no full-page reload
+    router.replace("/login");
+  }, [router]);
 
   const updateSession = useCallback((newSession: UserSession) => {
     setSession(newSession);
   }, []);
+
+  // ── Global back-button guard ──────────────────────────────────────────────
+  // We use a single, centralized popstate handler to prevent the browser's
+  // back/forward buttons or mobile back gestures from navigating away from
+  // the app. This replaces all the per-page popstate hacks that were
+  // conflicting with each other.
+  //
+  // Strategy: On mount, we replace the current state with a sentinel marker
+  // and push one dummy entry on top. If the user presses back:
+  //   1. The browser pops the dummy entry.
+  //   2. Our popstate handler immediately pushes a new dummy entry, keeping
+  //      the user on the same page.
+  // This creates a "sticky" history that the user can never back out of.
+  // Navigating *forward* within the app uses router.replace(), which doesn't
+  // add history entries and thus can't be "backed" over either.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const SENTINEL = "__cinematch_guard";
+
+    // Only install once — check if we already have the sentinel
+    if (!window.history.state?.[SENTINEL]) {
+      window.history.replaceState({ [SENTINEL]: true, path: pathname }, "", window.location.href);
+      window.history.pushState({ [SENTINEL]: true, path: pathname }, "", window.location.href);
+    }
+
+    const handlePopState = () => {
+      // No matter what, push the user back to where they are.
+      // This prevents: back to new-tab, back to login after logout, etc.
+      window.history.pushState(
+        { [SENTINEL]: true, path: window.location.pathname },
+        "",
+        window.location.href
+      );
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [pathname]);
 
   // Session Inactivity Logout
   useEffect(() => {

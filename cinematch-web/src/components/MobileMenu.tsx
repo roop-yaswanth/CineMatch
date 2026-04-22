@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+
 import { AnimatePresence, motion } from "framer-motion";
 
 interface MobileMenuProps {
@@ -54,7 +54,7 @@ export default function MobileMenu({
   onPreferences,
   onYourLikes,
 }: MobileMenuProps) {
-  const router = useRouter();
+
   const [isOpen, setIsOpen] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   
@@ -209,12 +209,12 @@ export default function MobileMenu({
 
               <div className="menu-divider" />
 
-              <button className="menu-btn" onClick={() => handleAction(onYourLikes ? onYourLikes : () => router.push("/your-ratings"))}>
+              <button className="menu-btn" onClick={() => handleAction(onYourLikes)}>
                 <span className="menu-btn-icon"><IconHeart /></span>
                 Your Collection
               </button>
 
-              <button className="menu-btn" onClick={() => handleAction(onPreferences ? onPreferences : () => router.push("/preferences"))}>
+              <button className="menu-btn" onClick={() => handleAction(onPreferences)}>
                 <span className="menu-btn-icon"><IconPreferences /></span>
                 Preferences
               </button>

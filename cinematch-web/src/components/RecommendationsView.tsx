@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { useRouter } from "next/navigation";
+
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import Image from "next/image";
@@ -200,7 +200,8 @@ export default function RecommendationsView({
   onBackToOnboarding,
   onLogout,
 }: Props) {
-  const router = useRouter();
+
+
   const [stacks, setStacks] = useState<Stack[]>([]);
   const [movies, setMovies] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState(false);
@@ -224,71 +225,11 @@ export default function RecommendationsView({
   // Detail Modal state
   const [activeMovie, setActiveMovie] = useState<DetailMovie | null>(null);
 
-  // History state syncing for modals
-  useEffect(() => {
-    if (!window.history.state || !window.history.state.isApp) {
-      // Create a trap entry before the active app entry
-      window.history.replaceState({ isApp: true, trap: true }, "", "/dashboard");
-      window.history.pushState({ isApp: true, modal: null }, "", "/dashboard");
-    }
-  }, []);
+  const openYourLikes = () => setShowYourLikes(true);
+  const closeYourLikes = () => setShowYourLikes(false);
 
-  useEffect(() => {
-    const handlePopState = (e: PopStateEvent) => {
-      const state = e.state;
-
-      if (state?.trap) {
-        // User hit back onto the trap entry, push them right back to the root dashboard
-        window.history.go(1);
-        return;
-      }
-
-      if (!state || !state.isApp) {
-        // Fallback: User exited the app or goes to an unmanaged state. 
-        // Force them back in and disable overlays.
-        window.history.pushState({ isApp: true, modal: null }, "", "/dashboard");
-        setShowYourLikes(false);
-        setShowPrefs(false);
-        setActiveStack(null);
-        setActiveMovie(null);
-        return;
-      }
-      
-      // Sync UI state based on history state
-      setShowYourLikes(state.modal === "yourLikes");
-      setShowPrefs(state.modal === "prefs");
-      
-      if (state.modal === "stack" && state.stackId) {
-        setActiveStack(state.stackId);
-      } else {
-        setActiveStack(null);
-      }
-      
-      // Close active movie on any history traversal for safety
-      setActiveMovie(null);
-    };
-
-    window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
-  }, []);
-
-  const openYourLikes = () => {
-    window.history.pushState({ isApp: true, modal: "yourLikes" }, "", "/your-ratings");
-    setShowYourLikes(true);
-  };
-  const closeYourLikes = () => {
-    if (window.history.state?.modal === "yourLikes") window.history.back();
-    else setShowYourLikes(false);
-  };
-
-  const openPrefs = () => {
-    window.history.pushState({ isApp: true, modal: "prefs" }, "", "/preferences");
-    setShowPrefs(true);
-  };
-  const closePrefs = () => {
-    if (window.history.state?.modal === "prefs") window.history.back();
-    else setShowPrefs(false);
-  };
+  const openPrefs = () => setShowPrefs(true);
+  const closePrefs = () => setShowPrefs(false);
   
 
   const [isUpdating, setIsUpdating] = useState(false);
@@ -971,7 +912,6 @@ export default function RecommendationsView({
                     disabled={loading}
                     onAction={handleAction}
                     onOpenDetail={() => {
-                      window.history.pushState({ isApp: true, modal: "stack", stackId: stack.id }, "");
                       setActiveStack(stack.id);
                     }}
                     onMovieClick={(m) => setActiveMovie(m as any)}
@@ -988,10 +928,7 @@ export default function RecommendationsView({
             <StackDetailView
               key={"detail-view-" + activeStack}
               stack={stacks.find((s) => s.id === activeStack)!}
-              onBack={() => {
-                if (window.history.state?.modal === "stack") window.history.back();
-                else setActiveStack(null);
-              }}
+              onBack={() => setActiveStack(null)}
               onAction={handleAction}
               onMovieClick={(m) => setActiveMovie(m as any)}
               disabled={loading}
