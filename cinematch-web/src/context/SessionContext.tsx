@@ -13,39 +13,89 @@ interface SessionContextType {
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
 const STORAGE_KEY = "cinematch_email";
+const SESSION_CACHE_KEY = "cinematch_session";
+
+/** Safely read a cached session from localStorage */
+function readCachedSession(): UserSession | null {
+  try {
+    const raw = localStorage.getItem(SESSION_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    // Basic shape check
+    if (parsed && typeof parsed.session_id === "string" && typeof parsed.identifier === "string") {
+      return parsed as UserSession;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/** Persist the full session object alongside the email identifier */
+function persistSession(s: UserSession) {
+  try {
+    localStorage.setItem(STORAGE_KEY, s.identifier);
+    localStorage.setItem(SESSION_CACHE_KEY, JSON.stringify(s));
+  } catch { /* storage full — non-critical */ }
+}
+
+/** Clear all session data from localStorage */
+function clearStoredSession() {
+  localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(SESSION_CACHE_KEY);
+}
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<UserSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const persistIdentifier = useCallback((identifier?: string) => {
-    if (identifier) {
-      localStorage.setItem(STORAGE_KEY, identifier);
-    }
-  }, []);
 
   const clearSession = useCallback(() => {
-    localStorage.removeItem(STORAGE_KEY);
+    clearStoredSession();
     setSession(null);
   }, []);
 
+  // Restore: instant from cache, then silently validate with backend
   const restoreSession = useCallback(async () => {
+    const cached = readCachedSession();
     const savedIdentifier = localStorage.getItem(STORAGE_KEY);
-    if (!savedIdentifier) {
+
+    if (!cached && !savedIdentifier) {
+      // Never logged in
       setSession(null);
       setIsLoading(false);
       return;
     }
 
+    // Instant restore from cache — no API needed, no loading flicker
+    if (cached) {
+      setSession(cached);
+      setIsLoading(false);
+
+      // Silently re-validate with the backend in the background
+      try {
+        const fresh = await apiLogin(cached.identifier);
+        setSession(fresh);
+        persistSession(fresh);
+      } catch {
+        // Backend unavailable — keep the cached session, don't log out
+        console.warn("[SessionProvider] Background re-validation failed; using cached session.");
+      }
+      return;
+    }
+
+    // Fallback: have an identifier but no cached session (e.g. old storage format)
     try {
-      const restored = await apiLogin(savedIdentifier);
+      const restored = await apiLogin(savedIdentifier!);
       setSession(restored);
-      persistIdentifier(restored.identifier);
+      persistSession(restored);
     } catch {
-      clearSession();
+      // Can't reach backend and no cached session — show login, but keep identifier
+      // so next refresh can try again
+      setSession(null);
     } finally {
       setIsLoading(false);
     }
-  }, [clearSession, persistIdentifier]);
+  }, []);
 
   useEffect(() => {
     void restoreSession();
@@ -54,9 +104,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (email: string) => {
     const newSession = await apiLogin(email);
     setSession(newSession);
-    persistIdentifier(newSession.identifier);
+    persistSession(newSession);
     return newSession;
-  }, [persistIdentifier]);
+  }, []);
 
   const logout = useCallback(() => {
     clearSession();
@@ -64,8 +114,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const updateSession = useCallback((newSession: UserSession) => {
     setSession(newSession);
-    persistIdentifier(newSession.identifier);
-  }, [persistIdentifier]);
+    persistSession(newSession);
+  }, []);
 
   useEffect(() => {
     const handleStorage = (event: StorageEvent) => {
