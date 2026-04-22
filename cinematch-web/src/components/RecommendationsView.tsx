@@ -7,12 +7,13 @@ import {
   useRef,
   useState,
 } from "react";
+import { useRouter } from "next/navigation";
 
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import Image from "next/image";
-import YourLikesView from "@/components/YourLikesView";
-import PreferencesModal from "@/components/PreferencesModal";
+
+
 import MovieDetailModal, { type DetailMovie } from "@/components/modals/MovieDetailModal";
 import MobileMenu from "@/components/MobileMenu";
 import {
@@ -151,14 +152,12 @@ export default function RecommendationsView({
   onBackToOnboarding,
   onLogout,
 }: Props) {
-
+  const router = useRouter();
 
   const [stacks, setStacks] = useState<Stack[]>([]);
   const [movies, setMovies] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState(false);
   const [initialLoad, setInitialLoad] = useState(true);
-  const [showYourLikes, setShowYourLikes] = useState(false);
-  const [showPrefs, setShowPrefs] = useState(false);
   
   const [showUpdateToast] = useState(false);
   const [activeStack, setActiveStack] = useState<StackId | null>(null);
@@ -176,11 +175,9 @@ export default function RecommendationsView({
   // Detail Modal state
   const [activeMovie, setActiveMovie] = useState<DetailMovie | null>(null);
 
-  const openYourLikes = () => setShowYourLikes(true);
-  const closeYourLikes = () => setShowYourLikes(false);
-
-  const openPrefs = () => setShowPrefs(true);
-  const closePrefs = () => setShowPrefs(false);
+  // Route-based navigation for sub-pages
+  const openYourLikes = () => router.push("/your-likes");
+  const openPrefs = () => router.push("/preferences");
   
 
   const [isUpdating, setIsUpdating] = useState(false);
@@ -495,13 +492,40 @@ export default function RecommendationsView({
   const handlePreferenceUpdate = useCallback(
     (nextPreferences: RecommendationPreferences) => {
       setPreferences(nextPreferences);
-      setShowPrefs(false);
       startTransition(() => {
         void generate(nextPreferences);
       });
     },
     [generate]
   );
+
+  // Pick up preference updates from /preferences page via sessionStorage
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState !== "visible") return;
+      try {
+        const raw = sessionStorage.getItem("cinematch_prefs_update");
+        if (raw) {
+          sessionStorage.removeItem("cinematch_prefs_update");
+          const nextPrefs = JSON.parse(raw) as RecommendationPreferences;
+          handlePreferenceUpdate(nextPrefs);
+        }
+      } catch { /* ignore */ }
+    };
+
+    // Also check immediately on mount (covers back-navigation)
+    try {
+      const raw = sessionStorage.getItem("cinematch_prefs_update");
+      if (raw) {
+        sessionStorage.removeItem("cinematch_prefs_update");
+        const nextPrefs = JSON.parse(raw) as RecommendationPreferences;
+        handlePreferenceUpdate(nextPrefs);
+      }
+    } catch { /* ignore */ }
+
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, [handlePreferenceUpdate]);
 
   return (
     <div
@@ -947,21 +971,7 @@ export default function RecommendationsView({
           )}
         </AnimatePresence>
 
-        {showYourLikes && (
-          <YourLikesView
-            sessionId={session.session_id}
-            onClose={closeYourLikes}
-          />
-        )}
 
-        {showPrefs && (
-          <PreferencesModal
-            preferences={preferences}
-            onUpdate={handlePreferenceUpdate}
-            onClose={closePrefs}
-            mode="recommendations"
-          />
-        )}
 
         {/* Movie Details Modal */}
         <MovieDetailModal
