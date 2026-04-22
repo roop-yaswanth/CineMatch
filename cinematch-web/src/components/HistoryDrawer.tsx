@@ -11,42 +11,38 @@ interface Props {
   onClose: () => void;
 }
 
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+function readHistoryCache(sessionId: string): { data: HistoryItem[]; isFresh: boolean } | null {
+  try {
+    const cached = localStorage.getItem(`history_cache_${sessionId}`);
+    if (!cached) return null;
+    const parsed = JSON.parse(cached) as { data?: HistoryItem[]; ts?: number };
+    if (!Array.isArray(parsed.data) || typeof parsed.ts !== "number") return null;
+    return { data: parsed.data, isFresh: Date.now() - parsed.ts < CACHE_TTL_MS };
+  } catch {
+    return null;
+  }
+}
+
 export default function HistoryDrawer({ sessionId, onClose }: Props) {
-  const [items, setItems] = useState<HistoryItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const initialCache = readHistoryCache(sessionId);
+  const [items, setItems] = useState<HistoryItem[]>(() => initialCache?.data ?? []);
+  const [loading, setLoading] = useState(!initialCache);
 
   useEffect(() => {
-    const CACHE_KEY = `history_cache_${sessionId}`;
-    const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-
-    // Load from cache immediately for instant display
-    try {
-      const cached = localStorage.getItem(CACHE_KEY);
-      if (cached) {
-        const { data, ts } = JSON.parse(cached) as { data: HistoryItem[]; ts: number };
-        if (Date.now() - ts < CACHE_TTL) {
-          setItems(data);
-          setLoading(false);
-          return; // Cache is fresh, skip API call
-        }
-        // Stale cache: show immediately while fetching fresh
-        setItems(data);
-        setLoading(false);
-      }
-    } catch {
-      // ignore bad cache
-    }
+    if (initialCache?.isFresh) return;
 
     apiGetHistory(sessionId)
       .then((data) => {
         setItems(data);
         try {
-          localStorage.setItem(CACHE_KEY, JSON.stringify({ data, ts: Date.now() }));
+          localStorage.setItem(`history_cache_${sessionId}`, JSON.stringify({ data, ts: Date.now() }));
         } catch { /* storage full */ }
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [sessionId]);
+  }, [sessionId, initialCache]);
 
   const handleDelete = (tmdbId: number) => {
     setItems((prev) => prev.filter((item) => item.tmdb_id !== tmdbId));
@@ -335,4 +331,3 @@ function HistoryItemCard({
     </motion.div>
   );
 }
-

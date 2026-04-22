@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { motion } from "framer-motion";
 import { apiLogin, type UserSession } from "@/lib/api";
 
@@ -158,9 +158,11 @@ export default function LoginScreen({ onLogin }: Props) {
           >
             {/* Restored full visual density, optimized via async decoding, lazy loading, and no-blur */}
             {[...posters, ...posters, ...posters].map((path, i) => (
+              // eslint-disable-next-line @next/next/no-img-element
               <img
                 key={i}
                 src={`${BASE}${path}`}
+                alt=""
                 loading="lazy"
                 decoding="async"
                 onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}

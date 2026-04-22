@@ -2,45 +2,35 @@
 
 import LoginScreen from "@/components/LoginScreen";
 import { useSession } from "@/context/SessionContext";
+import { sessionHomePath } from "@/lib/session-routing";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-
-const STORAGE_KEY = "cinematch_email";
 
 export default function LoginPage() {
   const { session, isLoading, updateSession } = useSession();
   const router = useRouter();
 
   useEffect(() => {
-    // If they manually navigate back to login but are still active, redirect them away
-    if (!isLoading && session) {
-      if (session.is_returning && session.onboarding_complete) {
-        router.replace("/dashboard");
-      } else {
-        router.replace("/onboarding");
-      }
-    }
+    if (isLoading || !session) return;
+
+    // If an active session exists, login is never a valid destination.
+    router.replace(sessionHomePath(session));
   }, [isLoading, session, router]);
 
-  if (isLoading || session) {
-    // Don't flash the login screen while redirecting or checking auth
-    return null; 
+  if (isLoading) {
+    return null;
+  }
+
+  if (session) {
+    // While replace() is in flight.
+    return null;
   }
 
   return (
     <LoginScreen
-      onLogin={(session) => {
-        updateSession(session);
-        if (session.identifier) {
-          localStorage.setItem(STORAGE_KEY, session.identifier);
-        }
-        
-        // Route them properly based on onboarding status
-        if (session.is_returning && session.onboarding_complete) {
-          router.replace("/dashboard");
-        } else {
-          router.replace("/onboarding");
-        }
+      onLogin={(nextSession) => {
+        updateSession(nextSession);
+        router.replace(sessionHomePath(nextSession));
       }}
     />
   );

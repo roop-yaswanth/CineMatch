@@ -113,15 +113,6 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
   const [hasInteracted, setHasInteracted] = useState(false);
   const [loadingVariantIdx, setLoadingVariantIdx] = useState(0);
   const [showTutorial, setShowTutorial] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
-
-  // Mobile detection
-  useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 768);
-    check();
-    window.addEventListener("resize", check);
-    return () => window.removeEventListener("resize", check);
-  }, []);
 
   // Tutorial is triggered directly from handleBuildSlate — no effect needed here.
 

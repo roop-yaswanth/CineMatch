@@ -6,7 +6,6 @@ import {
   useEffect,
   useRef,
   useState,
-  type ReactNode,
 } from "react";
 
 import { createPortal } from "react-dom";
@@ -16,7 +15,6 @@ import YourLikesView from "@/components/YourLikesView";
 import PreferencesModal from "@/components/PreferencesModal";
 import MovieDetailModal, { type DetailMovie } from "@/components/modals/MovieDetailModal";
 import MobileMenu from "@/components/MobileMenu";
-import BottomNav from "@/components/BottomNav";
 import {
   apiMultiRecommendations,
   apiRecommendationAction,
@@ -51,56 +49,9 @@ interface Stack {
   movies: Recommendation[];
 }
 
-const CARD_ACTIONS: Array<{
-  action: RecommendationAction;
-  label: string;
-  icon: ReactNode;
-  color: string;
-}> = [
-    {
-      action: "like",
-      label: "Like",
-      icon: (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
-        </svg>
-      ),
-      color: "var(--color-like)",
-    },
-    {
-      action: "okay",
-      label: "Okay",
-      icon: (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z" />
-          <path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" />
-        </svg>
-      ),
-      color: "var(--color-okay)",
-    },
-    {
-      action: "dislike",
-      label: "Dislike",
-      icon: (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10z" />
-          <path d="M17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17" />
-        </svg>
-      ),
-      color: "var(--color-dislike)",
-    },
-    {
-      action: "remove",
-      label: "Skip",
-      icon: (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <polygon points="5 4 15 12 5 20 5 4" fill="currentColor" stroke="none" />
-          <line x1="19" y1="5" x2="19" y2="19" />
-        </svg>
-      ),
-      color: "var(--color-skip)",
-    },
-  ];
+function toDetailMovie(movie: Recommendation): DetailMovie {
+  return { ...movie };
+}
 
 /**
  * Converts the pre-partitioned /api/recommendations/multi response into Stacks.
@@ -209,7 +160,7 @@ export default function RecommendationsView({
   const [showYourLikes, setShowYourLikes] = useState(false);
   const [showPrefs, setShowPrefs] = useState(false);
   
-  const [showUpdateToast, setShowUpdateToast] = useState(false);
+  const [showUpdateToast] = useState(false);
   const [activeStack, setActiveStack] = useState<StackId | null>(null);
   const [preferences, setPreferences] = useState<RecommendationPreferences>(
     () => preferencesFromProfile(session.profile)
@@ -514,7 +465,7 @@ export default function RecommendationsView({
           await generate(preferences, { autoRerun: true });
         } catch (err) {
           console.error("Taste profile update failed:", err);
-          try { await generate(preferences, { autoRerun: true }); } catch (_) { setIsUpdating(false); }
+          try { await generate(preferences, { autoRerun: true }); } catch { setIsUpdating(false); }
         }
         return;
       }
@@ -538,7 +489,7 @@ export default function RecommendationsView({
         })
         .catch((err) => console.error("Recommendation action failed:", err));
     },
-    [generate, onSessionUpdate, preferences, session.session_id, silentRefresh]
+    [activeMovie, generate, onSessionUpdate, preferences, session.session_id, silentRefresh]
   );
 
   const handlePreferenceUpdate = useCallback(
@@ -914,7 +865,7 @@ export default function RecommendationsView({
                     onOpenDetail={() => {
                       setActiveStack(stack.id);
                     }}
-                    onMovieClick={(m) => setActiveMovie(m as any)}
+                    onMovieClick={(m) => setActiveMovie(toDetailMovie(m))}
                   />
                 ))}
               </div>
@@ -930,7 +881,7 @@ export default function RecommendationsView({
               stack={stacks.find((s) => s.id === activeStack)!}
               onBack={() => setActiveStack(null)}
               onAction={handleAction}
-              onMovieClick={(m) => setActiveMovie(m as any)}
+              onMovieClick={(m) => setActiveMovie(toDetailMovie(m))}
               disabled={loading}
             />
           )}
@@ -1398,8 +1349,6 @@ function PosterCard({
   const backdrop = usePoster(movie.backdrop_path || movie.poster_path, recommendationId(movie), "w500");
   const hasBackdrop = !!movie.backdrop_path;
 
-  const [showActions, setShowActions] = useState(false);
-  
   // Expanded Hover State
   const [isExpanded, setIsExpanded] = useState(false);
   const [expandPos, setExpandPos] = useState<DOMRect | null>(null);
@@ -1407,7 +1356,6 @@ function PosterCard({
   const cardRef = useRef<HTMLDivElement>(null); // For outer article
   const posterRef = useRef<HTMLDivElement>(null); // For the poster itself
 
-  const touchStartXRef = useRef<number | null>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hoverCloseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 

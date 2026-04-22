@@ -13,6 +13,19 @@ interface Props {
 
 type InteractionFilter = "all" | "like" | "okay" | "dislike" | "not_watched" | "watchlist";
 type HistoryListItem = HistoryItem & { genres?: string[] };
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+function readHistoryCache(sessionId: string): { data: HistoryListItem[]; isFresh: boolean } | null {
+  try {
+    const cached = localStorage.getItem(`history_cache_${sessionId}`);
+    if (!cached) return null;
+    const parsed = JSON.parse(cached) as { data?: HistoryListItem[]; ts?: number };
+    if (!Array.isArray(parsed.data) || typeof parsed.ts !== "number") return null;
+    return { data: parsed.data, isFresh: Date.now() - parsed.ts < CACHE_TTL_MS };
+  } catch {
+    return null;
+  }
+}
 
 const RATING_CONFIG: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
   like: {
@@ -82,8 +95,9 @@ const IconHeart = () => (
 );
 
 export default function YourLikesView({ sessionId, onClose }: Props) {
-  const [items, setItems] = useState<HistoryListItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const initialCache = readHistoryCache(sessionId);
+  const [items, setItems] = useState<HistoryListItem[]>(() => initialCache?.data ?? []);
+  const [loading, setLoading] = useState(!initialCache);
   
   // Filters
   const [interactionFilter, setInteractionFilter] = useState<InteractionFilter>("all");
@@ -91,33 +105,18 @@ export default function YourLikesView({ sessionId, onClose }: Props) {
   const [languageFilter, setLanguageFilter] = useState<string>("all");
 
   useEffect(() => {
-    const CACHE_KEY = `history_cache_${sessionId}`;
-    const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-
-    try {
-      const cached = localStorage.getItem(CACHE_KEY);
-      if (cached) {
-        const { data, ts } = JSON.parse(cached) as { data: HistoryListItem[]; ts: number };
-        if (Date.now() - ts < CACHE_TTL) {
-          setItems(data);
-          setLoading(false);
-          return;
-        }
-        setItems(data);
-        setLoading(false);
-      }
-    } catch { /* ignore */ }
+    if (initialCache?.isFresh) return;
 
     apiGetHistory(sessionId)
       .then((data) => {
         setItems(data);
         try {
-          localStorage.setItem(CACHE_KEY, JSON.stringify({ data, ts: Date.now() }));
+          localStorage.setItem(`history_cache_${sessionId}`, JSON.stringify({ data, ts: Date.now() }));
         } catch { /* storage full */ }
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [sessionId]);
+  }, [sessionId, initialCache]);
 
   // Extract unique genres and languages from items
   const { genres, languages } = useMemo(() => {

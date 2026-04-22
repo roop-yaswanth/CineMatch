@@ -1,11 +1,11 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect } from "react";
-import { useSession } from "@/context/SessionContext";
 import OnboardingView from "@/components/OnboardingView";
 import { LoadingScreen } from "@/components/LoadingScreen";
+import { useSession } from "@/context/SessionContext";
+import { sessionHomePath } from "@/lib/session-routing";
 
 function OnboardingPageContent() {
   const router = useRouter();
@@ -13,30 +13,29 @@ function OnboardingPageContent() {
   const { session, logout, updateSession, isLoading } = useSession();
   const forcePreferences = searchParams.get("reset") === "true";
 
-  // If not authenticated, redirect to login
   useEffect(() => {
     if (!isLoading && !session) {
       router.replace("/login");
     }
   }, [session, isLoading, router]);
 
-  // If user completes onboarding, redirect to dashboard (don't stay on onboarding)
   useEffect(() => {
-    if (session && session.onboarding_complete && !forcePreferences) {
-      router.replace("/dashboard");
+    if (!isLoading && session && session.onboarding_complete && !forcePreferences) {
+      router.replace(sessionHomePath(session));
     }
-  }, [session, router, forcePreferences]);
+  }, [session, isLoading, router, forcePreferences]);
 
-
-
-
-  if (!session || isLoading) {
+  if (isLoading) {
     return <LoadingScreen />;
+  }
+
+  if (!session) {
+    return null;
   }
 
   const handleComplete = (nextSession: typeof session) => {
     updateSession(nextSession);
-    router.replace("/dashboard");
+    router.replace(sessionHomePath(nextSession));
   };
 
   return (
