@@ -39,6 +39,7 @@ const LANGUAGES = [
   { code: "pt", label: "Portuguese" },
   { code: "ru", label: "Russian" },
   { code: "zh", label: "Chinese" },
+  { code: "tw", label: "Taiwanese 🇹🇼" },  // UI-only: maps to zh + Taiwan production boost
   { code: "ar", label: "Arabic" },
   { code: "th", label: "Thai" },
 ];
