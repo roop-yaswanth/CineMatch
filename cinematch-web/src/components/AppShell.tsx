@@ -90,6 +90,24 @@ export default function AppShell() {
     }, INACTIVITY_MS);
   }, [handleLogout]);
 
+  // Block mobile back gesture from navigating away / refreshing the page.
+  // Strategy: The SPA does not use the browser back button. We push a dummy
+  // state on mount. If the user swipes back, the browser pops the dummy state
+  // and fires popstate. We catch it and immediately push the dummy state back.
+  // The user is permanently trapped inside the SPA, preventing accidental exits.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    
+    history.pushState(null, "", window.location.href);
+    const handlePopState = () => {
+      history.pushState(null, "", window.location.href);
+    };
+    
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  // Inactivity auto-logout
   useEffect(() => {
     const events = ["mousedown", "touchstart", "keydown", "scroll"];
     const handler = () => resetInactivityTimer();

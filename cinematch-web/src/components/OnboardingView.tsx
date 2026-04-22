@@ -145,28 +145,7 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
   }, []);
 
 
-  useEffect(() => {
-    // Sync hash with state
-    if (!buildingSlate) {
-      window.location.hash = "rating";
-    } else {
-      // clear the hash if we're building slate
-      if (window.location.hash === "#rating") {
-        window.history.replaceState(null, "", window.location.pathname + window.location.search);
-      }
-    }
-  }, [buildingSlate]);
 
-  useEffect(() => {
-    const handleHashChange = () => {
-      // If the user presses back and the hash disappears, they wanted to view preferences
-      if (window.location.hash !== "#rating" && state) {
-        setBuildingSlate(true);
-      }
-    };
-    window.addEventListener("hashchange", handleHashChange);
-    return () => window.removeEventListener("hashchange", handleHashChange);
-  }, [state]);
 
   const handleBuildSlate = useCallback(async () => {
     setLoading(true);
