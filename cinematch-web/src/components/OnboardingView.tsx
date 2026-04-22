@@ -232,6 +232,11 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
 
   const likeCount = state?.feedback_counts?.like || 0;
   const minLikes = state?.session?.min_likes_needed || 10;
+  const ratedCount = Object.values(state?.feedback_counts ?? {}).reduce(
+    (sum, value) => sum + (typeof value === "number" ? value : 0),
+    0
+  );
+  const ratedTotal = state?.session?.onboarding_total || 0;
 
   /* ─── Preferences Step ─────────────────────────── */
   if (buildingSlate) {
@@ -432,6 +437,7 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
           )}
           <MobileMenu
             onLogout={onLogout}
+            onPreferences={() => setShowPrefs(true)}
           />
         </div>
 
@@ -440,10 +446,27 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
           <div style={{ width: "100%", maxWidth: "700px", marginTop: "12px", flexShrink: 0 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "6px" }}>
               <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-text-primary)", letterSpacing: "0.02em", textTransform: "uppercase" }}>
-                Taste Profile
+                Rated
               </span>
               <span style={{ fontSize: "11px", color: "var(--color-text-muted)" }}>
-                {likeCount} / {minLikes} likes
+                {ratedCount} / {ratedTotal}
+              </span>
+            </div>
+            <div style={{ height: "6px", width: "100%", background: "var(--color-border)", borderRadius: "3px", overflow: "hidden" }}>
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${Math.min((ratedCount / Math.max(ratedTotal, 1)) * 100, 100)}%` }}
+                transition={{ duration: 1, ease: "easeOut" }}
+                style={{ height: "100%", background: "var(--color-text-primary)", borderRadius: "3px" }}
+              />
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginTop: "10px", marginBottom: "6px" }}>
+              <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-text-primary)", letterSpacing: "0.02em", textTransform: "uppercase" }}>
+                Likes Needed
+              </span>
+              <span style={{ fontSize: "11px", color: "var(--color-text-muted)" }}>
+                {likeCount} / {minLikes}
               </span>
             </div>
             <div style={{ height: "6px", width: "100%", background: "var(--color-border)", borderRadius: "3px", overflow: "hidden" }}>

@@ -1,37 +1,18 @@
 "use client";
 
-import LoginScreen from "@/components/LoginScreen";
-import { useSession } from "@/context/SessionContext";
-import { sessionHomePath } from "@/lib/session-routing";
-import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
-export default function LoginPage() {
-  const { session, isLoading, updateSession } = useSession();
+/**
+ * All navigation is handled by AppShell at "/".
+ * This catch-all redirects any stale bookmarks or manual URL entries back to root.
+ */
+export default function CatchAllRedirect() {
   const router = useRouter();
 
   useEffect(() => {
-    if (isLoading || !session) return;
+    router.replace("/");
+  }, [router]);
 
-    // If an active session exists, login is never a valid destination.
-    router.replace(sessionHomePath(session));
-  }, [isLoading, session, router]);
-
-  if (isLoading) {
-    return null;
-  }
-
-  if (session) {
-    // While replace() is in flight.
-    return null;
-  }
-
-  return (
-    <LoginScreen
-      onLogin={(nextSession) => {
-        updateSession(nextSession);
-        router.replace(sessionHomePath(nextSession));
-      }}
-    />
-  );
+  return null;
 }

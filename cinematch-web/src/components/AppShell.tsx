@@ -75,6 +75,11 @@ export default function AppShell() {
     setSession(null);
     setForcePreferences(false);
     setPhase("login");
+    // Replace the current history entry so there's nothing to "go back" to.
+    // This prevents stale history entries from re-appearing after logout.
+    try {
+      history.replaceState(null, "", "/");
+    } catch { /* ignore */ }
   }, []);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showTimeoutToast, setShowTimeoutToast] = useState(false);
@@ -90,19 +95,25 @@ export default function AppShell() {
     }, INACTIVITY_MS);
   }, [handleLogout]);
 
-  // Block mobile back gesture from navigating away / refreshing the page.
-  // Strategy: The SPA does not use the browser back button. We push a dummy
-  // state on mount. If the user swipes back, the browser pops the dummy state
-  // and fires popstate. We catch it and immediately push the dummy state back.
-  // The user is permanently trapped inside the SPA, preventing accidental exits.
+  // Block browser back/forward from doing anything.
+  // Strategy: On mount, replace the current entry with "/" and push a guard
+  // entry.  If the user triggers back (swipe, button, keyboard), the browser
+  // pops the guard and fires popstate — we immediately push the guard back,
+  // always keeping the URL at "/".  This makes the app immune to
+  // back-gesture issues across Safari, Chrome, Firefox, iOS, and Android.
   useEffect(() => {
     if (typeof window === "undefined") return;
-    
-    history.pushState(null, "", window.location.href);
+
+    // Ensure the URL is always "/" (handles deep-link arrivals)
+    history.replaceState(null, "", "/");
+    // Push a guard entry so "back" has something to pop without leaving the page
+    history.pushState(null, "", "/");
+
     const handlePopState = () => {
-      history.pushState(null, "", window.location.href);
+      // Re-push the guard — the user never leaves
+      history.pushState(null, "", "/");
     };
-    
+
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);

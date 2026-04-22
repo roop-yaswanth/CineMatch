@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
-import { SessionProvider } from "@/context/SessionContext";
 import "./globals.css";
 
 const inter = Inter({
@@ -43,9 +42,7 @@ export default function RootLayout({
         <meta name="theme-color" content="#1C1C1E" />
       </head>
       <body className="bg-[var(--color-bg)] text-[var(--color-text-primary)] antialiased">
-        <SessionProvider>
-          {children}
-        </SessionProvider>
+        {children}
         <Analytics />
         <SpeedInsights />
       </body>
