@@ -38,16 +38,28 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
   const [successAction, setSuccessAction] = useState<string | null>(null);
   const [similar, setSimilar] = useState<Recommendation[]>([]);
   const [similarLoading, setSimilarLoading] = useState(false);
+  const [trailerKey, setTrailerKey] = useState<string | null>(null);
+  const [trailerLanguages, setTrailerLanguages] = useState<Array<{lang:string;label:string;key:string}>>([]);
+  const [selectedTrailerLang, setSelectedTrailerLang] = useState<string | null>(null);
+  const [trailerLoading, setTrailerLoading] = useState(false);
+  const [trailerFetched, setTrailerFetched] = useState(false);
+  const [showTrailerPlayer, setShowTrailerPlayer] = useState(false);
   const similarRowRef = useRef<HTMLDivElement>(null);
 
-  // Prevent body scroll when open
+  // Prevent body scroll when open; reset trailer on close
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "auto";
-      // Use setTimeout to avoid synchronous setState warning inside effect
-      setTimeout(() => setSuccessAction(null), 0);
+      setTimeout(() => {
+        setSuccessAction(null);
+        setTrailerKey(null);
+        setTrailerLanguages([]);
+        setSelectedTrailerLang(null);
+        setTrailerFetched(false);
+        setShowTrailerPlayer(false);
+      }, 0);
     }
     return () => {
       document.body.style.overflow = "auto";
@@ -81,6 +93,38 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
     setTimeout(() => setSuccessAction(null), 2500);
   };
 
+  const handleWatchTrailer = (langKey?: string) => {
+    // Specific language button clicked — open that language's trailer directly
+    if (langKey) { setShowTrailerPlayer(true); setSelectedTrailerLang(langKey); return; }
+    // Already fetched and found — open player (first/primary language)
+    if (trailerFetched && !trailerLoading) {
+      if (trailerKey) { setShowTrailerPlayer(true); }
+      return;
+    }
+    // First click — lazy fetch
+    const id = movie?.tmdb_id ?? movie?.id;
+    if (!id) return;
+    setTrailerLoading(true);
+    fetch(`/api/tmdb-trailer?id=${id}`)
+      .then((r) => r.json())
+      .then((d: { key: string | null; languages: Array<{lang:string;label:string;key:string}> }) => {
+        const langs = d.languages ?? [];
+        setTrailerLanguages(langs);
+        setTrailerFetched(true);
+        // Prefer original language of the movie, fall back to first available
+        const origLang = movie?.original_language;
+        const preferred = langs.find((l) => l.lang === origLang) ?? langs[0];
+        const key = preferred?.key ?? d.key ?? null;
+        setTrailerKey(key);
+        setSelectedTrailerLang(key);
+        // Auto-open player only for single-language movies.
+        // For multilingual: just show the language pills — user picks first.
+        if (key && langs.length <= 1) setShowTrailerPlayer(true);
+      })
+      .catch(() => setTrailerFetched(true))
+      .finally(() => setTrailerLoading(false));
+  };
+
   if (!movie) return null;
 
   const poster = posterUrl(movie.poster_path, "w500");
@@ -99,6 +143,17 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
     <AnimatePresence>
       {isOpen && (
         <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center" }}>
+
+          {/* Fullscreen trailer overlay — sits above the modal */}
+          <AnimatePresence>
+            {showTrailerPlayer && selectedTrailerLang && (
+              <TrailerOverlay
+                videoKey={selectedTrailerLang}
+                title={movie.title}
+                onClose={() => setShowTrailerPlayer(false)}
+              />
+            )}
+          </AnimatePresence>
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -157,7 +212,7 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
             </button>
 
             <div style={{ display: "flex", flexDirection: "row", flexWrap: "wrap", position: "relative", zIndex: 1 }}>
-              {/* Left Column: Poster Image */}
+              {/* Left Column: Poster (clean, no trailer inline) */}
               <div
                 style={{
                   flex: "1 1 240px",
@@ -170,16 +225,16 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                   width: "100%",
                   background: "var(--color-surface)",
                   borderRadius: "8px",
-                  overflow: "hidden"
+                  overflow: "hidden",
                 }}
               >
-                  <Image
-                    src={poster}
-                    alt={movie.title}
-                    fill
-                    style={{ objectFit: "cover" }}
-                    unoptimized
-                  />
+                <Image
+                  src={poster}
+                  alt={movie.title}
+                  fill
+                  style={{ objectFit: "cover" }}
+                  unoptimized
+                />
               </div>
 
               {/* Right Column: Details and Actions */}
@@ -271,6 +326,116 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                     </p>
                   </div>
                 )}
+
+                {/* Watch Trailer — single button or multilingual pill group */}
+                {(() => {
+                  const notFound = trailerFetched && !trailerLoading && !trailerKey;
+                  const isMultiLang = trailerLanguages.length > 1;
+
+                  // ── Loading state ──────────────────────────────────────────
+                  if (trailerLoading) {
+                    return (
+                      <div style={{
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        gap: "10px", padding: "14px 20px", borderRadius: "12px",
+                        background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
+                        color: "var(--color-text-muted)", fontSize: "14px",
+                      }}>
+                        <div style={{
+                          width: "15px", height: "15px", borderRadius: "50%",
+                          border: "2px solid rgba(255,255,255,0.15)",
+                          borderTopColor: "rgba(255,255,255,0.6)",
+                          animation: "spin 0.8s linear infinite", flexShrink: 0,
+                        }} />
+                        <style>{"@keyframes spin{to{transform:rotate(360deg)}}"}</style>
+                        <span>Finding trailer...</span>
+                      </div>
+                    );
+                  }
+
+                  // ── Not found ──────────────────────────────────────────────
+                  if (notFound) {
+                    return (
+                      <div style={{
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        gap: "8px", padding: "13px 20px", borderRadius: "12px",
+                        background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)",
+                        color: "rgba(255,255,255,0.25)", fontSize: "13px",
+                      }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                        </svg>
+                        <span>No trailer available</span>
+                      </div>
+                    );
+                  }
+
+                  // ── Multilingual pills ─────────────────────────────────────
+                  if (isMultiLang) {
+                    return (
+                      <div>
+                        <p style={{ margin: "0 0 8px", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.07em", color: "var(--color-text-muted)", opacity: 0.6 }}>
+                          Watch Trailer in
+                        </p>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                          {trailerLanguages.map((tl) => {
+                            const isActive = tl.key === selectedTrailerLang;
+                            return (
+                              <motion.button
+                                key={tl.lang}
+                                whileHover={{ scale: 1.04 }}
+                                whileTap={{ scale: 0.96 }}
+                                onClick={() => handleWatchTrailer(tl.key)}
+                                style={{
+                                  display: "flex", alignItems: "center", gap: "6px",
+                                  padding: "9px 16px", borderRadius: "100px",
+                                  background: isActive ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.06)",
+                                  border: `1px solid ${isActive ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.1)"}`,
+                                  color: isActive ? "var(--color-text-primary)" : "var(--color-text-muted)",
+                                  fontSize: "13px", fontWeight: isActive ? 600 : 500,
+                                  cursor: "pointer", transition: "all 0.18s",
+                                }}
+                              >
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" style={{ opacity: isActive ? 1 : 0.7 }}>
+                                  <polygon points="5 3 19 12 5 21 5 3" />
+                                </svg>
+                                {tl.label}
+                              </motion.button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // ── Single language / idle ─────────────────────────────────
+                  return (
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.97 }}
+                      onClick={() => handleWatchTrailer()}
+                      style={{
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        gap: "10px", width: "100%", padding: "14px 20px", borderRadius: "12px",
+                        background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)",
+                        color: "var(--color-text-primary)", cursor: "pointer",
+                        fontSize: "14px", fontWeight: 600, letterSpacing: "0.01em",
+                      }}
+                    >
+                      <div style={{
+                        width: "32px", height: "32px", borderRadius: "50%",
+                        background: "rgba(255,255,255,0.12)",
+                        display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                      }}>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+                          <polygon points="5 3 19 12 5 21 5 3" />
+                        </svg>
+                      </div>
+                      <span>Watch Trailer</span>
+                    </motion.button>
+                  );
+                })()}
+
 
                 {onAction && (
                     <div style={{ marginTop: "auto", paddingTop: "16px", borderTop: "1px solid var(--color-border-subtle)" }}>
@@ -480,6 +645,102 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
         </div>
       )}
     </AnimatePresence>,
+    document.body
+  );
+}
+
+/* ── Fullscreen Trailer Overlay ──────────────────────
+ * Rendered in a separate portal so it sits above the movie modal.
+ * Unmounting the iframe stops playback instantly.
+ * ─────────────────────────────────────────────────── */
+export function TrailerOverlay({
+  videoKey,
+  title,
+  onClose,
+}: {
+  videoKey: string;
+  title: string;
+  onClose: () => void;
+}) {
+  // ESC key closes
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
+      style={{
+        position: "fixed", inset: 0, zIndex: 200,
+        background: "rgba(0,0,0,0.96)",
+        display: "flex", flexDirection: "column",
+        alignItems: "center", justifyContent: "center",
+        padding: "16px",
+      }}
+    >
+      {/* Header row */}
+      <div style={{
+        width: "100%", maxWidth: "900px",
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        marginBottom: "12px",
+      }}>
+        <p style={{
+          margin: 0, fontSize: "14px", fontWeight: 600,
+          color: "rgba(255,255,255,0.8)",
+          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+          maxWidth: "calc(100% - 52px)",
+        }}>
+          {title}
+        </p>
+        <button
+          onClick={onClose}
+          style={{
+            flexShrink: 0,
+            width: "40px", height: "40px", borderRadius: "50%",
+            background: "rgba(255,255,255,0.1)",
+            border: "1px solid rgba(255,255,255,0.15)",
+            color: "white", cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+
+      {/* 16:9 iframe container */}
+      <div style={{
+        width: "100%", maxWidth: "900px",
+        aspectRatio: "16 / 9",
+        borderRadius: "12px",
+        overflow: "hidden",
+        background: "#000",
+        boxShadow: "0 32px 80px rgba(0,0,0,0.8)",
+      }}>
+        <iframe
+          src={`https://www.youtube.com/embed/${videoKey}?autoplay=1&playsinline=1&rel=0&modestbranding=1`}
+          title={`${title} trailer`}
+          allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+          allowFullScreen
+          style={{ width: "100%", height: "100%", border: "none", display: "block" }}
+        />
+      </div>
+
+      {/* Tap-backdrop-to-close on mobile */}
+      <div
+        onClick={onClose}
+        style={{ position: "absolute", inset: 0, zIndex: -1 }}
+      />
+    </motion.div>,
     document.body
   );
 }
