@@ -73,7 +73,7 @@ const LANGUAGES_LIST = [
   { code: "it", label: "Italian" },
   { code: "pt", label: "Portuguese" },
   { code: "zh", label: "Chinese" },
-  { code: "tw", label: "Taiwanese 🇹🇼" },
+  { code: "tw", label: "Taiwanese" },
   { code: "ar", label: "Arabic" },
 ];
 

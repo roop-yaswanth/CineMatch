@@ -39,7 +39,7 @@ const LANGUAGES = [
   { code: "pt", label: "Portuguese" },
   { code: "ru", label: "Russian" },
   { code: "zh", label: "Chinese" },
-  { code: "tw", label: "Taiwanese 🇹🇼" },  // UI-only: maps to zh + Taiwan production boost
+  { code: "tw", label: "Taiwanese" },  // UI-only: maps to zh + Taiwan production boost
   { code: "ar", label: "Arabic" },
   { code: "th", label: "Thai" },
 ];
@@ -103,113 +103,113 @@ export default function PreferencesModal({ preferences, onUpdate, onClose, mode 
             width: "90%", maxWidth: "520px", maxHeight: "85vh",
             overflowY: "auto", boxSizing: "border-box",
             padding: "24px", pointerEvents: "auto",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "24px" }}>
-          <h2 style={{ fontSize: "18px", fontWeight: 600, letterSpacing: "-0.02em", margin: 0 }}>
-            Preferences
-          </h2>
-          <button
-            onClick={onClose}
-            className="glass-pill"
-            style={{ fontSize: "12px", color: "var(--color-text-muted)", cursor: "pointer", padding: "6px 14px" }}
-          >
-            Close
-          </button>
-        </div>
-
-        {/* Region — shown in onboarding mode or default (not recommendations) */}
-        {mode !== "recommendations" && (
-          <Section title="Your Region">
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-              {REGION_OPTIONS.map((region) => (
-                <GlassPill
-                  key={region}
-                  label={region}
-                  active={localPrefs.region === region}
-                  onClick={() => setLocalPrefs({ ...localPrefs, region })}
-                />
-              ))}
-            </div>
-          </Section>
-        )}
-
-        {/* Age Group — shown in onboarding mode or default (not recommendations) */}
-        {mode !== "recommendations" && (
-          <Section title="Age Group">
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-              {AGE_GROUP_OPTIONS.map((age) => (
-                <GlassPill
-                  key={age}
-                  label={age}
-                  active={localPrefs.age_group === age}
-                  onClick={() => setLocalPrefs({ ...localPrefs, age_group: age })}
-                />
-              ))}
-            </div>
-          </Section>
-        )}
-
-        {/* Languages — always shown */}
-        <Section title="Languages">
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-            {LANGUAGES.map(({ code, label }) => (
-              <GlassPill
-                key={code}
-                label={label}
-                active={localPrefs.languages.includes(code)}
-                onClick={() => toggle("languages", code)}
-              />
-            ))}
-          </div>
-          <p style={{ marginTop: "10px", fontSize: "11px", color: "var(--color-text-muted)" }}>
-            Leave empty to use your region or the default mix.
-          </p>
-        </Section>
-
-        <Section title="Genres">
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-            {GENRES.map((genre) => (
-              <GlassPill
-                key={genre}
-                label={genre}
-                active={localPrefs.genres.includes(genre)}
-                onClick={() => toggle("genres", genre)}
-              />
-            ))}
-          </div>
-          <p style={{ marginTop: "10px", fontSize: "11px", color: "var(--color-text-muted)" }}>
-            Leave empty for all genres.
-          </p>
-        </Section>
-
-        {/* Classics toggle — shown in recommendations mode or default (not onboarding) */}
-        {mode !== "onboarding" && (
-          <div style={{ marginBottom: "24px" }}>
-            <GlassPill
-              label="Pre-2000 Classics"
-              active={localPrefs.include_classics}
-              onClick={() => setLocalPrefs({ ...localPrefs, include_classics: !localPrefs.include_classics })}
-            />
-          </div>
-        )}
-
-        {/* Apply */}
-        <motion.button
-          whileHover={{ scale: 1.01 }}
-          whileTap={{ scale: 0.99 }}
-          onClick={handleApply}
-          className="glass-button"
-          style={{
-            marginTop: "8px", width: "100%", padding: "14px 0",
-            background: "rgba(255,255,255,0.12)",
-            color: "var(--color-text-primary)",
-            fontSize: "14px", fontWeight: 500, letterSpacing: "0.02em",
-            borderRadius: "var(--radius-pill)", cursor: "pointer",
           }}
         >
-          Apply Changes
-        </motion.button>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "24px" }}>
+            <h2 style={{ fontSize: "18px", fontWeight: 600, letterSpacing: "-0.02em", margin: 0 }}>
+              Preferences
+            </h2>
+            <button
+              onClick={onClose}
+              className="glass-pill"
+              style={{ fontSize: "12px", color: "var(--color-text-muted)", cursor: "pointer", padding: "6px 14px" }}
+            >
+              Close
+            </button>
+          </div>
+
+          {/* Region — shown in onboarding mode or default (not recommendations) */}
+          {mode !== "recommendations" && (
+            <Section title="Your Region">
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                {REGION_OPTIONS.map((region) => (
+                  <GlassPill
+                    key={region}
+                    label={region}
+                    active={localPrefs.region === region}
+                    onClick={() => setLocalPrefs({ ...localPrefs, region })}
+                  />
+                ))}
+              </div>
+            </Section>
+          )}
+
+          {/* Age Group — shown in onboarding mode or default (not recommendations) */}
+          {mode !== "recommendations" && (
+            <Section title="Age Group">
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                {AGE_GROUP_OPTIONS.map((age) => (
+                  <GlassPill
+                    key={age}
+                    label={age}
+                    active={localPrefs.age_group === age}
+                    onClick={() => setLocalPrefs({ ...localPrefs, age_group: age })}
+                  />
+                ))}
+              </div>
+            </Section>
+          )}
+
+          {/* Languages — always shown */}
+          <Section title="Languages">
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+              {LANGUAGES.map(({ code, label }) => (
+                <GlassPill
+                  key={code}
+                  label={label}
+                  active={localPrefs.languages.includes(code)}
+                  onClick={() => toggle("languages", code)}
+                />
+              ))}
+            </div>
+            <p style={{ marginTop: "10px", fontSize: "11px", color: "var(--color-text-muted)" }}>
+              Leave empty to use your region or the default mix.
+            </p>
+          </Section>
+
+          <Section title="Genres">
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+              {GENRES.map((genre) => (
+                <GlassPill
+                  key={genre}
+                  label={genre}
+                  active={localPrefs.genres.includes(genre)}
+                  onClick={() => toggle("genres", genre)}
+                />
+              ))}
+            </div>
+            <p style={{ marginTop: "10px", fontSize: "11px", color: "var(--color-text-muted)" }}>
+              Leave empty for all genres.
+            </p>
+          </Section>
+
+          {/* Classics toggle — shown in recommendations mode or default (not onboarding) */}
+          {mode !== "onboarding" && (
+            <div style={{ marginBottom: "24px" }}>
+              <GlassPill
+                label="Pre-2000 Classics"
+                active={localPrefs.include_classics}
+                onClick={() => setLocalPrefs({ ...localPrefs, include_classics: !localPrefs.include_classics })}
+              />
+            </div>
+          )}
+
+          {/* Apply */}
+          <motion.button
+            whileHover={{ scale: 1.01 }}
+            whileTap={{ scale: 0.99 }}
+            onClick={handleApply}
+            className="glass-button"
+            style={{
+              marginTop: "8px", width: "100%", padding: "14px 0",
+              background: "rgba(255,255,255,0.12)",
+              color: "var(--color-text-primary)",
+              fontSize: "14px", fontWeight: 500, letterSpacing: "0.02em",
+              borderRadius: "var(--radius-pill)", cursor: "pointer",
+            }}
+          >
+            Apply Changes
+          </motion.button>
         </div>
       </motion.div>
     </>
