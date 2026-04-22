@@ -2,17 +2,35 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import RecommendationsView from "@/components/RecommendationsView";
+import { useSession } from "@/context/SessionContext";
 
-/**
- * All navigation is handled by AppShell at "/".
- * This catch-all redirects any stale bookmarks or manual URL entries back to root.
- */
-export default function CatchAllRedirect() {
+export default function DashboardPage() {
   const router = useRouter();
+  const { session, isLoading, logout, updateSession } = useSession();
 
+  // Route protection
   useEffect(() => {
-    router.replace("/");
-  }, [router]);
+    if (!isLoading && !session) {
+      router.replace("/login");
+    } else if (!isLoading && session && !session.onboarding_complete) {
+      router.replace("/onboarding");
+    }
+  }, [session, isLoading, router]);
 
-  return null;
+  const handleLogout = () => {
+    logout();
+    router.replace("/login");
+  };
+
+  if (isLoading || !session) return null;
+
+  return (
+    <RecommendationsView
+      session={session}
+      onSessionUpdate={updateSession}
+      onLogout={handleLogout}
+      onBackToOnboarding={() => router.push("/onboarding")}
+    />
+  );
 }

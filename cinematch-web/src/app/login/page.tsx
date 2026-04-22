@@ -2,17 +2,33 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import LoginScreen from "@/components/LoginScreen";
+import { useSession } from "@/context/SessionContext";
+import type { UserSession } from "@/lib/api";
 
-/**
- * All navigation is handled by AppShell at "/".
- * This catch-all redirects any stale bookmarks or manual URL entries back to root.
- */
-export default function CatchAllRedirect() {
+export default function LoginPage() {
   const router = useRouter();
+  const { session, isLoading, updateSession } = useSession();
 
+  // If already logged in, push them away from the login screen
   useEffect(() => {
-    router.replace("/");
-  }, [router]);
+    if (!isLoading && session) {
+      router.replace(session.onboarding_complete ? "/dashboard" : "/onboarding");
+    }
+  }, [session, isLoading, router]);
 
-  return null;
+  const handleLogin = (newSession: UserSession) => {
+    updateSession(newSession); // Sync with your global SessionContext
+    
+    // .replace() removes the login page from the browser's back history stack
+    if (newSession.is_returning && newSession.onboarding_complete) {
+      router.replace("/dashboard");
+    } else {
+      router.replace("/onboarding");
+    }
+  };
+
+  if (isLoading || session) return null; // Avoid flicker
+
+  return <LoginScreen onLogin={handleLogin} />;
 }
