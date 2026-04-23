@@ -130,7 +130,7 @@ export default function MovieCard({ movie, priority = false, className = "", com
           {movie.title}
         </h2>
 
-        {/* Metadata line: Year · Language · IMDb 7.0 */}
+        {/* Metadata line: Year · Language · IMDb */}
         <div className={compact
           ? "mt-1 flex items-center gap-1.5 text-[10px] text-[var(--color-text-muted)] font-light flex-wrap"
           : "mt-2 flex items-center justify-center gap-2 text-xs text-[var(--color-text-muted)] font-light flex-wrap"

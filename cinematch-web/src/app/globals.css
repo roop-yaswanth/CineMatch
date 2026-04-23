@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /* ═══════════════════════════════════════════════════════════
-   CineMatch — Liquid Glass Design System
+   CineMatch 
    Apple-inspired translucency, depth, and motion.
    ═══════════════════════════════════════════════════════════ */
 
@@ -12,20 +12,19 @@
     BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
 
   /* ─── Base Canvas ────────────────────────────── */
-  /* Warm obsidian — not cold blue-black, not flat grey */
+
   --color-bg: #1f1f1f;
   --color-bg-raised: #1f1f1f;
 
-  /* Ambient tint — Obsidian & Gold palette */
-  /* Antique Gold */
+
   --tint-gold: 212, 175, 55;
-  /* Deep Bronze */
+
   --tint-bronze: 197, 148, 75;
-  /* Warm Onyx — for depth without colour clashing */
+
   --tint-charcoal: 50, 42, 28;
 
   /* ─── Surfaces ───────────────────────────────── */
-  /* Translucent fills — layered on ambient backdrop for liquid glass. */
+
   --glass-thin: rgba(22, 22, 32, 0.35);
   --glass-regular: rgba(22, 22, 32, 0.55);
   --glass-thick: rgba(16, 16, 24, 0.72);
@@ -107,7 +106,7 @@
   --shadow-glow-like: 0 0 32px rgba(48, 209, 88, 0.35);
   --shadow-glow-dislike: 0 0 32px rgba(255, 69, 58, 0.35);
 
-  /* ─── Motion (Apple-tuned spring curves) ─── */
+  /* ─── Motion ─── */
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -244,11 +243,8 @@ textarea,
     opacity var(--dur-base) var(--ease-out);
 }
 
-/* ═══════════════════════════════════════════════════════════
-   Liquid Glass surfaces
-   ═══════════════════════════════════════════════════════════ */
 
-/* Top-chrome (nav / sticky headers) — true liquid glass */
+/* Top-chrome (nav / sticky headers) */
 .glass {
   background: linear-gradient(
     180deg,
@@ -505,7 +501,7 @@ textarea,
 }
 
 /* ═══════════════════════════════════════════════════════════
-   Rating action buttons — tactile glass with colored tint
+   Rating action buttons
    ═══════════════════════════════════════════════════════════ */
 
 .rating-btn {
@@ -1020,7 +1016,7 @@ body:has(.onboarding-rating-layout) {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   Typography helpers (optional utility classes)
+   Typography helpers ( utility classes)
    ═══════════════════════════════════════════════════════════ */
 
 .heading-display {

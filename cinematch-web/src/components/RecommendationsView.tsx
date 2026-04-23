@@ -54,23 +54,17 @@ function toDetailMovie(movie: Recommendation): DetailMovie {
   return { ...movie };
 }
 
-/**
- * Converts the pre-partitioned /api/recommendations/multi response into Stacks.
- * The backend already separated movies by language bucket, so we just map them.
- */
 function partitionFromBuckets(
   resp: MultiBucketResponse,
   preferences: RecommendationPreferences
 ): { stacks: Stack[]; allMovies: Recommendation[] } {
   const { english, regional, global: globalMovies } = resp.buckets;
 
-  // Collect all regional movies (interleaved across languages for fairness)
   const regionalEntries = Object.entries(regional).filter(
-    ([key]) => key !== "_merged"  // Skip internal merge key
+    ([key]) => key !== "_merged"
   );
   const hasRegional = regionalEntries.some(([, arr]) => arr.length > 0);
 
-  // Interleave regional languages so they mix evenly in the stack
   const regionalMerged: Recommendation[] = [];
   if (hasRegional) {
     const buckets = regionalEntries.map(([, arr]) => [...arr]);
@@ -88,8 +82,6 @@ function partitionFromBuckets(
     }
   }
 
-  // Build label from actual language codes, not internal keys
-  // Use selected languages from preferences for accurate labeling
   const selectedNonEnglish = (preferences.languages || [])
     .filter((l) => l && l.toLowerCase() !== "en");
 
@@ -99,7 +91,6 @@ function partitionFromBuckets(
 
   const result: Stack[] = [];
 
-  // Regional language stack FIRST (if user selected non-English languages)
   if (hasRegional || (regional._merged && regional._merged.length > 0)) {
     const movies = hasRegional ? regionalMerged : (regional._merged || []);
     result.push({
@@ -110,7 +101,6 @@ function partitionFromBuckets(
     });
   }
 
-  // English stack, when present
   if ((english || []).length > 0) {
     result.push({
       id: "hollywood",
@@ -120,7 +110,6 @@ function partitionFromBuckets(
     });
   }
 
-  // Global Cinema stack, when present
   if ((globalMovies || []).length > 0) {
     result.push({
       id: "other",
@@ -138,18 +127,16 @@ function partitionFromBuckets(
 
   return { stacks: result, allMovies };
 }
-// ── Cache + display sizing constants ──────────────────────────────────────
-const BUCKET_DISPLAY = 50;   // max shown per stack at any time
-const BUCKET_FETCH = 100;  // movies fetched per bucket from backend
-const CACHE_REFETCH_THRESHOLD = 20; // trigger a silent API refetch when a stack's display falls below this AND cache is empty
+
+const BUCKET_DISPLAY = 50;
+const BUCKET_FETCH = 100;
+const CACHE_REFETCH_THRESHOLD = 20;
 
 type StackCache = Record<StackId, Recommendation[]>;
 const EMPTY_CACHE = (): StackCache => ({ hollywood: [], matched: [], other: [] });
 
-// ── Session-scoped recommendation cache ──────────────────────────────────
-// Survives navigations to /your-likes, /preferences etc. without re-fetching.
 const RECS_CACHE_KEY = "cinematch_recs_cache";
-const RECS_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+const RECS_CACHE_TTL_MS = 10 * 60 * 1000;
 
 interface RecsCache {
   stacks: Stack[];
@@ -199,7 +186,7 @@ export default function RecommendationsView({
   const [movies, setMovies] = useState<Recommendation[]>(() => cachedRef.current?.movies ?? []);
   const [loading, setLoading] = useState(false);
   const [initialLoad, setInitialLoad] = useState(!hadCache);
-  
+
   const [showUpdateToast] = useState(false);
   const [activeStack, setActiveStack] = useState<StackId | null>(null);
   const [preferences, setPreferences] = useState<RecommendationPreferences>(
@@ -219,7 +206,7 @@ export default function RecommendationsView({
   // Route-based navigation for sub-pages
   const openYourLikes = () => router.push("/your-likes");
   const openPrefs = () => router.push("/preferences");
-  
+
 
   const [isUpdating, setIsUpdating] = useState(false);
 
@@ -237,10 +224,7 @@ export default function RecommendationsView({
     new Set(cachedRef.current?.displayedIds ?? [])
   );
 
-  // ── Bucket cache ───────────────────────────────────────────────────────────
-  // Stores the "reserve" movies (indices 50-100) that are not yet displayed.
-  // When a displayed movie is acted on the stack is immediately topped back up
-  // from here — no API call needed until the cache itself runs dry.
+
   const bucketCacheRef = useRef<StackCache>(
     cachedRef.current?.bucketCache ?? EMPTY_CACHE()
   );
@@ -271,10 +255,9 @@ export default function RecommendationsView({
       } finally {
         setSearchLoading(false);
       }
-    }, 2000); // 2s debounce — only call after user stops typing
+    }, 1500); // 1.5s debounce — only call after user stops typing
   }, []);
 
-  // Apply frontend classics filter (genres are handled by backend, not here)
   const applyFilters = useCallback((arr: Recommendation[], prefs: RecommendationPreferences): Recommendation[] => {
     if (!prefs.include_classics) {
       const modern = arr.filter((m) => {
@@ -286,10 +269,6 @@ export default function RecommendationsView({
     return arr;
   }, []);
 
-  // ── applyBucketResponse ────────────────────────────────────────────────────
-  // Converts the raw API response (100 per bucket) into:
-  //   • display stacks  (first BUCKET_DISPLAY movies per stack)
-  //   • bucketCacheRef  (remainder → used to silently top up stacks)
   const applyBucketResponse = useCallback(
     (resp: MultiBucketResponse, prefs: RecommendationPreferences) => {
       const filterBucket = (arr: Recommendation[]) =>
@@ -331,7 +310,6 @@ export default function RecommendationsView({
         other: fGlob.slice(BUCKET_DISPLAY),
       };
 
-      // Build display resp (only first 50 per bucket for partitionFromBuckets)
       const displayResp: MultiBucketResponse = {
         ...resp,
         buckets: {
@@ -342,7 +320,6 @@ export default function RecommendationsView({
       };
 
       const { stacks: newStacks, allMovies } = partitionFromBuckets(displayResp, prefs);
-      // Track all displayed IDs so we can exclude them on the next auto-rerun
       for (const m of allMovies) displayedIdsRef.current.add(recommendationId(m));
       setStacks(newStacks);
       setMovies(allMovies);
@@ -350,8 +327,6 @@ export default function RecommendationsView({
     [applyFilters]
   );
 
-  // ── silentRefresh ──────────────────────────────────────────────────────────
-  // Fires ONLY when: cache for a stack is exhausted AND display < CACHE_REFETCH_THRESHOLD.
   const silentRefreshInFlight = useRef(false);
   const silentRefresh = useCallback(async (prefs: RecommendationPreferences) => {
     if (silentRefreshInFlight.current) return;
@@ -390,10 +365,6 @@ export default function RecommendationsView({
     }
   }, [applyBucketResponse, onSessionUpdate, session.session_id]);
 
-  // ── generate ──────────────────────────────────────────────────────────────
-  // autoRerun=true: overlay mode — keep existing stacks visible while fetching,
-  //   pass displayedIds to backend so it returns genuinely new movies.
-  // autoRerun=false (default): full clear → loading spinner → new stacks.
   const generate = useCallback(
     async (
       nextPreferences: RecommendationPreferences = preferences,
@@ -451,7 +422,7 @@ export default function RecommendationsView({
     [applyBucketResponse, onSessionUpdate, preferences, session.session_id]
   );
 
-  
+
 
   useEffect(() => {
     if (!initialLoad) return;
@@ -475,15 +446,13 @@ export default function RecommendationsView({
     async (movie: Recommendation | DetailMovie, action: RecommendationAction) => {
       const tmdbId = "tmdb_id" in movie && movie.tmdb_id ? movie.tmdb_id : movie.id;
 
-      // 1. Mark as seen
       seenIdsRef.current.add(tmdbId);
 
-      // Dismiss modal if open
       if (activeMovie && (activeMovie.id === tmdbId || activeMovie.tmdb_id === tmdbId)) {
         setActiveMovie(null);
       }
 
-      // 2. Optimistic removal from stacks + cache replenish
+      // Optimistic removal from stacks + cache replenish
       setMovies((prev) => prev.filter((m) => recommendationId(m) !== tmdbId));
       let targetStackId: StackId | null = null;
 
@@ -493,7 +462,6 @@ export default function RecommendationsView({
           if (!inThis) return s;
           targetStackId = s.id as StackId;
           const remaining = s.movies.filter((m) => recommendationId(m) !== tmdbId);
-          // Pull from cache immediately
           const cache = bucketCacheRef.current[s.id as StackId];
           const needed = BUCKET_DISPLAY - remaining.length;
           const toAdd = needed > 0 && cache && cache.length > 0 ? cache.splice(0, needed) : [];
@@ -501,20 +469,16 @@ export default function RecommendationsView({
         })
       );
 
-      // 3. Update action counters
       actionCountRef.current.total++;
       if (action === "like" || action === "okay") actionCountRef.current.positive++;
       if (action === "dislike") actionCountRef.current.negative++;
-      // Skip = half-dislike: counts 0.5 toward negative threshold
       if (action === "remove" || action === "skip") actionCountRef.current.negative += 0.5;
 
       const { positive, negative, total } = actionCountRef.current;
       const shouldAutoRerun = negative >= 10 || total >= 10 || positive >= 10;
 
-      // 4. Taste Profile Update — overlay mode: keep stacks visible, fetch new movies
       if (shouldAutoRerun) {
         actionCountRef.current = { positive: 0, negative: 0, total: 0 };
-        // isUpdating drives the overlay; it is cleared in generate()'s finally block
         setIsUpdating(true);
         try {
           await apiRecommendationAction(session.session_id, tmdbId, action);
@@ -526,12 +490,9 @@ export default function RecommendationsView({
         return;
       }
 
-      // 5. Fire-and-forget backend update
       apiRecommendationAction(session.session_id, tmdbId, action)
         .then((result) => {
           onSessionUpdate(result.session);
-
-          // 6. If target stack cache is empty AND displayed count is thin → silent re-fetch
           if (targetStackId) {
             const cacheRemaining = bucketCacheRef.current[targetStackId]?.length || 0;
             setStacks(currentStacks => {
@@ -612,24 +573,24 @@ export default function RecommendationsView({
           }}
         >
 
-        {/* Search Backdrop Scrim — lives OUTSIDE header so it covers all stacks */}
-        {showSearch && (
-          <div
-            onClick={() => {
-              setShowSearch(false);
-              setSearchQuery("");
-              setSearchResults([]);
-            }}
-            style={{
-              position: "fixed",
-              inset: 0,
-              zIndex: 39,
-              background: "rgba(0, 0, 0, 0.80)",
-              backdropFilter: "blur(6px)",
-              WebkitBackdropFilter: "blur(6px)",
-            }}
-          />
-        )}
+          {/* Search Backdrop Scrim — lives OUTSIDE header so it covers all stacks */}
+          {showSearch && (
+            <div
+              onClick={() => {
+                setShowSearch(false);
+                setSearchQuery("");
+                setSearchResults([]);
+              }}
+              style={{
+                position: "fixed",
+                inset: 0,
+                zIndex: 39,
+                background: "rgba(0, 0, 0, 0.80)",
+                backdropFilter: "blur(6px)",
+                WebkitBackdropFilter: "blur(6px)",
+              }}
+            />
+          )}
           {/* Header */}
           <header
             className="glass"
@@ -1489,16 +1450,12 @@ function PosterCard({
   const lang = languageLabel(movie.original_language || "");
   const imdb = movie.imdb_rating ? movie.imdb_rating.toFixed(1) : movie.vote_average ? movie.vote_average.toFixed(1) : null;
   const genreList = (movie.genres && movie.genres.length > 0) ? movie.genres.slice(0, 3) : (movie.primary_genre ? [movie.primary_genre] : []);
-  
+
   const isActuallyExpanded = isExpanded && expandPos && isDesktopHoverEnabled();
 
   // Portal render logic
   let portalElement = null;
   if (isActuallyExpanded && expandPos && typeof document !== "undefined") {
-    // FIX: The app uses html { zoom: 1.18 } on desktop. 
-    // getBoundingClientRect returns *visual* viewport pixels. 
-    // But setting top/left on a portaled element inside a zoomed body scales those pixels again!
-    // We must invert the zoom to get the true CSS coordinates.
     const zoom = parseFloat(getComputedStyle(document.documentElement).zoom || "1");
     const s = {
       top: expandPos.top / zoom,
@@ -1506,16 +1463,16 @@ function PosterCard({
       width: expandPos.width / zoom,
       height: expandPos.height / zoom
     };
-    
+
     // Compute bounds checking limits with inverted zoom too
     const vw = window.innerWidth / zoom;
     const vh = window.innerHeight / zoom;
-    
+
     // Scale wider for aesthetic (like Netflix/Prime)
     const scaleFactor = hasBackdrop ? 2.0 : 1.65;
-    
-    const expandedWidth = Math.max(280, s.width * scaleFactor); 
-    const expandedImgHeight = hasBackdrop ? (expandedWidth * 9 / 16) : (expandedWidth * 1.5); 
+
+    const expandedWidth = Math.max(280, s.width * scaleFactor);
+    const expandedImgHeight = hasBackdrop ? (expandedWidth * 9 / 16) : (expandedWidth * 1.5);
     const detailsHeight = 170; // Adjusted for overlap
     const targetHeight = expandedImgHeight + detailsHeight;
 
@@ -1523,7 +1480,7 @@ function PosterCard({
     let tLeft = s.left - (expandedWidth - s.width) / 2;
     // tTop centers the IMAGE part only!
     let tTop = s.top - (expandedImgHeight - s.height) / 2;
-    
+
     // Bounds check to keep entirely within screen
     if (tLeft < 25) tLeft = 25;
     if (tLeft + expandedWidth > vw - 25) tLeft = vw - expandedWidth - 25;
@@ -1534,7 +1491,7 @@ function PosterCard({
       <AnimatePresence>
         {isExpanded && (
           <motion.div
-            initial={{ 
+            initial={{
               opacity: 0,
               top: s.top,
               left: s.left,
@@ -1542,7 +1499,7 @@ function PosterCard({
               height: s.height,
               borderRadius: "8px"
             }}
-            animate={{ 
+            animate={{
               opacity: 1,
               top: tTop,
               left: tLeft,
@@ -1550,7 +1507,7 @@ function PosterCard({
               height: targetHeight,
               borderRadius: "16px"
             }}
-            exit={{ 
+            exit={{
               opacity: 0,
               top: s.top,
               left: s.left,
@@ -1579,43 +1536,43 @@ function PosterCard({
           >
             {/* The Image Header (Poster or Backdrop) */}
             <div style={{ position: "relative", width: "100%", height: expandedImgHeight, flexShrink: 0 }}>
-               <Image src={hasBackdrop ? backdrop : poster} alt={movie.title} fill sizes="400px" style={{ objectFit: "cover", objectPosition: "center 20%" }} unoptimized />
-               <div style={{ position: "absolute", bottom: -2, left: 0, right: 0, height: "65%", background: "linear-gradient(to top, #18191c 0%, rgba(24,25,28,0.95) 20%, rgba(24,25,28,0.6) 50%, rgba(24,25,28,0) 100%)", pointerEvents: "none" }} />
-               {imdb && (
+              <Image src={hasBackdrop ? backdrop : poster} alt={movie.title} fill sizes="400px" style={{ objectFit: "cover", objectPosition: "center 20%" }} unoptimized />
+              <div style={{ position: "absolute", bottom: -2, left: 0, right: 0, height: "65%", background: "linear-gradient(to top, #18191c 0%, rgba(24,25,28,0.95) 20%, rgba(24,25,28,0.6) 50%, rgba(24,25,28,0) 100%)", pointerEvents: "none" }} />
+              {imdb && (
                 <div style={{ position: "absolute", top: "12px", right: "12px", padding: "4px 8px", borderRadius: "8px", background: "rgba(0,0,0,0.7)", fontSize: "11px", fontWeight: 700, color: "#e8c84a", display: "flex", alignItems: "center", gap: "4px", boxShadow: "0 4px 12px rgba(0,0,0,0.4)" }}>
                   <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>
                   {imdb}
                 </div>
-               )}
+              )}
             </div>
 
             {/* The Extra Info Panel under the Image */}
             <div style={{ marginTop: "-40px", padding: "0 18px 20px 18px", flex: 1, display: "flex", flexDirection: "column", gap: "8px", zIndex: 2, background: "transparent" }}>
-               <h3 style={{ fontSize: "18px", fontWeight: 700, color: "#fff", margin: 0, lineHeight: 1.2 }}>{movie.title}</h3>
-               <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                 <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-                    <span style={{ color: "rgba(255,255,255,0.9)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "6px", padding: "2px 6px", fontSize: "10px", fontWeight: 600 }}>{movie.year || "--"}</span>
-                    <span style={{ color: "rgba(255,255,255,0.9)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "6px", padding: "2px 6px", fontSize: "10px", fontWeight: 600 }}>{lang || "Global"}</span>
-                 </div>
-                 {genreList.length > 0 && (
-                   <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-                      {genreList.map((g) => (
-                        <span key={g} style={{ color: "rgba(255,255,255,0.75)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "6px", padding: "2px 6px", fontSize: "10px", fontWeight: 600 }}>{g}</span>
-                      ))}
-                   </div>
-                 )}
-               </div>
-               {movie.overview && (
-                 <p style={{ margin: "2px 0 0", fontSize: "12px", color: "rgba(255,255,255,0.75)", lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{movie.overview}</p>
-               )}
-               <div style={{ marginTop: "auto", marginBottom: "4px", display: "flex", gap: "10px", alignItems: "center" }}>
-                 <button onClick={(e) => { e.stopPropagation(); if (onClick) onClick(); setIsExpanded(false); }} style={{ background: "#fff", color: "#000", border: "none", borderRadius: "100px", padding: "8px 16px", fontSize: "13px", fontWeight: 700, display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", flex: 1, justifyContent: "center" }}>
-                   <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg> View
-                 </button>
-                 <button onClick={(e) => { e.stopPropagation(); onAction(movie, "watchlist"); setIsExpanded(false); }} style={{ background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "50%", width: "34px", height: "34px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
-                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" /></svg>
-                 </button>
-               </div>
+              <h3 style={{ fontSize: "18px", fontWeight: 700, color: "#fff", margin: 0, lineHeight: 1.2 }}>{movie.title}</h3>
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                  <span style={{ color: "rgba(255,255,255,0.9)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "6px", padding: "2px 6px", fontSize: "10px", fontWeight: 600 }}>{movie.year || "--"}</span>
+                  <span style={{ color: "rgba(255,255,255,0.9)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "6px", padding: "2px 6px", fontSize: "10px", fontWeight: 600 }}>{lang || "Global"}</span>
+                </div>
+                {genreList.length > 0 && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                    {genreList.map((g) => (
+                      <span key={g} style={{ color: "rgba(255,255,255,0.75)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "6px", padding: "2px 6px", fontSize: "10px", fontWeight: 600 }}>{g}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {movie.overview && (
+                <p style={{ margin: "2px 0 0", fontSize: "12px", color: "rgba(255,255,255,0.75)", lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{movie.overview}</p>
+              )}
+              <div style={{ marginTop: "auto", marginBottom: "4px", display: "flex", gap: "10px", alignItems: "center" }}>
+                <button onClick={(e) => { e.stopPropagation(); if (onClick) onClick(); setIsExpanded(false); }} style={{ background: "#fff", color: "#000", border: "none", borderRadius: "100px", padding: "8px 16px", fontSize: "13px", fontWeight: 700, display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", flex: 1, justifyContent: "center" }}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg> View
+                </button>
+                <button onClick={(e) => { e.stopPropagation(); onAction(movie, "watchlist"); setIsExpanded(false); }} style={{ background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "50%", width: "34px", height: "34px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" /></svg>
+                </button>
+              </div>
             </div>
           </motion.div>
         )}
@@ -1636,16 +1593,16 @@ function PosterCard({
         minWidth: "130px",
         flexShrink: 0,
         scrollSnapAlign: "start",
-        paddingBottom: "8px", 
+        paddingBottom: "8px",
         position: "relative",
       }}
       onMouseEnter={scheduleHoverOpen}
       onMouseLeave={() => scheduleHoverClose(100)}
     >
-      <div 
-        style={{ 
-          opacity: isActuallyExpanded ? 0 : 1, // Hides the main card perfectly when portaled duplicate expands!!
-          transition: "opacity 0.15s ease" 
+      <div
+        style={{
+          opacity: isActuallyExpanded ? 0 : 1,
+          transition: "opacity 0.15s ease"
         }}
       >
         <div

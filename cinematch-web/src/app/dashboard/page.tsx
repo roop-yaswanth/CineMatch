@@ -23,20 +23,12 @@ export default function DashboardPage() {
     router.replace("/login");
   };
 
-  /**
-   * Reset handler: immediately marks onboarding_complete=false in localStorage
-   * so the route guard redirects correctly, then calls the backend to clear
-   * MongoDB (onboarding_feedback, recommendation_pool, etc.).
-   */
   const handleBackToOnboarding = useCallback(async () => {
     if (!session) return;
-    // 1. Clear the recs cache so fresh recommendations are fetched after re-onboarding
     try {
       sessionStorage.removeItem(`cinematch_recs_cache_${session.session_id}`);
     } catch { /* non-critical */ }
-    // 2. Optimistically clear onboarding_complete in localStorage so route guard works
     updateSession({ ...session, onboarding_complete: false });
-    // 3. Ask backend to wipe session state in MongoDB
     try {
       await fetch("/api/reset", {
         method: "POST",
@@ -44,7 +36,6 @@ export default function DashboardPage() {
         body: JSON.stringify({ session_id: session.session_id }),
       });
     } catch {
-      // Non-critical — build_slate will also reset when user re-submits prefs
     }
     router.push("/onboarding");
   }, [session, updateSession, router]);

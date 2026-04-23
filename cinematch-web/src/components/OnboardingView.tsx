@@ -114,9 +114,6 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
   const [loadingVariantIdx, setLoadingVariantIdx] = useState(0);
   const [showTutorial, setShowTutorial] = useState(false);
 
-  // Tutorial is triggered directly from handleBuildSlate — no effect needed here.
-
-  // Drag indicator
   const dragX = useMotionValue(0);
   const dragY = useMotionValue(0);
   const [cardGlow, setCardGlow] = useState("none");

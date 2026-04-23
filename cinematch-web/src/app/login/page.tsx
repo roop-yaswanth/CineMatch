@@ -20,7 +20,6 @@ export default function LoginPage() {
   const handleLogin = (newSession: UserSession) => {
     updateSession(newSession); // Sync with your global SessionContext
     
-    // .replace() removes the login page from the browser's back history stack
     if (newSession.is_returning && newSession.onboarding_complete) {
       router.replace("/dashboard");
     } else {

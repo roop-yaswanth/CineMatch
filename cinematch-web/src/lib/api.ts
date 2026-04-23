@@ -440,9 +440,6 @@ export async function fetchTmdbPoster(tmdbId: number): Promise<string | null> {
 export async function prefetchPosters(
   movies: Array<{ poster_path?: string; id: number; tmdb_id?: number }>
 ): Promise<void> {
-  // Resolve missing TMDB paths (small string cache). We intentionally do NOT
-  // eagerly instantiate `new Image()` here — that kept full-size bitmaps alive
-  // in JS heap indefinitely. Let <Image> lazy-load as cards enter the viewport.
   const missing = movies.filter((m) => !m.poster_path);
   await Promise.allSettled(
     missing.map((m) => fetchTmdbPoster(m.tmdb_id ?? m.id))

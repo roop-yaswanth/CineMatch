@@ -146,7 +146,7 @@ export default function MobileMenu({
                 zIndex: 100,
                 display: "flex",
                 flexDirection: "column",
-                /* True liquid glass — as close as possible to Apple */
+
                 background: "linear-gradient(145deg, rgba(36,36,52,0.62) 0%, rgba(20,20,32,0.72) 100%)",
                 backdropFilter: "blur(60px) saturate(2.2) brightness(1.1)",
                 WebkitBackdropFilter: "blur(60px) saturate(2.2) brightness(1.1)",

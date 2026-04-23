@@ -140,9 +140,9 @@ export default function LoginScreen({ onLogin }: Props) {
         fontFamily: "var(--font-sans)",
       }}
     >
-      {/* Background Mosaic (Optimized) */}
+      {/* Background Mosaic  */}
       <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, overflow: "hidden", zIndex: 0, background: "#0a0a12" }}>
-        {/* Simplified scrim to reduce compositing costs. Avoid backdropFilter blur on large moving areas! */}
+        {/* Simplified scrim */}
         <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse at 50% 50%, rgba(10,10,18,0.15) 0%, rgba(0,0,0,0.85) 100%)", zIndex: 3, pointerEvents: "none" }} />
         <div style={{ position: "absolute", inset: "-20%", width: "140%", height: "140%", display: "flex", flexWrap: "wrap", gap: "16px", transform: "rotate(-10deg) scale(1.2)", opacity: 0.55, zIndex: 1, willChange: "transform" }}>
           <motion.div
@@ -156,9 +156,7 @@ export default function LoginScreen({ onLogin }: Props) {
             }}
             style={{ display: "flex", flexWrap: "wrap", gap: "16px", justifyContent: "center", willChange: "transform" }}
           >
-            {/* Restored full visual density, optimized via async decoding, lazy loading, and no-blur */}
             {[...posters, ...posters, ...posters].map((path, i) => (
-              // eslint-disable-next-line @next/next/no-img-element
               <img
                 key={i}
                 src={`${BASE}${path}`}

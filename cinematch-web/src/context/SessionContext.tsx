@@ -132,7 +132,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!session) return; // Only track when logged in
 
-    const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minutes
+    const INACTIVITY_TIMEOUT = 5 * 60 * 1000; // 5 minutes
 
     let timeoutId: ReturnType<typeof setTimeout>;
     const resetTimer = () => {
