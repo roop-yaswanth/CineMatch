@@ -1002,6 +1002,7 @@ export default function RecommendationsView({
           onClose={() => setActiveMovie(null)}
           movie={activeMovie}
           sessionId={session.session_id}
+          userRegion={session.profile?.region ?? null}
           onAction={(action) => {
             if (activeMovie) {
               handleAction(activeMovie, action);
@@ -1569,8 +1570,11 @@ function PosterCard({
                 <button onClick={(e) => { e.stopPropagation(); if (onClick) onClick(); setIsExpanded(false); }} style={{ background: "#fff", color: "#000", border: "none", borderRadius: "100px", padding: "8px 16px", fontSize: "13px", fontWeight: 700, display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", flex: 1, justifyContent: "center" }}>
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg> View
                 </button>
-                <button onClick={(e) => { e.stopPropagation(); onAction(movie, "watchlist"); setIsExpanded(false); }} style={{ background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "50%", width: "34px", height: "34px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
+                <button onClick={(e) => { e.stopPropagation(); onAction(movie, "watchlist"); setIsExpanded(false); }} title="Add to watchlist" aria-label="Add to watchlist" style={{ background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "50%", width: "34px", height: "34px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" /></svg>
+                </button>
+                <button onClick={(e) => { e.stopPropagation(); onAction(movie, "dislike"); setIsExpanded(false); }} title="Show me less of this" aria-label="Show me less of this" style={{ background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "50%", width: "34px", height: "34px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
                 </button>
               </div>
             </div>

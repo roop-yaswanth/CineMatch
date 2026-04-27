@@ -8,6 +8,8 @@ import MobileMenu from "@/components/MobileMenu";
 import {
   apiBuildSlate,
   apiRateOnboarding,
+  apiUndoOnboarding,
+  apiEscapeObscure,
   REGION_OPTIONS,
   AGE_GROUP_OPTIONS,
   preferencesFromProfile,
@@ -23,11 +25,30 @@ interface Props {
   forcePreferences?: boolean;
 }
 
+// Haptic feedback patterns for each rating action. The Vibration API silently
+// no-ops on devices without vibrators (e.g. desktops, iOS Safari), so this is
+// safe to call unconditionally.
+function triggerHaptic(action: string): void {
+  if (typeof navigator === "undefined") return;
+  const nav = navigator as Navigator & { vibrate?: (p: number | number[]) => boolean };
+  if (typeof nav.vibrate !== "function") return;
+  switch (action) {
+    case "like":           nav.vibrate(15); break;
+    case "okay":           nav.vibrate(20); break;
+    case "dislike":        nav.vibrate([20, 10, 20]); break;
+    case "not_watched":    nav.vibrate(8); break;
+    case "not_interested": nav.vibrate([10, 20, 10]); break;
+    case "undo":           nav.vibrate([8, 30, 8]); break;
+    default:               nav.vibrate(10);
+  }
+}
+
 const RATING_OPTIONS = [
   { value: "like", label: "Like", shortcut: "L", color: "var(--color-like)", variant: "like" },
   { value: "okay", label: "Okay", shortcut: "O", color: "var(--color-okay)", variant: "okay" },
   { value: "dislike", label: "Dislike", shortcut: "D", color: "var(--color-dislike)", variant: "dislike" },
-  { value: "not_watched", label: "Skip", shortcut: "S", color: "var(--color-skip)", variant: "skip" },
+  { value: "not_watched", label: "Haven't Seen", shortcut: "S", color: "var(--color-skip)", variant: "skip" },
+  { value: "not_interested", label: "Not For Me", shortcut: "N", color: "var(--color-skip)", variant: "skip" },
 ] as const;
 
 const ease = [0.25, 0.1, 0.25, 1] as [number, number, number, number];
@@ -116,6 +137,9 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
   const [showTutorial, setShowTutorial] = useState(false);
 
   const inFlightRef = useRef(false);
+  const cardShownAtRef = useRef<number>(Date.now());
+  const [escapeUsed, setEscapeUsed] = useState(false);
+  const [nudgeDismissed, setNudgeDismissed] = useState(false);
 
   const dragX = useMotionValue(0);
   const dragY = useMotionValue(0);
@@ -173,6 +197,8 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
     async (rating: string) => {
       if (!state?.movie || loading || inFlightRef.current) return;
       inFlightRef.current = true;
+      triggerHaptic(rating);
+      const dwellMs = Math.max(0, Date.now() - cardShownAtRef.current);
       setLastSwipe(ratingDirection(rating));
       setOptimisticRemoved(true); // Trigger instantaneous exit
       setHasInteracted(true);
@@ -184,7 +210,8 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
         const result = await apiRateOnboarding(
           session.session_id,
           recommendationId(state.movie),
-          rating
+          rating,
+          dwellMs
         );
         setState(result);
         // Only auto-redirect when is_ready (is_complete AND enough likes)
@@ -202,6 +229,48 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
     [state, session.session_id, loading, onComplete, ratingDirection]
   );
 
+  // Reset the dwell-time stopwatch each time a new card becomes visible.
+  useEffect(() => {
+    cardShownAtRef.current = Date.now();
+  }, [state?.movie?.tmdb_id, state?.movie?.id]);
+
+  const handleEscapeObscure = useCallback(async () => {
+    if (loading || inFlightRef.current || escapeUsed) return;
+    inFlightRef.current = true;
+    setLoading(true);
+    setEscapeUsed(true);
+    try {
+      const result = await apiEscapeObscure(session.session_id);
+      setState(result);
+    } catch (err) {
+      console.error("Escape obscure failed:", err);
+      setEscapeUsed(false); // allow retry on error
+    } finally {
+      inFlightRef.current = false;
+      setLoading(false);
+      setOptimisticRemoved(false);
+    }
+  }, [loading, escapeUsed, session.session_id]);
+
+  const handleUndo = useCallback(async () => {
+    // Only allow undo when at least one rating has been recorded.
+    const idx = state?.session?.onboarding_index ?? 0;
+    if (loading || inFlightRef.current || idx <= 0) return;
+    inFlightRef.current = true;
+    triggerHaptic("undo");
+    setLoading(true);
+    try {
+      const result = await apiUndoOnboarding(session.session_id);
+      setState(result);
+    } catch (err) {
+      console.error("Undo failed:", err);
+    } finally {
+      inFlightRef.current = false;
+      setLoading(false);
+      setOptimisticRemoved(false);
+    }
+  }, [state?.session?.onboarding_index, loading, session.session_id]);
+
   useEffect(() => {
     const handleKeyboard = (e: KeyboardEvent) => {
       if (!state?.movie || loading) return;
@@ -209,6 +278,8 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
       else if (e.key === "o" || e.key === "O") handleRate("okay");
       else if (e.key === "d" || e.key === "D") handleRate("dislike");
       else if (e.key === "s" || e.key === "S") handleRate("not_watched");
+      else if (e.key === "n" || e.key === "N") handleRate("not_interested");
+      else if (e.key === "u" || e.key === "U") handleUndo();
       else if (e.key === "ArrowLeft") handleRate("dislike");
       else if (e.key === "ArrowRight") handleRate("like");
       else if (e.key === "ArrowUp") handleRate("not_watched");
@@ -216,7 +287,7 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
     };
     window.addEventListener("keydown", handleKeyboard);
     return () => window.removeEventListener("keydown", handleKeyboard);
-  }, [state?.movie, loading, handleRate]);
+  }, [state?.movie, loading, handleRate, handleUndo]);
 
   const handleDragEnd = (_event: unknown, info: { offset: { x: number; y: number } }) => {
     if (!state?.movie || loading) return;
@@ -676,8 +747,102 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
         <div className="onboarding-actions" style={{ width: "100%", maxWidth: "700px", flexShrink: 0, paddingTop: "4px", paddingBottom: "2px" }}>
           {state?.movie && (
             <>
+              {(() => {
+                const idx = state?.session?.onboarding_index ?? 0;
+                const likes = state?.session?.onboarding_likes ?? 0;
+                const minLikes = state?.session?.min_likes_needed ?? 10;
+                const showNudge = !nudgeDismissed && idx >= 15 && likes < minLikes && !state?.is_ready;
+                if (!showNudge) return null;
+                return (
+                  <motion.div
+                    initial={{ opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="glass-card"
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
+                      padding: "10px 12px",
+                      marginBottom: "8px",
+                      borderRadius: "10px",
+                      fontSize: "12px",
+                      color: "var(--color-text-primary)",
+                    }}
+                  >
+                    <span style={{ fontSize: "16px", lineHeight: 1 }}>👋</span>
+                    <span style={{ flex: 1, lineHeight: 1.4 }}>
+                      Not finding your style? Adjusting your genres or region might help.
+                    </span>
+                    <button
+                      onClick={() => setShowPrefs(true)}
+                      style={{
+                        background: "rgba(255,255,255,0.10)",
+                        border: "1px solid rgba(255,255,255,0.15)",
+                        color: "var(--color-text-primary)",
+                        borderRadius: "var(--radius-pill)",
+                        padding: "5px 12px",
+                        fontSize: "11px",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      Adjust
+                    </button>
+                    <button
+                      onClick={() => setNudgeDismissed(true)}
+                      aria-label="Dismiss"
+                      style={{
+                        background: "transparent",
+                        border: "none",
+                        color: "var(--color-text-muted)",
+                        fontSize: "16px",
+                        cursor: "pointer",
+                        padding: "0 4px",
+                        lineHeight: 1,
+                      }}
+                    >
+                      ×
+                    </button>
+                  </motion.div>
+                );
+              })()}
+              {(state?.session?.onboarding_index ?? 0) > 0 && (
+                <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "6px" }}>
+                  <motion.button
+                    whileTap={{ scale: 0.94 }}
+                    onClick={handleUndo}
+                    disabled={loading}
+                    className="glass-button"
+                    style={{
+                      padding: "5px 12px",
+                      fontSize: "11px",
+                      fontWeight: 500,
+                      color: "var(--color-text-muted)",
+                      cursor: loading ? "not-allowed" : "pointer",
+                      opacity: loading ? 0.4 : 0.85,
+                      borderRadius: "var(--radius-pill)",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "6px",
+                    }}
+                    aria-label="Undo last rating"
+                    title="Undo last rating (U)"
+                  >
+                    <span>↶ Undo</span>
+                    <span style={{
+                      fontSize: "9px",
+                      opacity: 0.6,
+                      padding: "1px 5px",
+                      borderRadius: "3px",
+                      background: "rgba(255,255,255,0.08)",
+                      border: "1px solid rgba(255,255,255,0.08)",
+                    }}>U</span>
+                  </motion.button>
+                </div>
+              )}
 
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "10px", justifyContent: "center" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: "8px", justifyContent: "center" }}>
                 {RATING_OPTIONS.map((opt) => (
                   <motion.button
                     key={opt.value}
@@ -688,8 +853,8 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
                     style={{
                       cursor: loading ? "not-allowed" : "pointer",
                       opacity: loading ? 0.4 : 1,
-                      padding: "12px 6px",
-                      fontSize: "13px",
+                      padding: "12px 4px",
+                      fontSize: "12px",
                     }}
                   >
                     <span>{opt.label}</span>
@@ -705,6 +870,30 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
                   </motion.button>
                 ))}
               </div>
+
+              {!escapeUsed && (
+                <div style={{ display: "flex", justifyContent: "center", marginTop: "8px" }}>
+                  <button
+                    onClick={handleEscapeObscure}
+                    disabled={loading}
+                    style={{
+                      background: "transparent",
+                      border: "none",
+                      color: "var(--color-text-muted)",
+                      fontSize: "11px",
+                      fontWeight: 500,
+                      cursor: loading ? "not-allowed" : "pointer",
+                      opacity: loading ? 0.4 : 0.75,
+                      textDecoration: "underline",
+                      textUnderlineOffset: "3px",
+                      padding: "4px 8px",
+                    }}
+                    title="Replace upcoming movies with popular, well-known titles"
+                  >
+                    Don&rsquo;t recognise any of these? Show me popular titles
+                  </button>
+                </div>
+              )}
             </>
           )}
 

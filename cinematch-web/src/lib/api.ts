@@ -261,7 +261,8 @@ export async function apiBuildSlate(
 export async function apiRateOnboarding(
   sessionId: string,
   tmdbId: number,
-  rating: string
+  rating: string,
+  dwellMs: number = 0
 ): Promise<OnboardingState> {
   return request<OnboardingState>("/api/onboarding/rate", {
     method: "POST",
@@ -269,6 +270,7 @@ export async function apiRateOnboarding(
       session_id: sessionId,
       tmdb_id: tmdbId,
       rating,
+      dwell_ms: dwellMs,
     }),
   });
 }
@@ -280,6 +282,24 @@ export async function apiOnboardingNav(
   return request<OnboardingState>("/api/onboarding/nav", {
     method: "POST",
     body: JSON.stringify({ session_id: sessionId, direction }),
+  });
+}
+
+export async function apiUndoOnboarding(
+  sessionId: string
+): Promise<OnboardingState> {
+  return request<OnboardingState>("/api/onboarding/undo", {
+    method: "POST",
+    body: JSON.stringify({ session_id: sessionId }),
+  });
+}
+
+export async function apiEscapeObscure(
+  sessionId: string
+): Promise<OnboardingState> {
+  return request<OnboardingState>("/api/onboarding/escape_obscure", {
+    method: "POST",
+    body: JSON.stringify({ session_id: sessionId }),
   });
 }
 
@@ -325,7 +345,8 @@ export async function apiMultiRecommendations(
 export async function apiRecommendationAction(
   sessionId: string,
   tmdbId: number,
-  action: string
+  action: string,
+  dwellMs: number = 0
 ): Promise<RecommendationPage> {
   return request<RecommendationPage>("/api/recommendations/action", {
     method: "POST",
@@ -333,6 +354,7 @@ export async function apiRecommendationAction(
       session_id: sessionId,
       tmdb_id: tmdbId,
       action,
+      dwell_ms: dwellMs,
     }),
   });
 }

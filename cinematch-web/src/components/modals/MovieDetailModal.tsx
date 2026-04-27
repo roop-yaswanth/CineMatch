@@ -3,6 +3,7 @@ import { useEffect, useState, useRef } from "react";
 import Image from "next/image";
 import { createPortal } from "react-dom";
 import { posterUrl, languageLabel, apiSimilarMovies, type Recommendation } from "@/lib/api";
+import WatchProvidersPanel, { REGION_TO_COUNTRY } from "@/components/WatchProvidersPanel";
 
 export interface DetailMovie {
   id: number;
@@ -32,9 +33,11 @@ interface Props {
   onAction?: (action: "like" | "okay" | "dislike" | "watchlist" | "skip") => void;
   onMovieSelect?: (movie: DetailMovie) => void;
   sessionId?: string | null;
+  userRegion?: string | null;
 }
 
-export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onMovieSelect, sessionId }: Props) {
+export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onMovieSelect, sessionId, userRegion }: Props) {
+  const [showWatchProviders, setShowWatchProviders] = useState(false);
   const [successAction, setSuccessAction] = useState<string | null>(null);
   const [similar, setSimilar] = useState<Recommendation[]>([]);
   const [similarLoading, setSimilarLoading] = useState(false);
@@ -59,6 +62,7 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
         setSelectedTrailerLang(null);
         setTrailerFetched(false);
         setShowTrailerPlayer(false);
+        setShowWatchProviders(false);
       }, 0);
     }
     return () => {
@@ -212,29 +216,73 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
             </button>
 
             <div style={{ display: "flex", flexDirection: "row", flexWrap: "wrap", position: "relative", zIndex: 1 }}>
-              {/* Left Column: Poster (clean, no trailer inline) */}
+              {/* Left Column: Poster + Where-to-Watch */}
               <div
                 style={{
                   flex: "1 1 240px",
-                  position: "relative",
-                  aspectRatio: "2/3",
-                  minHeight: "220px",
-                  maxHeight: "50vh",
                   maxWidth: "340px",
                   margin: "0 auto",
                   width: "100%",
-                  background: "var(--color-surface)",
-                  borderRadius: "8px",
-                  overflow: "hidden",
+                  display: "flex",
+                  flexDirection: "column",
+                  padding: "0 12px",
                 }}
               >
-                <Image
-                  src={poster}
-                  alt={movie.title}
-                  fill
-                  style={{ objectFit: "cover" }}
-                  unoptimized
-                />
+                <div
+                  style={{
+                    position: "relative",
+                    aspectRatio: "2/3",
+                    minHeight: "220px",
+                    maxHeight: "50vh",
+                    width: "100%",
+                    background: "var(--color-surface)",
+                    borderRadius: "8px",
+                    overflow: "hidden",
+                  }}
+                >
+                  <Image
+                    src={poster}
+                    alt={movie.title}
+                    fill
+                    style={{ objectFit: "cover" }}
+                    unoptimized
+                  />
+                </div>
+
+                {(movie.tmdb_id ?? movie.id) > 0 && (
+                  <>
+                    <button
+                      onClick={() => setShowWatchProviders((s) => !s)}
+                      className="glass-button"
+                      style={{
+                        marginTop: "12px",
+                        padding: "10px 14px",
+                        borderRadius: "var(--radius-pill)",
+                        fontSize: "13px",
+                        fontWeight: 600,
+                        color: "var(--color-text-primary)",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "8px",
+                      }}
+                      aria-expanded={showWatchProviders}
+                    >
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="2" y="6" width="20" height="14" rx="2" ry="2" />
+                        <polyline points="10 11 14 14 10 17 10 11" fill="currentColor" stroke="none" />
+                      </svg>
+                      <span>{showWatchProviders ? "Hide streaming options" : "Where to Watch"}</span>
+                    </button>
+                    {showWatchProviders && (
+                      <WatchProvidersPanel
+                        tmdbId={(movie.tmdb_id ?? movie.id) as number}
+                        defaultCountry={REGION_TO_COUNTRY[userRegion ?? "Other"] || "US"}
+                      />
+                    )}
+                  </>
+                )}
               </div>
 
               {/* Right Column: Details and Actions */}
