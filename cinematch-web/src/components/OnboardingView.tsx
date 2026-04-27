@@ -500,7 +500,7 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
           display: "flex", alignItems: "center", justifyContent: "space-between",
           flexShrink: 0,
         }}>
-          <div style={{ width: "40px" }} /> {/* Spacer */}
+          <div style={{ width: "40px" }} aria-hidden /> {/* Header spacer (Undo lives near the rating buttons) */}
           {state && (
             <div style={{ textAlign: "center" }}>
               <div style={{ fontSize: "11px", color: "var(--color-text-muted)", fontWeight: 500, letterSpacing: "0.05em", textTransform: "uppercase" }}>
@@ -807,43 +807,9 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
                   </motion.div>
                 );
               })()}
-              {(state?.session?.onboarding_index ?? 0) > 0 && (
-                <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "6px" }}>
-                  <motion.button
-                    whileTap={{ scale: 0.94 }}
-                    onClick={handleUndo}
-                    disabled={loading}
-                    className="glass-button"
-                    style={{
-                      padding: "5px 12px",
-                      fontSize: "11px",
-                      fontWeight: 500,
-                      color: "var(--color-text-muted)",
-                      cursor: loading ? "not-allowed" : "pointer",
-                      opacity: loading ? 0.4 : 0.85,
-                      borderRadius: "var(--radius-pill)",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "6px",
-                    }}
-                    aria-label="Undo last rating"
-                    title="Undo last rating (U)"
-                  >
-                    <span>↶ Undo</span>
-                    <span style={{
-                      fontSize: "9px",
-                      opacity: 0.6,
-                      padding: "1px 5px",
-                      borderRadius: "3px",
-                      background: "rgba(255,255,255,0.08)",
-                      border: "1px solid rgba(255,255,255,0.08)",
-                    }}>U</span>
-                  </motion.button>
-                </div>
-              )}
-
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: "8px", justifyContent: "center" }}>
-                {RATING_OPTIONS.map((opt) => (
+              {/* Top row: judgement ratings (rated movies you've seen) */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "8px" }}>
+                {RATING_OPTIONS.slice(0, 3).map((opt) => (
                   <motion.button
                     key={opt.value}
                     whileTap={{ scale: 0.94 }}
@@ -853,26 +819,71 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
                     style={{
                       cursor: loading ? "not-allowed" : "pointer",
                       opacity: loading ? 0.4 : 1,
-                      padding: "12px 4px",
-                      fontSize: "12px",
+                      padding: "12px 8px",
+                      fontSize: "13px",
+                      fontWeight: 600,
                     }}
+                    title={`${opt.label} (${opt.shortcut})`}
                   >
-                    <span>{opt.label}</span>
-                    <span style={{
-                      fontSize: "10px",
-                      opacity: 0.55,
+                    {opt.label}
+                  </motion.button>
+                ))}
+              </div>
+              {/* Bottom row: skip variants (haven't seen / not for me) */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "8px", marginTop: "8px" }}>
+                {RATING_OPTIONS.slice(3).map((opt) => (
+                  <motion.button
+                    key={opt.value}
+                    whileTap={{ scale: 0.94 }}
+                    onClick={() => handleRate(opt.value)}
+                    disabled={loading}
+                    className={`rating-btn rating-btn--${opt.variant}`}
+                    style={{
+                      cursor: loading ? "not-allowed" : "pointer",
+                      opacity: loading ? 0.4 : 1,
+                      padding: "11px 8px",
+                      fontSize: "12px",
                       fontWeight: 500,
-                      padding: "2px 6px",
-                      borderRadius: "4px",
-                      background: "rgba(255,255,255,0.08)",
-                      border: "1px solid rgba(255,255,255,0.08)",
-                    }}>{opt.shortcut}</span>
+                    }}
+                    title={`${opt.label} (${opt.shortcut})`}
+                  >
+                    {opt.label}
                   </motion.button>
                 ))}
               </div>
 
-              {!escapeUsed && (
-                <div style={{ display: "flex", justifyContent: "center", marginTop: "8px" }}>
+              {/* Footer row: Undo (left) + Escape-obscure (right) — both secondary actions */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "10px", gap: "8px", minHeight: "28px" }}>
+                {(state?.session?.onboarding_index ?? 0) > 0 ? (
+                  <motion.button
+                    whileTap={{ scale: 0.94 }}
+                    onClick={handleUndo}
+                    disabled={loading}
+                    aria-label="Undo last rating"
+                    title="Undo last rating (U)"
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "5px",
+                      background: "rgba(255,255,255,0.06)",
+                      border: "1px solid rgba(255,255,255,0.10)",
+                      color: "var(--color-text-secondary)",
+                      cursor: loading ? "not-allowed" : "pointer",
+                      opacity: loading ? 0.4 : 1,
+                      borderRadius: "var(--radius-pill)",
+                      padding: "5px 12px",
+                      fontSize: "11px",
+                      fontWeight: 600,
+                    }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M3 7v6h6" />
+                      <path d="M21 17a9 9 0 0 0-15-6.7L3 13" />
+                    </svg>
+                    <span>Undo</span>
+                  </motion.button>
+                ) : <span />}
+                {!escapeUsed ? (
                   <button
                     onClick={handleEscapeObscure}
                     disabled={loading}
@@ -886,14 +897,15 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
                       opacity: loading ? 0.4 : 0.75,
                       textDecoration: "underline",
                       textUnderlineOffset: "3px",
-                      padding: "4px 8px",
+                      padding: "4px 0 4px 8px",
+                      textAlign: "right",
                     }}
                     title="Replace upcoming movies with popular, well-known titles"
                   >
-                    Don&rsquo;t recognise any of these? Show me popular titles
+                    Don&rsquo;t recognise any? Show popular titles
                   </button>
-                </div>
-              )}
+                ) : <span />}
+              </div>
             </>
           )}
 

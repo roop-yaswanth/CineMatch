@@ -225,7 +225,7 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                   width: "100%",
                   display: "flex",
                   flexDirection: "column",
-                  padding: "0 12px",
+                  gap: "12px",
                 }}
               >
                 <div
@@ -236,8 +236,9 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                     maxHeight: "50vh",
                     width: "100%",
                     background: "var(--color-surface)",
-                    borderRadius: "8px",
+                    borderRadius: "12px",
                     overflow: "hidden",
+                    boxShadow: "0 12px 32px -8px rgba(0,0,0,0.6)",
                   }}
                 >
                   <Image
@@ -255,7 +256,6 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                       onClick={() => setShowWatchProviders((s) => !s)}
                       className="glass-button"
                       style={{
-                        marginTop: "12px",
                         padding: "10px 14px",
                         borderRadius: "var(--radius-pill)",
                         fontSize: "13px",

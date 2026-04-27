@@ -60,9 +60,9 @@ function countryLabel(iso: string): string {
 function ProviderRow({ title, providers, link }: { title: string; providers?: WatchProvider[]; link?: string }) {
   if (!providers || providers.length === 0) return null;
   return (
-    <div style={{ marginTop: "14px" }}>
-      <div style={{ fontSize: "13px", fontWeight: 700, color: "rgba(255,255,255,0.95)", marginBottom: "8px" }}>{title}</div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+    <div style={{ marginTop: "10px" }}>
+      <div style={{ fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.55)", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.06em" }}>{title}</div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
         {providers.map((p) => {
           const logoUrl = p.logo_path ? `https://image.tmdb.org/t/p/w92${p.logo_path}` : null;
           const node = (
@@ -70,12 +70,12 @@ function ProviderRow({ title, providers, link }: { title: string; providers?: Wa
               key={p.provider_id}
               title={p.provider_name}
               style={{
-                width: "44px",
-                height: "44px",
+                width: "38px",
+                height: "38px",
                 borderRadius: "8px",
                 overflow: "hidden",
                 background: "rgba(255,255,255,0.06)",
-                border: "1px solid rgba(255,255,255,0.10)",
+                border: "1px solid rgba(255,255,255,0.08)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -83,9 +83,9 @@ function ProviderRow({ title, providers, link }: { title: string; providers?: Wa
               }}
             >
               {logoUrl ? (
-                <Image src={logoUrl} alt={p.provider_name} fill sizes="44px" style={{ objectFit: "cover" }} unoptimized />
+                <Image src={logoUrl} alt={p.provider_name} fill sizes="38px" style={{ objectFit: "cover" }} unoptimized />
               ) : (
-                <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.7)", padding: "2px", textAlign: "center" }}>{p.provider_name}</span>
+                <span style={{ fontSize: "9px", color: "rgba(255,255,255,0.7)", padding: "2px", textAlign: "center", lineHeight: 1.1 }}>{p.provider_name}</span>
               )}
             </div>
           );
@@ -170,23 +170,27 @@ export default function WatchProvidersPanel({ tmdbId, defaultCountry }: Props) {
   }
 
   return (
-    <div style={{ padding: "12px 0 4px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", marginBottom: "4px" }}>
-        <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.55)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-          Country
-        </span>
+    <div style={{
+      padding: "12px",
+      background: "rgba(255,255,255,0.03)",
+      border: "1px solid rgba(255,255,255,0.08)",
+      borderRadius: "10px",
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
         <select
           value={country}
           onChange={(e) => setCountry(e.target.value)}
           style={{
-            background: "rgba(255,255,255,0.08)",
+            flex: 1,
+            background: "rgba(255,255,255,0.06)",
             color: "#fff",
-            border: "1px solid rgba(255,255,255,0.15)",
+            border: "1px solid rgba(255,255,255,0.12)",
             borderRadius: "8px",
             padding: "6px 10px",
-            fontSize: "13px",
+            fontSize: "12px",
             outline: "none",
             cursor: "pointer",
+            minWidth: 0,
           }}
         >
           {availableCountries.map((c) => (
@@ -195,22 +199,6 @@ export default function WatchProvidersPanel({ tmdbId, defaultCountry }: Props) {
             </option>
           ))}
         </select>
-        {current?.link && (
-          <a
-            href={current.link}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              fontSize: "11px",
-              color: "rgba(255,255,255,0.55)",
-              textDecoration: "underline",
-              textUnderlineOffset: "3px",
-              marginLeft: "auto",
-            }}
-          >
-            View on JustWatch ↗
-          </a>
-        )}
       </div>
 
       {current ? (
@@ -222,18 +210,29 @@ export default function WatchProvidersPanel({ tmdbId, defaultCountry }: Props) {
           <ProviderRow title="Buy" providers={current.buy} link={current.link} />
         </>
       ) : (
-        <div style={{ marginTop: "12px", color: "rgba(255,255,255,0.55)", fontSize: "13px" }}>
+        <div style={{ marginTop: "10px", color: "rgba(255,255,255,0.55)", fontSize: "12px" }}>
           Not available in this country.
         </div>
       )}
 
-      <p style={{ marginTop: "14px", fontSize: "10px", color: "rgba(255,255,255,0.4)", lineHeight: 1.5 }}>
-        Streaming data provided by{" "}
-        <a href="https://www.justwatch.com/" target="_blank" rel="noopener noreferrer" style={{ color: "rgba(255,255,255,0.55)", textDecoration: "underline" }}>
-          JustWatch
-        </a>
-        {" "}via TMDB.
-      </p>
+      <div style={{ marginTop: "12px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
+        {current?.link ? (
+          <a
+            href={current.link}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              fontSize: "11px",
+              color: "rgba(255,255,255,0.6)",
+              textDecoration: "underline",
+              textUnderlineOffset: "3px",
+            }}
+          >
+            View on JustWatch ↗
+          </a>
+        ) : <span />}
+        <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.35)" }}>via TMDB · JustWatch</span>
+      </div>
     </div>
   );
 }

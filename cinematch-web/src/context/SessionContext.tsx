@@ -128,28 +128,47 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("storage", handleStorage);
   }, []);
 
-  // Session Inactivity Logout
+  // Session inactivity / out-of-focus logout.
+  // Logs out after 10 minutes of either: no user interaction, or document hidden.
   useEffect(() => {
     if (!session) return; // Only track when logged in
 
-    const INACTIVITY_TIMEOUT = 5 * 60 * 1000; // 5 minutes
+    const INACTIVITY_TIMEOUT = 10 * 60 * 1000; // 10 minutes
 
-    let timeoutId: ReturnType<typeof setTimeout>;
-    const resetTimer = () => {
-      if (timeoutId) clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => {
-        logout();
-      }, INACTIVITY_TIMEOUT);
+    let activityTimeoutId: ReturnType<typeof setTimeout> | null = null;
+    let hiddenTimeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    const resetActivityTimer = () => {
+      if (activityTimeoutId) clearTimeout(activityTimeoutId);
+      activityTimeoutId = setTimeout(() => logout(), INACTIVITY_TIMEOUT);
     };
 
-    resetTimer(); // Start the timer
+    const handleVisibility = () => {
+      if (document.hidden) {
+        // Tab/window hidden — start a separate timer; logout if still hidden after 10 min.
+        if (hiddenTimeoutId) clearTimeout(hiddenTimeoutId);
+        hiddenTimeoutId = setTimeout(() => logout(), INACTIVITY_TIMEOUT);
+      } else {
+        // Back in focus — cancel the hidden timer and reset the activity timer.
+        if (hiddenTimeoutId) {
+          clearTimeout(hiddenTimeoutId);
+          hiddenTimeoutId = null;
+        }
+        resetActivityTimer();
+      }
+    };
 
-    const events = ["mousemove", "keydown", "wheel", "touchstart"];
-    events.forEach((event) => window.addEventListener(event, resetTimer, { passive: true }));
+    resetActivityTimer();
+
+    const events = ["mousemove", "keydown", "wheel", "touchstart", "click"];
+    events.forEach((event) => window.addEventListener(event, resetActivityTimer, { passive: true }));
+    document.addEventListener("visibilitychange", handleVisibility);
 
     return () => {
-      if (timeoutId) clearTimeout(timeoutId);
-      events.forEach((event) => window.removeEventListener(event, resetTimer));
+      if (activityTimeoutId) clearTimeout(activityTimeoutId);
+      if (hiddenTimeoutId) clearTimeout(hiddenTimeoutId);
+      events.forEach((event) => window.removeEventListener(event, resetActivityTimer));
+      document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, [session, logout]);
 
