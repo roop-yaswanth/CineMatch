@@ -138,10 +138,7 @@ html {
   text-rendering: optimizeLegibility;
   font-feature-settings: "cv11", "ss01", "ss03";
   letter-spacing: -0.011em;
-  /* Global UI density: matches setting browser zoom to ~90%. Keeps the entire
-     app comfortably visible on a 100% browser-zoom desktop. Skipped on small
-     mobile widths where the layout is already tightly tuned. */
-  zoom: 0.9;
+  zoom: 0.8;
 }
 
 @media (max-width: 640px) {
