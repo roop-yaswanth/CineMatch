@@ -72,8 +72,9 @@ const LANGUAGES_LIST = [
   { code: "de", label: "German" },
   { code: "it", label: "Italian" },
   { code: "pt", label: "Portuguese" },
-  { code: "zh", label: "Chinese" },
-  { code: "tw", label: "Taiwanese" },
+  { code: "zh", label: "Mandarin" },
+  { code: "tw", label: "Mandarin (Taiwan)" },  // UI-only: maps to zh + Taiwan production boost
+  { code: "cn", label: "Cantonese" },
   { code: "ar", label: "Arabic" },
 ];
 

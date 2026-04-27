@@ -184,7 +184,7 @@ export const REGION_LANGUAGE_MAP: Record<string, string[]> = {
   UK: ["en"],
   Europe: ["fr", "de", "it", "es"],
   "Latin-America": ["es", "pt"],
-  "East Asia": ["ja", "ko", "zh"],
+  "East Asia": ["ja", "ko", "zh", "cn"],
   "South-East Asia": ["th", "id"],
   "Middle-East": ["ar", "fa", "tr"],
   Africa: ["ar", "en", "fr"],
@@ -192,7 +192,7 @@ export const REGION_LANGUAGE_MAP: Record<string, string[]> = {
 };
 
 export const LANGUAGE_LABELS: Record<string, string> = {
-  ar: "Arabic", bn: "Bengali", cn: "Chinese", da: "Danish",
+  ar: "Arabic", bn: "Bengali", cn: "Cantonese", da: "Danish",
   de: "German", el: "Greek", en: "English", es: "Spanish",
   fa: "Persian", fi: "Finnish", fr: "French", he: "Hebrew",
   hi: "Hindi", id: "Indonesian", it: "Italian", ja: "Japanese",
@@ -200,7 +200,7 @@ export const LANGUAGE_LABELS: Record<string, string> = {
   nl: "Dutch", no: "Norwegian", pl: "Polish", pt: "Portuguese",
   ro: "Romanian", ru: "Russian", sv: "Swedish", ta: "Tamil",
   te: "Telugu", th: "Thai", tr: "Turkish", uk: "Ukrainian",
-  ur: "Urdu", zh: "Chinese",
+  ur: "Urdu", zh: "Mandarin",
 };
 
 export function languageLabel(code: string): string {

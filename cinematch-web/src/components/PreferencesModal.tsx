@@ -38,8 +38,9 @@ const LANGUAGES = [
   { code: "it", label: "Italian" },
   { code: "pt", label: "Portuguese" },
   { code: "ru", label: "Russian" },
-  { code: "zh", label: "Chinese" },
-  { code: "tw", label: "Taiwanese" },  // UI-only: maps to zh + Taiwan production boost
+  { code: "zh", label: "Mandarin" },
+  { code: "tw", label: "Mandarin (Taiwan)" },  // UI-only: maps to zh + Taiwan production boost
+  { code: "cn", label: "Cantonese" },
   { code: "ar", label: "Arabic" },
   { code: "th", label: "Thai" },
 ];
