@@ -46,6 +46,11 @@ const COUNTRY_NAMES: Record<string, string> = {
   PK: "Pakistan", BD: "Bangladesh", LK: "Sri Lanka",
 };
 
+const regionNames =
+  typeof Intl !== "undefined" && typeof Intl.DisplayNames !== "undefined"
+    ? new Intl.DisplayNames(["en"], { type: "region" })
+    : null;
+
 function flagEmoji(iso: string): string {
   if (!iso || iso.length !== 2) return "";
   const A = 0x1f1e6;
@@ -54,8 +59,15 @@ function flagEmoji(iso: string): string {
          String.fromCodePoint(A + iso.toUpperCase().charCodeAt(1) - a);
 }
 
+function countryName(iso: string): string {
+  const code = iso?.toUpperCase();
+  if (!code || code.length !== 2) return iso;
+  return COUNTRY_NAMES[code] ?? regionNames?.of(code) ?? code;
+}
+
 function countryLabel(iso: string): string {
-  return `${flagEmoji(iso)} ${COUNTRY_NAMES[iso] ?? iso}`;
+  const code = iso?.toUpperCase();
+  return `${flagEmoji(code)} ${countryName(code)}`;
 }
 
 /**
@@ -133,6 +145,7 @@ export default function WatchProvidersPanel({ tmdbId, defaultCountry, movieTitle
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [country, setCountry] = useState<string>(defaultCountry || "US");
+  const [countryQuery, setCountryQuery] = useState("");
 
   useEffect(() => {
     if (!tmdbId) return;
@@ -165,9 +178,18 @@ export default function WatchProvidersPanel({ tmdbId, defaultCountry, movieTitle
         // Default country first, then alphabetical by display name.
         if (a === country) return -1;
         if (b === country) return 1;
-        return countryLabel(a).localeCompare(countryLabel(b));
+        return countryName(a).localeCompare(countryName(b));
       });
   }, [data, country]);
+
+  const filteredCountries = useMemo(() => {
+    const q = countryQuery.trim().toLowerCase();
+    if (!q) return availableCountries;
+    return availableCountries.filter((c) => {
+      const name = countryName(c).toLowerCase();
+      return name.includes(q) || c.toLowerCase().includes(q);
+    });
+  }, [availableCountries, countryQuery]);
 
   const current: CountryProviders | undefined = data?.results?.[country];
   // Build the JustWatch deep-link for the currently selected country.
@@ -236,29 +258,73 @@ export default function WatchProvidersPanel({ tmdbId, defaultCountry, movieTitle
       border: "1px solid rgba(255,255,255,0.08)",
       borderRadius: "10px",
     }}>
-      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-        <select
-          value={country}
-          onChange={(e) => setCountry(e.target.value)}
+      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+        <input
+          type="text"
+          value={countryQuery}
+          onChange={(e) => setCountryQuery(e.target.value)}
+          placeholder="Search country (name or code)..."
+          aria-label="Search country"
           style={{
-            flex: 1,
+            width: "100%",
             background: "rgba(255,255,255,0.06)",
             color: "#fff",
             border: "1px solid rgba(255,255,255,0.12)",
             borderRadius: "8px",
-            padding: "6px 10px",
+            padding: "8px 10px",
             fontSize: "12px",
             outline: "none",
-            cursor: "pointer",
-            minWidth: 0,
+          }}
+        />
+
+        <div
+          style={{
+            maxHeight: "238px", // ~7 rows visible
+            overflowY: "auto",
+            border: "1px solid rgba(255,255,255,0.12)",
+            borderRadius: "8px",
+            background: "rgba(255,255,255,0.03)",
+            padding: "4px",
           }}
         >
-          {availableCountries.map((c) => (
-            <option key={c} value={c} style={{ background: "#1a1a1a" }}>
-              {countryLabel(c)}
-            </option>
-          ))}
-        </select>
+          {filteredCountries.length === 0 ? (
+            <div style={{ padding: "10px", fontSize: "12px", color: "rgba(255,255,255,0.55)" }}>
+              No countries match {countryQuery}.
+            </div>
+          ) : (
+            filteredCountries.map((c) => {
+              const selected = c === country;
+              return (
+                <button
+                  key={c}
+                  onClick={() => setCountry(c)}
+                  style={{
+                    width: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: "10px",
+                    border: "none",
+                    borderRadius: "6px",
+                    padding: "8px 10px",
+                    textAlign: "left",
+                    cursor: "pointer",
+                    background: selected ? "rgba(255,255,255,0.14)" : "transparent",
+                    color: selected ? "#fff" : "rgba(255,255,255,0.8)",
+                    fontSize: "12px",
+                  }}
+                >
+                  <span>{countryLabel(c)}</span>
+                  {selected && (
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  )}
+                </button>
+              );
+            })
+          )}
+        </div>
       </div>
 
       {current ? (
