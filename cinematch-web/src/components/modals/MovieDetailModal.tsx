@@ -47,7 +47,16 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
   const [trailerLoading, setTrailerLoading] = useState(false);
   const [trailerFetched, setTrailerFetched] = useState(false);
   const [showTrailerPlayer, setShowTrailerPlayer] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const similarRowRef = useRef<HTMLDivElement>(null);
+
+  // Track mobile breakpoint for poster height capping
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 640);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   // Prevent body scroll when open; reset trailer on close
   useEffect(() => {
@@ -232,8 +241,9 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                   style={{
                     position: "relative",
                     aspectRatio: "2/3",
-                    minHeight: "220px",
-                    maxHeight: "50vh",
+                    // On mobile the columns stack full-width; a 2:3 ratio at ~330px wide
+                    // would be ~495px tall — cap it so the modal stays usable.
+                    maxHeight: isMobile ? "220px" : "50vh",
                     width: "100%",
                     background: "var(--color-surface)",
                     borderRadius: "12px",
@@ -245,7 +255,7 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                     src={poster}
                     alt={movie.title}
                     fill
-                    style={{ objectFit: "cover" }}
+                    style={{ objectFit: "cover", objectPosition: "top center" }}
                     unoptimized
                   />
                 </div>
@@ -279,6 +289,7 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                       <WatchProvidersPanel
                         tmdbId={(movie.tmdb_id ?? movie.id) as number}
                         defaultCountry={REGION_TO_COUNTRY[userRegion ?? "Other"] || "US"}
+                        movieTitle={movie.title}
                       />
                     )}
                   </>
