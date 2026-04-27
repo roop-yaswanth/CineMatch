@@ -50,9 +50,9 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
   const [isMobile, setIsMobile] = useState(false);
   const similarRowRef = useRef<HTMLDivElement>(null);
 
-  // Track mobile breakpoint for poster height capping
+  // Treat phones + small tablets as compact layout
   useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 640);
+    const check = () => setIsMobile(window.innerWidth < 900);
     check();
     window.addEventListener("resize", check);
     return () => window.removeEventListener("resize", check);
@@ -149,13 +149,38 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
   const runtime = movie.runtime ? `${Math.floor(movie.runtime / 60)}h ${movie.runtime % 60}m` : null;
   const matchPct = movie.score !== undefined && movie.score >= 0.70 ? Math.round(movie.score * 100) : null;
   const matchColor = movie.score !== undefined && movie.score >= 0.85 ? "#22c55e" : "#eab308";
+  const guessedCountry = userRegion ? (REGION_TO_COUNTRY[userRegion] ?? "US") : "US";
+  const watchButtonStyle = {
+    position: "absolute" as const,
+    bottom: isMobile ? "14px" : "16px",
+    left: isMobile ? "12px" : "16px",
+    right: isMobile ? "12px" : "16px",
+    padding: "12px 16px",
+    borderRadius: "12px",
+    fontSize: "13px",
+    fontWeight: 700,
+    color: "#fff",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "10px",
+    background: "linear-gradient(130deg, rgba(255,255,255,0.24) 0%, rgba(255,255,255,0.10) 30%, rgba(255,255,255,0.18) 52%, rgba(255,255,255,0.07) 100%), rgba(255,255,255,0.03)",
+    border: "1px solid rgba(255, 255, 255, 0.34)",
+    backdropFilter: "blur(20px) saturate(1.55)",
+    WebkitBackdropFilter: "blur(20px) saturate(1.55)",
+    boxShadow: "0 8px 24px rgba(0, 0, 0, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.42), inset 0 -10px 16px rgba(255, 255, 255, 0.04)",
+    zIndex: 10,
+    textShadow: "0 2px 4px rgba(0, 0, 0, 0.3)",
+    transition: "all 0.3s ease",
+  };
 
   if (typeof document === 'undefined') return null;
 
   return createPortal(
     <AnimatePresence>
       {isOpen && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", alignItems: isMobile ? "flex-start" : "center", justifyContent: "center" }}>
 
           {/* Fullscreen trailer overlay — sits above the modal */}
           <AnimatePresence>
@@ -189,23 +214,26 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
             className="glass-modal"
             style={{
               position: "relative",
-              width: "88%",
-              maxWidth: "700px",
-              maxHeight: "82vh",
+              width: isMobile ? "100%" : "94vw",
+              maxWidth: isMobile ? "100%" : "980px",
+              maxHeight: isMobile ? "100vh" : "92vh",
+              height: isMobile ? "100vh" : "auto",
+              minHeight: isMobile ? undefined : "72vh",
+              borderRadius: isMobile ? "0" : undefined,
+              boxShadow: isMobile ? "none" : "0 25px 80px -12px rgba(0, 0, 0, 0.8)",
               overflowY: "auto",
               display: "flex",
               flexDirection: "column",
-              boxShadow: "0 25px 80px -12px rgba(0, 0, 0, 0.8)",
             }}
           >
             <button
               onClick={onClose}
               style={{
                 position: "absolute",
-                top: "16px",
-                right: "16px",
-                zIndex: 20,
-                background: "rgba(0,0,0,0.5)",
+                top: isMobile ? "calc(env(safe-area-inset-top) + 10px)" : "12px",
+                right: isMobile ? "10px" : "12px",
+                zIndex: 30,
+                background: "rgba(0,0,0,0.6)",
                 border: "none",
                 borderRadius: "50%",
                 width: "36px",
@@ -216,6 +244,7 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                 color: "#fff",
                 cursor: "pointer",
                 backdropFilter: "blur(4px)",
+                transition: "all 0.2s ease",
               }}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -224,89 +253,219 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
               </svg>
             </button>
 
-            {/* paddingTop on mobile reserves space for the absolute-positioned X button */}
-            <div style={{ display: "flex", flexDirection: "row", flexWrap: "wrap", position: "relative", zIndex: 1, paddingTop: isMobile ? "52px" : 0 }}>
+            {/* Content wrapper - no top padding to remove excess space */}
+            <div style={{ display: "flex", flexDirection: "row", flexWrap: "wrap", position: "relative", zIndex: 1 }}>
               {/* Left Column: Poster + Where-to-Watch */}
               <div
                 style={{
-                  flex: "1 1 240px",
-                  maxWidth: "340px",
+                  flex: isMobile ? "1 1 100%" : "1 1 240px",
+                  maxWidth: isMobile ? "100%" : "340px",
                   margin: "0 auto",
                   width: "100%",
-                  padding: isMobile ? "0 12px" : 0,
+                  padding: 0,
                   display: "flex",
                   flexDirection: "column",
-                  gap: "12px",
+                  gap: 0,
                 }}
               >
                 <div
                   style={{
                     position: "relative",
-                    // On mobile: fixed height so the poster never overflows the viewport.
+                    // On compact screens: tall hero area with full poster visibility
                     // On desktop: maintain 2:3 aspect ratio, capped at 50vh.
                     ...(isMobile
-                      ? { height: "200px" }
-                      : { aspectRatio: "2/3", maxHeight: "50vh" }),
+                      ? { height: "56vh", maxHeight: "560px", minHeight: "320px" }
+                      : { aspectRatio: "2/3", maxHeight: "62vh" }),
                     width: "100%",
                     background: "var(--color-surface)",
-                    borderRadius: "12px",
+                    borderRadius: isMobile ? "0" : "12px",
                     overflow: "hidden",
-                    boxShadow: "0 12px 32px -8px rgba(0,0,0,0.6)",
+                    boxShadow: isMobile ? "none" : "0 12px 32px -8px rgba(0,0,0,0.6)",
                   }}
                 >
-                  <Image
-                    src={poster}
-                    alt={movie.title}
-                    fill
-                    style={{ objectFit: "cover", objectPosition: "top center" }}
-                    unoptimized
-                  />
-                </div>
+                  {isMobile && (
+                    <>
+                      <Image
+                        src={poster}
+                        alt=""
+                        aria-hidden
+                        fill
+                        style={{
+                          objectFit: "cover",
+                          objectPosition: "center center",
+                          filter: "blur(18px) saturate(1.15) brightness(0.52)",
+                          transform: "scale(1.08)",
+                        }}
+                        unoptimized
+                      />
+                      <div
+                        style={{
+                          position: "absolute",
+                          inset: 0,
+                          background: "linear-gradient(180deg, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0.22) 100%)",
+                          zIndex: 1,
+                        }}
+                      />
+                    </>
+                  )}
 
-                {(movie.tmdb_id ?? movie.id) > 0 && (
-                  <>
-                    <button
-                      onClick={() => setShowWatchProviders((s) => !s)}
-                      className="glass-button"
+                  {isMobile ? (
+                    <div
                       style={{
-                        padding: "10px 14px",
-                        borderRadius: "var(--radius-pill)",
-                        fontSize: "13px",
-                        fontWeight: 600,
-                        color: "var(--color-text-primary)",
-                        cursor: "pointer",
+                        position: "absolute",
+                        inset: 0,
+                        zIndex: 2,
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        gap: "8px",
+                        pointerEvents: "none",
                       }}
-                      aria-expanded={showWatchProviders}
                     >
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <rect x="2" y="6" width="20" height="14" rx="2" ry="2" />
-                        <polyline points="10 11 14 14 10 17 10 11" fill="currentColor" stroke="none" />
-                      </svg>
-                      <span>{showWatchProviders ? "Hide streaming options" : "Where to Watch"}</span>
-                    </button>
-                    {showWatchProviders && (
-                      <WatchProvidersPanel
-                        tmdbId={(movie.tmdb_id ?? movie.id) as number}
-                        defaultCountry="US"
-                        movieTitle={movie.title}
+                      <div
+                        style={{
+                          position: "relative",
+                          width: "auto",
+                          height: "100%",
+                          maxWidth: "100%",
+                          maxHeight: "100%",
+                          aspectRatio: "2 / 3",
+                          pointerEvents: "auto",
+                        }}
+                      >
+                        <Image
+                          src={poster}
+                          alt={movie.title}
+                          fill
+                          style={{ objectFit: "cover", objectPosition: "center center" }}
+                          unoptimized
+                        />
+
+                        {/* Watch Providers Button - Inside poster frame on mobile */}
+                        {(movie.tmdb_id ?? movie.id) > 0 && (
+                          <motion.button
+                            onClick={() => setShowWatchProviders((s) => !s)}
+                            whileHover={{ scale: 1.05, y: -1 }}
+                            whileTap={{ scale: 0.95 }}
+                            style={watchButtonStyle}
+                            aria-expanded={showWatchProviders}
+                          >
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                              <rect x="2" y="5" width="20" height="14" rx="3" ry="3" />
+                              <line x1="8" y1="3" x2="6" y2="5" />
+                              <line x1="13" y1="3" x2="11" y2="5" />
+                              <line x1="18" y1="3" x2="16" y2="5" />
+                              <polygon points="10,10 15,12 10,14" fill="currentColor" stroke="none" />
+                            </svg>
+                            <span>{showWatchProviders ? "Hide" : "Where to Watch"}</span>
+                          </motion.button>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <Image
+                        src={poster}
+                        alt={movie.title}
+                        fill
+                        style={{ objectFit: "cover", objectPosition: "center center", zIndex: 2 }}
+                        unoptimized
                       />
-                    )}
-                  </>
-                )}
+
+                      {(movie.tmdb_id ?? movie.id) > 0 && (
+                        <motion.button
+                          onClick={() => setShowWatchProviders((s) => !s)}
+                          whileHover={{ scale: 1.05, y: -1 }}
+                          whileTap={{ scale: 0.95 }}
+                          style={watchButtonStyle}
+                          aria-expanded={showWatchProviders}
+                        >
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="2" y="5" width="20" height="14" rx="3" ry="3" />
+                            <line x1="8" y1="3" x2="6" y2="5" />
+                            <line x1="13" y1="3" x2="11" y2="5" />
+                            <line x1="18" y1="3" x2="16" y2="5" />
+                            <polygon points="10,10 15,12 10,14" fill="currentColor" stroke="none" />
+                          </svg>
+                          <span>{showWatchProviders ? "Hide" : "Where to Watch"}</span>
+                        </motion.button>
+                      )}
+                    </>
+                  )}
+
+                  {/* Watch Providers Overlay on Poster */}
+                  {showWatchProviders && (movie.tmdb_id ?? movie.id) > 0 && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      style={{
+                        position: "absolute",
+                        inset: 0,
+                        background: "linear-gradient(165deg, rgba(16, 18, 24, 0.40) 0%, rgba(12, 14, 20, 0.26) 100%)",
+                        backdropFilter: "blur(14px) saturate(1.35) brightness(1.06)",
+                        WebkitBackdropFilter: "blur(14px) saturate(1.35) brightness(1.06)",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        padding: "16px",
+                        zIndex: 20,
+                        borderRadius: isMobile ? "0" : "12px",
+                        border: "1px solid rgba(255, 255, 255, 0.14)",
+                      }}
+                    >
+                      <motion.div
+                        initial={{ scale: 0.9, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        transition={{ type: "spring", damping: 20 }}
+                        style={{
+                          width: "100%",
+                          maxHeight: "80%",
+                          overflowY: "auto",
+                        }}
+                      >
+                        <div style={{ marginBottom: "12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <h3 style={{ margin: 0, fontSize: "14px", fontWeight: 600, color: "#fff" }}>Where to Watch</h3>
+                          <button
+                            onClick={() => setShowWatchProviders(false)}
+                            style={{
+                              background: "rgba(255,255,255,0.1)",
+                              border: "none",
+                              borderRadius: "50%",
+                              width: "28px",
+                              height: "28px",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              color: "#fff",
+                              cursor: "pointer",
+                            }}
+                          >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <line x1="18" y1="6" x2="6" y2="18" />
+                              <line x1="6" y1="6" x2="18" y2="18" />
+                            </svg>
+                          </button>
+                        </div>
+                        <WatchProvidersPanel
+                          tmdbId={(movie.tmdb_id ?? movie.id) as number}
+                          defaultCountry={guessedCountry}
+                          movieTitle={movie.title}
+                        />
+                      </motion.div>
+                    </motion.div>
+                  )}
+                </div>
               </div>
 
               {/* Right Column: Details and Actions */}
               <div
                 style={{
-                  flex: "2 1 340px",
-                  padding: "24px 20px",
+                  flex: isMobile ? "1 1 100%" : "2 1 340px",
+                  padding: isMobile ? "14px 14px 20px" : "24px 20px",
                   display: "flex",
                   flexDirection: "column",
-                  gap: "16px",
+                  gap: "14px",
                   background: movie.backdrop_path ? "transparent" : "var(--color-bg)",
                 }}
               >
