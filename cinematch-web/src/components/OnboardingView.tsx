@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { motion, AnimatePresence, useMotionValue } from "framer-motion";
 import MovieCard from "@/components/MovieCard";
 import PreferencesModal from "@/components/PreferencesModal";
@@ -114,6 +114,8 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
   const [loadingVariantIdx, setLoadingVariantIdx] = useState(0);
   const [showTutorial, setShowTutorial] = useState(false);
 
+  const inFlightRef = useRef(false);
+
   const dragX = useMotionValue(0);
   const dragY = useMotionValue(0);
   const [cardGlow, setCardGlow] = useState("none");
@@ -168,7 +170,8 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
 
   const handleRate = useCallback(
     async (rating: string) => {
-      if (!state?.movie || loading) return;
+      if (!state?.movie || loading || inFlightRef.current) return;
+      inFlightRef.current = true;
       setLastSwipe(ratingDirection(rating));
       setOptimisticRemoved(true); // Trigger instantaneous exit
       setHasInteracted(true);
@@ -190,6 +193,7 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
       } catch (err) {
         console.error("Rating failed:", err);
       } finally {
+        inFlightRef.current = false;
         setLoading(false);
         setOptimisticRemoved(false); // Reset to allow next card
       }
