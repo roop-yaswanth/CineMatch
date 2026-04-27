@@ -224,7 +224,8 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
               </svg>
             </button>
 
-            <div style={{ display: "flex", flexDirection: "row", flexWrap: "wrap", position: "relative", zIndex: 1 }}>
+            {/* paddingTop on mobile reserves space for the absolute-positioned X button */}
+            <div style={{ display: "flex", flexDirection: "row", flexWrap: "wrap", position: "relative", zIndex: 1, paddingTop: isMobile ? "52px" : 0 }}>
               {/* Left Column: Poster + Where-to-Watch */}
               <div
                 style={{
@@ -232,6 +233,7 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                   maxWidth: "340px",
                   margin: "0 auto",
                   width: "100%",
+                  padding: isMobile ? "0 12px" : 0,
                   display: "flex",
                   flexDirection: "column",
                   gap: "12px",
@@ -240,10 +242,11 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                 <div
                   style={{
                     position: "relative",
-                    aspectRatio: "2/3",
-                    // On mobile the columns stack full-width; a 2:3 ratio at ~330px wide
-                    // would be ~495px tall — cap it so the modal stays usable.
-                    maxHeight: isMobile ? "220px" : "50vh",
+                    // On mobile: fixed height so the poster never overflows the viewport.
+                    // On desktop: maintain 2:3 aspect ratio, capped at 50vh.
+                    ...(isMobile
+                      ? { height: "200px" }
+                      : { aspectRatio: "2/3", maxHeight: "50vh" }),
                     width: "100%",
                     background: "var(--color-surface)",
                     borderRadius: "12px",
@@ -288,7 +291,7 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                     {showWatchProviders && (
                       <WatchProvidersPanel
                         tmdbId={(movie.tmdb_id ?? movie.id) as number}
-                        defaultCountry={REGION_TO_COUNTRY[userRegion ?? "Other"] || "US"}
+                        defaultCountry="US"
                         movieTitle={movie.title}
                       />
                     )}

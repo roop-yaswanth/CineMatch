@@ -82,7 +82,7 @@ function justWatchUrl(country: string, title: string): string {
   return `https://www.justwatch.com/${country.toLowerCase()}/movie/${slug}`;
 }
 
-function ProviderRow({ title, providers, jwLink }: { title: string; providers?: WatchProvider[]; jwLink?: string }) {
+function ProviderRow({ title, providers, link }: { title: string; providers?: WatchProvider[]; link?: string }) {
   if (!providers || providers.length === 0) return null;
   return (
     <div style={{ marginTop: "10px" }}>
@@ -114,9 +114,9 @@ function ProviderRow({ title, providers, jwLink }: { title: string; providers?: 
               )}
             </div>
           );
-          // Link directly to JustWatch movie page for this country
-          return jwLink ? (
-            <a key={p.provider_id} href={jwLink} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
+          // Link to TMDB watch page (current.link) so the correct platform is shown
+          return link ? (
+            <a key={p.provider_id} href={link} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
               {node}
             </a>
           ) : (
@@ -263,11 +263,11 @@ export default function WatchProvidersPanel({ tmdbId, defaultCountry, movieTitle
 
       {current ? (
         <>
-          <ProviderRow title="Stream" providers={current.flatrate} jwLink={jwLink} />
-          <ProviderRow title="Free" providers={current.free} jwLink={jwLink} />
-          <ProviderRow title="With Ads" providers={current.ads} jwLink={jwLink} />
-          <ProviderRow title="Rent" providers={current.rent} jwLink={jwLink} />
-          <ProviderRow title="Buy" providers={current.buy} jwLink={jwLink} />
+          <ProviderRow title="Stream" providers={current.flatrate} link={current.link} />
+          <ProviderRow title="Free" providers={current.free} link={current.link} />
+          <ProviderRow title="With Ads" providers={current.ads} link={current.link} />
+          <ProviderRow title="Rent" providers={current.rent} link={current.link} />
+          <ProviderRow title="Buy" providers={current.buy} link={current.link} />
         </>
       ) : (
         <div style={{ marginTop: "10px", fontSize: "12px", color: "rgba(255,255,255,0.45)" }}>
