@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="CineMatch icon">
+  <defs>
+    <linearGradient id="cStroke" x1="180" y1="120" x2="860" y2="940" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ff4f3a" />
+      <stop offset="1" stop-color="#ff1f2f" />
+    </linearGradient>
+    <filter id="softGlow" x="-30%" y="-30%" width="160%" height="160%" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="28" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+
+  <rect width="1024" height="1024" fill="#0b0f15" />
+
+  <path
+    d="M 800 250 A 330 330 0 1 0 800 774"
+    fill="none"
+    stroke="url(#cStroke)"
+    stroke-width="128"
+    stroke-linecap="round"
+    opacity="0.35"
+    filter="url(#softGlow)"
+  />
+
+  <path
+    d="M 800 250 A 330 330 0 1 0 800 774"
+    fill="none"
+    stroke="url(#cStroke)"
+    stroke-width="108"
+    stroke-linecap="round"
+  />
+
+  <path
+    d="M 462 334 L 462 690 C 462 704 478 712 491 704 L 777 540 C 789 533 789 516 777 510 L 491 320 C 478 313 462 321 462 334 Z"
+    fill="#f3f4f6"
+  />
+</svg>
