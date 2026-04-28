@@ -419,6 +419,122 @@ export async function apiSimilarMovies(
   return data.results ?? [];
 }
 
+export type ExploreCategory =
+  | "trending_day"
+  | "trending_week"
+  | "popular"
+  | "top_rated"
+  | "now_playing"
+  | "upcoming";
+
+export interface ExploreMovie {
+  id: number;
+  tmdb_id: number;
+  title: string;
+  original_title?: string;
+  year?: number;
+  release_date?: string | null;
+  poster_path?: string;
+  backdrop_path?: string;
+  overview?: string;
+  original_language?: string;
+  vote_average?: number;
+  vote_count?: number;
+  genres?: string[];
+  primary_genre?: string;
+}
+
+export interface ExploreResponse {
+  results: ExploreMovie[];
+  page: number;
+  total_pages: number;
+}
+
+export type DiscoverSort =
+  | "popularity.desc"
+  | "popularity.asc"
+  | "vote_average.desc"
+  | "vote_average.asc"
+  | "primary_release_date.desc"
+  | "primary_release_date.asc"
+  | "revenue.desc"
+  | "title.asc";
+
+export interface DiscoverFilters {
+  sort_by?: DiscoverSort;
+  with_genres?: number[];
+  year_from?: number;
+  year_to?: number;
+  with_original_language?: string;
+  vote_average_gte?: number;
+  vote_count_gte?: number;
+  region?: string;
+  page?: number;
+}
+
+export async function apiDiscover(filters: DiscoverFilters): Promise<ExploreResponse> {
+  const params = new URLSearchParams();
+  if (filters.sort_by) params.set("sort_by", filters.sort_by);
+  if (filters.with_genres?.length) params.set("with_genres", filters.with_genres.join(","));
+  if (filters.year_from) params.set("year_from", String(filters.year_from));
+  if (filters.year_to) params.set("year_to", String(filters.year_to));
+  if (filters.with_original_language) params.set("with_original_language", filters.with_original_language);
+  if (filters.vote_average_gte != null) params.set("vote_average_gte", String(filters.vote_average_gte));
+  if (filters.vote_count_gte != null) params.set("vote_count_gte", String(filters.vote_count_gte));
+  if (filters.region) params.set("region", filters.region);
+  params.set("page", String(filters.page ?? 1));
+  const res = await fetch(`/api/tmdb/discover?${params.toString()}`);
+  if (!res.ok) throw new Error(`Discover fetch failed: ${res.status}`);
+  return res.json();
+}
+
+export interface CastMember {
+  id: number;
+  name: string;
+  character?: string | null;
+  profile_path?: string | null;
+}
+export interface CrewMember {
+  id: number;
+  name: string;
+  job?: string;
+  profile_path?: string | null;
+}
+export interface CreditsResponse {
+  cast: CastMember[];
+  directors: CrewMember[];
+  writers: CrewMember[];
+}
+
+export async function apiCredits(tmdbId: number, kind: "movie" | "tv" = "movie"): Promise<CreditsResponse> {
+  const res = await fetch(`/api/tmdb/credits?id=${tmdbId}&kind=${kind}`);
+  if (!res.ok) return { cast: [], directors: [], writers: [] };
+  return res.json();
+}
+
+export interface TmdbGenre { id: number; name: string }
+let genreCache: TmdbGenre[] | null = null;
+export async function apiGenres(): Promise<TmdbGenre[]> {
+  if (genreCache) return genreCache;
+  const res = await fetch("/api/tmdb/genres");
+  if (!res.ok) return [];
+  const data = await res.json();
+  genreCache = data.genres || [];
+  return genreCache!;
+}
+
+export async function apiExplore(
+  category: ExploreCategory,
+  page: number = 1,
+  region?: string
+): Promise<ExploreResponse> {
+  const params = new URLSearchParams({ category, page: String(page) });
+  if (region) params.set("region", region);
+  const res = await fetch(`/api/tmdb/explore?${params.toString()}`);
+  if (!res.ok) throw new Error(`Explore fetch failed: ${res.status}`);
+  return res.json();
+}
+
 export function posterUrl(path: string | null | undefined, size = "w500"): string {
   if (!path) return "/poster_placeholder.svg";
   if (path.startsWith("http")) return path;

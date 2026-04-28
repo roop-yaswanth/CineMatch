@@ -2,7 +2,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState, useRef } from "react";
 import Image from "next/image";
 import { createPortal } from "react-dom";
-import { posterUrl, languageLabel, apiSimilarMovies, type Recommendation } from "@/lib/api";
+import { posterUrl, languageLabel, apiSimilarMovies, apiCredits, type Recommendation, type CastMember, type CrewMember } from "@/lib/api";
 import WatchProvidersPanel, { REGION_TO_COUNTRY } from "@/components/WatchProvidersPanel";
 
 export interface DetailMovie {
@@ -41,6 +41,10 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
   const [successAction, setSuccessAction] = useState<string | null>(null);
   const [similar, setSimilar] = useState<Recommendation[]>([]);
   const [similarLoading, setSimilarLoading] = useState(false);
+  const [cast, setCast] = useState<CastMember[]>([]);
+  const [directors, setDirectors] = useState<CrewMember[]>([]);
+  const [writers, setWriters] = useState<CrewMember[]>([]);
+  const [creditsLoading, setCreditsLoading] = useState(false);
   const [trailerKey, setTrailerKey] = useState<string | null>(null);
   const [trailerLanguages, setTrailerLanguages] = useState<Array<{ lang: string; label: string; key: string }>>([]);
   const [selectedTrailerLang, setSelectedTrailerLang] = useState<string | null>(null);
@@ -129,6 +133,30 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
       .catch(() => setSimilar([]))
       .finally(() => setSimilarLoading(false));
   }, [movie?.id, movie?.tmdb_id, isOpen, sessionId]);
+
+  // Fetch cast & crew whenever the movie changes
+  useEffect(() => {
+    const id = movie?.tmdb_id ?? movie?.id;
+    if (!isOpen || !id) {
+      setTimeout(() => { setCast([]); setDirectors([]); setWriters([]); }, 0);
+      return;
+    }
+    let cancelled = false;
+    setTimeout(() => {
+      setCreditsLoading(true);
+      setCast([]); setDirectors([]); setWriters([]);
+    }, 0);
+    apiCredits(id, "movie")
+      .then((c) => {
+        if (cancelled) return;
+        setCast(c.cast);
+        setDirectors(c.directors);
+        setWriters(c.writers);
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setCreditsLoading(false); });
+    return () => { cancelled = true; };
+  }, [movie?.id, movie?.tmdb_id, isOpen]);
 
   const handleActionClick = (action: "like" | "okay" | "dislike" | "watchlist" | "skip") => {
     if (!onAction) return;
@@ -930,10 +958,90 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
               </div>
             </div>
 
+            {/* ── Cast & Crew ──────────────────────────── */}
+            {(creditsLoading || cast.length > 0 || directors.length > 0 || writers.length > 0) && (
+              <div style={{ padding: "8px 20px 0", position: "relative", zIndex: 1 }}>
+                {(directors.length > 0 || writers.length > 0) && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "16px 24px", marginBottom: "16px", fontSize: "13px" }}>
+                    {directors.length > 0 && (
+                      <div>
+                        <div style={{ fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--color-text-muted)", marginBottom: "3px" }}>
+                          {directors.length > 1 ? "Directors" : "Director"}
+                        </div>
+                        <div style={{ color: "var(--color-text-primary)", fontWeight: 500 }}>
+                          {directors.map((d) => d.name).join(", ")}
+                        </div>
+                      </div>
+                    )}
+                    {writers.length > 0 && (
+                      <div>
+                        <div style={{ fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--color-text-muted)", marginBottom: "3px" }}>
+                          {writers.length > 1 ? "Writers" : "Writer"}
+                        </div>
+                        <div style={{ color: "var(--color-text-primary)", fontWeight: 500 }}>
+                          {Array.from(new Set(writers.map((w) => w.name))).slice(0, 4).join(", ")}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {(creditsLoading || cast.length > 0) && (
+                  <div>
+                    <h4 style={{ margin: "0 0 12px", fontSize: "12px", textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--color-text-muted)", fontWeight: 600 }}>
+                      Cast
+                    </h4>
+                    {creditsLoading && cast.length === 0 ? (
+                      <div style={{ color: "var(--color-text-muted)", fontSize: "13px", padding: "8px 0" }}>Loading…</div>
+                    ) : (
+                      <div style={{ display: "flex", gap: "12px", overflowX: "auto", paddingBottom: "0", scrollbarWidth: "none", msOverflowStyle: "none" }}>
+                        {cast.map((c) => (
+                          <div key={c.id} style={{ width: "92px", flexShrink: 0, textAlign: "center" }}>
+                            <div style={{
+                              width: "92px",
+                              height: "92px",
+                              borderRadius: "50%",
+                              overflow: "hidden",
+                              background: "var(--color-surface)",
+                              marginBottom: "8px",
+                              position: "relative",
+                            }}>
+                              {c.profile_path ? (
+                                <Image
+                                  src={posterUrl(c.profile_path, "w185")}
+                                  alt={c.name}
+                                  fill
+                                  sizes="92px"
+                                  style={{ objectFit: "cover" }}
+                                  unoptimized
+                                />
+                              ) : (
+                                <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-text-muted)", fontSize: "24px" }}>
+                                  {c.name?.[0] || "?"}
+                                </div>
+                              )}
+                            </div>
+                            <div style={{ fontSize: "12px", color: "var(--color-text-primary)", fontWeight: 500, lineHeight: 1.25, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                              {c.name}
+                            </div>
+                            {c.character && (
+                              <div style={{ fontSize: "11px", color: "var(--color-text-muted)", marginTop: "2px", lineHeight: 1.25, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                                {c.character}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* ── More Like This ───────────────────────── */}
             {(similarLoading || similar.length > 0) && (
               <div style={{
-                padding: "16px 20px 20px",
+                padding: "4px 20px 20px",
                 position: "relative",
                 zIndex: 1,
               }}>
@@ -1164,6 +1272,8 @@ function SimilarCard({ movie, onClick }: { movie: Recommendation; onClick: () =>
         maxWidth: "90px",
         background: "none",
         border: "none",
+        outline: "none",
+        WebkitTapHighlightColor: "transparent",
         padding: 0,
         cursor: "pointer",
         textAlign: "left",

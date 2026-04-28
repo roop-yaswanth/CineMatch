@@ -1,29 +1,28 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 
 import { AnimatePresence, motion } from "framer-motion";
 
 interface MobileMenuProps {
   onLogout: () => void;
-  onRefresh?: () => void;
   onReset?: () => void;
   onPreferences?: () => void;
   onYourLikes?: () => void;
   onWatchlist?: () => void;
 }
 
-const IconBookmark = () => (
+const IconCompass = () => (
   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+    <circle cx="12" cy="12" r="10" />
+    <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" />
   </svg>
 );
 
-const IconRefresh = () => (
+const IconBookmark = () => (
   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="23 4 23 10 17 10" />
-    <polyline points="1 20 1 14 7 14" />
-    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+    <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
   </svg>
 );
 
@@ -56,16 +55,16 @@ const IconPreferences = () => (
 
 export default function MobileMenu({
   onLogout,
-  onRefresh,
   onReset,
   onPreferences,
   onYourLikes,
   onWatchlist,
 }: MobileMenuProps) {
 
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
-  
+
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -155,7 +154,7 @@ export default function MobileMenu({
                 display: "flex",
                 flexDirection: "column",
 
-                background: "linear-gradient(145deg, rgba(36,36,52,0.62) 0%, rgba(20,20,32,0.72) 100%)",
+                background: "linear-gradient(145deg, rgba(28,28,40,0.94) 0%, rgba(12,12,22,0.98) 100%)",
                 backdropFilter: "blur(60px) saturate(2.2) brightness(1.1)",
                 WebkitBackdropFilter: "blur(60px) saturate(2.2) brightness(1.1)",
                 borderRadius: "20px",
@@ -179,13 +178,6 @@ export default function MobileMenu({
                 maskComposite: "exclude",
                 pointerEvents: "none",
               }} />
-              {onRefresh && (
-                <button className="menu-btn" onClick={() => handleAction(onRefresh)}>
-                  <span className="menu-btn-icon"><IconRefresh /></span>
-                  Refresh
-                </button>
-              )}
-
               {onReset && !showResetConfirm && (
                 <button className="menu-btn" onClick={() => setShowResetConfirm(true)}>
                   <span className="menu-btn-icon"><IconReset /></span>
@@ -216,6 +208,11 @@ export default function MobileMenu({
               )}
 
               <div className="menu-divider" />
+
+              <button className="menu-btn" onClick={() => handleAction(() => router.push("/explore"))}>
+                <span className="menu-btn-icon"><IconCompass /></span>
+                Explore
+              </button>
 
               <button className="menu-btn" onClick={() => handleAction(onWatchlist)}>
                 <span className="menu-btn-icon"><IconBookmark /></span>

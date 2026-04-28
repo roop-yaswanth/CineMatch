@@ -7,10 +7,11 @@ import {
   recommendationId,
   type Movie,
   type Recommendation,
+  type ExploreMovie,
 } from "@/lib/api";
 import { usePoster } from "@/lib/usePoster";
 
-type MovieLike = Movie | Recommendation;
+type MovieLike = Movie | Recommendation | ExploreMovie;
 
 interface Props {
   movie: MovieLike;
@@ -19,11 +20,20 @@ interface Props {
   compact?: boolean;
   overlay?: boolean;
   noLayout?: boolean;
+  showFullDate?: boolean;
 }
 
-export default function MovieCard({ movie, priority = false, className = "", compact = false, overlay = false, noLayout = false }: Props) {
+export default function MovieCard({ movie, priority = false, className = "", compact = false, overlay = false, noLayout = false, showFullDate = false }: Props) {
   const poster = usePoster(movie.poster_path, recommendationId(movie), "w780");
-  const year = movie.year || "";
+  
+  let fullDate = "";
+  if (showFullDate && "release_date" in movie && movie.release_date) {
+    const date = new Date(movie.release_date);
+    if (!isNaN(date.getTime())) {
+      fullDate = date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    }
+  }
+  const year = fullDate ? "" : (movie.year ? movie.year.toString() : "");
   const lang = movie.original_language ? languageLabel(movie.original_language) : "";
   const genres = movie.genres?.slice(0, 2) || [];
   const primaryGenre = ("primary_genre" in movie && movie.primary_genre) ? movie.primary_genre as string : genres[0] || "";
@@ -129,6 +139,15 @@ export default function MovieCard({ movie, priority = false, className = "", com
         >
           {movie.title}
         </h2>
+
+        {fullDate && (
+          <div className={compact
+            ? "mt-1 text-[10px] text-[var(--color-text-muted)] font-light"
+            : "mt-1.5 text-xs text-[var(--color-text-muted)] font-light"
+          }>
+            {fullDate}
+          </div>
+        )}
 
         {/* Metadata line: Year · Language · IMDb */}
         <div className={compact

@@ -632,7 +632,6 @@ export default function RecommendationsView({
                 <div>
                   <MobileMenu
                     onLogout={onLogout}
-                    onRefresh={() => void generate(preferences)}
                     onReset={onBackToOnboarding}
                     onPreferences={openPrefs}
                     onYourLikes={openYourLikes}
