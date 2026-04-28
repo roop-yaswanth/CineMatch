@@ -1472,7 +1472,7 @@ function PosterCard({
     const vw = window.innerWidth / zoom;
     const vh = window.innerHeight / zoom;
 
-    // Scale wider for aesthetic (like Netflix/Prime)
+    // Scale wider for aesthetic 
     const scaleFactor = hasBackdrop ? 2.0 : 1.65;
 
     const expandedWidth = Math.max(280, s.width * scaleFactor);
