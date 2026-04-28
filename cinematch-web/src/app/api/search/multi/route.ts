@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getGenreMap, sanitizeQuery, tmdbCacheHeaders } from "@/lib/tmdb-server";
+import { clientIp, createRateLimiter } from "@/lib/rate-limit";
+
+// Multi-search fans out to 5 parallel upstream calls per request, so we cap
+// it tightly. 30 requests / minute (0.5/s sustained) with a small burst.
+const limiter = createRateLimiter(15, 0.5);
 
 const TMDB_BEARER = process.env.TMDB_BEARER_TOKEN || "";
 const HF_API_URL = process.env.HF_API_URL ?? "http://localhost:8000";
@@ -180,6 +185,14 @@ async function searchTmdb(kind: "movie" | "tv" | "person", q: string, langCode?:
 }
 
 export async function GET(req: NextRequest) {
+  const rl = limiter.check(clientIp(req));
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfterSeconds) } }
+    );
+  }
+
   const rawQ = sanitizeQuery(req.nextUrl.searchParams.get("q"), 500);
   if (!rawQ) return NextResponse.json({ movies: [], tv: [], people: [] });
 

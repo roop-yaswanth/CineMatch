@@ -419,6 +419,14 @@ export interface MultiSearchResponse {
 const MULTI_SEARCH_CACHE_MAX = 30;
 const multiSearchCache = new Map<string, MultiSearchResponse>();
 
+/** Synchronous read of the multi-search cache. Returns null on miss.
+ *  Used by the search page to render instantly when the user re-types a
+ *  recent query — no async boundary, no flash of empty state. */
+export function peekMultiSearchCache(query: string): MultiSearchResponse | null {
+  const key = query.trim().toLowerCase();
+  return multiSearchCache.get(key) ?? null;
+}
+
 export async function apiSearchMulti(query: string): Promise<MultiSearchResponse> {
   const key = query.trim().toLowerCase();
   const hit = multiSearchCache.get(key);

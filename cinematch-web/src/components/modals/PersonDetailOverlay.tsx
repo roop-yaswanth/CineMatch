@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { motion } from "framer-motion";
 import { apiPerson, type PersonDetail, type PersonCredit } from "@/lib/api";
 import { PersonContent } from "@/components/PersonProfileContent";
 import type { DetailMovie } from "@/components/modals/MovieDetailModal";
@@ -13,22 +14,21 @@ interface PersonDetailOverlayProps {
 }
 
 export function PersonDetailOverlay({ personId, onClose, onSelectMovie }: PersonDetailOverlayProps) {
-  const [data, setData] = useState<PersonDetail | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Tag the fetched result with the personId it was fetched for. `loading`
+  // and the displayed `data` are derived without a second setState-in-effect.
+  const [result, setResult] = useState<{ forId: number; data: PersonDetail | null } | null>(null);
   const [bioExpanded, setBioExpanded] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setData(null);
     apiPerson(personId).then((d) => {
-      if (!cancelled) {
-        setData(d);
-        setLoading(false);
-      }
+      if (!cancelled) setResult({ forId: personId, data: d });
     });
     return () => { cancelled = true; };
   }, [personId]);
+
+  const data = result && result.forId === personId ? result.data : null;
+  const loading = !result || result.forId !== personId;
 
   const actingByYear = useMemo(() => {
     if (!data) return [] as Array<[string, PersonCredit[]]>;
@@ -60,16 +60,30 @@ export function PersonDetailOverlay({ personId, onClose, onSelectMovie }: Person
     }
   };
 
-  return (
+  // Reset the overlay's own scroll position whenever the personId changes —
+  // otherwise opening a second person while the first is scrolled would land
+  // mid-page and feel disorienting.
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+  }, [personId]);
+
+  // Render via portal so the overlay is a sibling of the modal panel rather
+  // than a child of the modal's scroll container. This guarantees the overlay
+  // covers the *viewport* (position: fixed) instead of being trapped at the
+  // top of the parent's scrolled content — that mismatch was the cause of the
+  // half-modal/half-person split-screen glitch.
+  return createPortal(
     <motion.div
+      ref={scrollRef}
       initial={{ x: "100%", opacity: 0.5 }}
       animate={{ x: 0, opacity: 1 }}
       exit={{ x: "100%", opacity: 0 }}
-      transition={{ type: "spring", damping: 25, stiffness: 200 }}
+      transition={{ type: "spring", damping: 28, stiffness: 240 }}
       style={{
-        position: "absolute",
+        position: "fixed",
         inset: 0,
-        zIndex: 50,
+        zIndex: 1100, // above the movie modal (which sits around 100–200)
         background: "var(--color-bg, #08080c)",
         overflowY: "auto",
         display: "flex",
@@ -112,6 +126,7 @@ export function PersonDetailOverlay({ personId, onClose, onSelectMovie }: Person
           />
         )}
       </div>
-    </motion.div>
+    </motion.div>,
+    document.body
   );
 }

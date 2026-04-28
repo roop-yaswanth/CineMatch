@@ -3,6 +3,8 @@ import { Inter } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { SessionProvider } from "@/context/SessionContext";
+import AppBottomNav from "@/components/AppBottomNav";
+import RouteTransition from "@/components/ui/RouteTransition";
 import "./globals.css";
 
 const inter = Inter({
@@ -52,7 +54,8 @@ export default function RootLayout({
       </head>
       <body className="bg-[var(--color-bg)] text-[var(--color-text-primary)] antialiased">
         <SessionProvider>
-          {children}
+          <RouteTransition>{children}</RouteTransition>
+          <AppBottomNav />
         </SessionProvider>
         <Analytics />
         <SpeedInsights />

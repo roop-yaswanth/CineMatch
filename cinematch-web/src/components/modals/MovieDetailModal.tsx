@@ -1,7 +1,6 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState, useRef } from "react";
 import Image from "next/image";
-import Link from "next/link";
 import { createPortal } from "react-dom";
 import { posterUrl, languageLabel, apiSimilarMovies, apiCredits, type Recommendation, type CastMember, type CrewMember } from "@/lib/api";
 import { PersonDetailOverlay } from "./PersonDetailOverlay";
@@ -122,18 +121,23 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
       .finally(() => setSimilarLoading(false));
   }, [movie?.id, movie?.tmdb_id, isOpen, sessionId]);
 
-  // Fetch cast & crew whenever the movie changes
+  // Fetch cast & crew whenever the movie changes.
+  // The synchronous setState resets are intentional: when the user opens a
+  // different movie, we want stale credits cleared on the next paint, not on
+  // a deferred microtask.
   useEffect(() => {
     const id = movie?.tmdb_id ?? movie?.id;
     if (!isOpen || !id) {
+      /* eslint-disable react-hooks/set-state-in-effect */
       setCast([]); setDirectors([]); setWriters([]);
       setActivePersonId(null);
+      /* eslint-enable react-hooks/set-state-in-effect */
       return;
     }
     let cancelled = false;
     setCreditsLoading(true);
     setCast([]); setDirectors([]); setWriters([]);
-    
+
     apiCredits(id, "movie")
       .then((c) => {
         if (cancelled) return;
@@ -1285,13 +1289,22 @@ export function TrailerOverlay({
         background: "#000",
         boxShadow: "0 32px 80px rgba(0,0,0,0.8)",
       }}>
-        <iframe
-          src={`https://www.youtube.com/embed/${videoKey}?autoplay=1&playsinline=1&rel=0&modestbranding=1`}
-          title={`${title} trailer`}
-          allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-          allowFullScreen
-          style={{ width: "100%", height: "100%", border: "none", display: "block" }}
-        />
+        {/* Hardened YouTube embed:
+            - Validate the key (YouTube IDs are 11 chars [A-Za-z0-9_-]); refuse anything else.
+            - youtube-nocookie.com instead of youtube.com (privacy + matches CSP allow-list).
+            - Sandbox limits what the embed can do (no top-nav, no form posts, no popups).
+            - referrerpolicy avoids leaking our path to YouTube. */}
+        {/^[A-Za-z0-9_-]{11}$/.test(videoKey) && (
+          <iframe
+            src={`https://www.youtube-nocookie.com/embed/${videoKey}?autoplay=1&playsinline=1&rel=0&modestbranding=1`}
+            title={`${title} trailer`}
+            allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+            allowFullScreen
+            referrerPolicy="strict-origin-when-cross-origin"
+            sandbox="allow-scripts allow-same-origin allow-presentation"
+            style={{ width: "100%", height: "100%", border: "none", display: "block" }}
+          />
+        )}
       </div>
 
       {/* Tap-backdrop-to-close on mobile */}

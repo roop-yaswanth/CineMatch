@@ -8,6 +8,8 @@ import { motion } from "framer-motion";
 import dynamic from "next/dynamic";
 import { PersonContent } from "@/components/PersonProfileContent";
 import MobileMenu from "@/components/MobileMenu";
+import BackButton from "@/components/ui/BackButton";
+import EmptyState from "@/components/ui/EmptyState";
 import type { DetailMovie } from "@/components/modals/MovieDetailModal";
 
 const MovieDetailModal = dynamic(() => import("@/components/modals/MovieDetailModal"), { ssr: false });
@@ -83,16 +85,7 @@ export default function PersonPage() {
       {/* Header */}
       <header className="glass" style={{ position: "sticky", top: 0, zIndex: 40 }}>
         <div style={{ width: "100%", padding: "12px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <button
-            onClick={() => router.back()}
-            className="glass-button"
-            aria-label="Back"
-            style={{ width: "40px", height: "40px", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-text-primary)", padding: 0, cursor: "pointer" }}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="15 18 9 12 15 6" />
-            </svg>
-          </button>
+          <BackButton />
           <h1
             className="heading-display"
             style={{
@@ -119,9 +112,13 @@ export default function PersonPage() {
 
       <div className="app-container" style={{ flex: 1, width: "100%", padding: "24px 20px 80px", maxWidth: "1100px", margin: "0 auto" }}>
         {loading ? (
-          <div style={{ padding: "60px 0", textAlign: "center", color: "var(--color-text-muted)" }}>Loading…</div>
+          <PersonSkeleton />
         ) : !data ? (
-          <div style={{ padding: "60px 0", textAlign: "center", color: "var(--color-text-muted)" }}>Person not found.</div>
+          <EmptyState
+            title="Person not found"
+            description="We couldn't load this person's profile. They may have been removed from TMDB."
+            cta={{ kind: "link", href: "/dashboard", label: "Back to home" }}
+          />
         ) : (
           <PersonContent
             data={data}
@@ -141,6 +138,32 @@ export default function PersonPage() {
         sessionId={session?.session_id ?? null}
         userRegion={session?.profile?.region ?? null}
       />
+    </div>
+  );
+}
+
+/* Layout-matching skeleton — keeps the user oriented while data loads. */
+function PersonSkeleton() {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "minmax(220px, 280px) 1fr", gap: 32 }} className="person-grid">
+      <div style={{ width: "100%", aspectRatio: "2 / 3", borderRadius: 18, background: "rgba(255,255,255,0.04)", position: "relative", overflow: "hidden" }}>
+        <div className="skeleton-shimmer-overlay" />
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 14, minWidth: 0 }}>
+        <div style={{ height: 32, width: "60%", borderRadius: 8, background: "rgba(255,255,255,0.04)", position: "relative", overflow: "hidden" }}>
+          <div className="skeleton-shimmer-overlay" />
+        </div>
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} style={{ height: 12, width: `${90 - i * 10}%`, borderRadius: 6, background: "rgba(255,255,255,0.04)", position: "relative", overflow: "hidden" }}>
+            <div className="skeleton-shimmer-overlay" />
+          </div>
+        ))}
+      </div>
+      <style>{`
+        @media (max-width: 720px) {
+          .person-grid { grid-template-columns: 1fr !important; }
+        }
+      `}</style>
     </div>
   );
 }

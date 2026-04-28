@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+import { clientIp, createRateLimiter } from "@/lib/rate-limit";
 
 const HF_API_URL = process.env.HF_API_URL ?? "http://localhost:8000";
 const HF_TOKEN = process.env.HF_TOKEN ?? "";
 const MAX_BODY_BYTES = 1_000_000; // 1 MB hard cap on bodies forwarded upstream
+
+// Login is the most abuse-prone path (credential stuffing / enumeration). Cap
+// it tighter than other proxied endpoints. 10/min sustained, burst 5.
+const loginLimiter = createRateLimiter(5, 10 / 60);
+// All other proxied endpoints share a more generous bucket. 120/min sustained.
+const generalLimiter = createRateLimiter(40, 2);
 
 // Path segments must be alphanumeric / dash / underscore / dot. Blocks `..`,
 // encoded slashes, and any other path-traversal trickery.
@@ -31,6 +38,17 @@ async function proxy(
     }
   }
   const path = segments.join("/");
+
+  // Rate-limit by client IP. Login gets a tighter bucket than the rest.
+  const isLogin = segments[0] === "login";
+  const limiter = isLogin ? loginLimiter : generalLimiter;
+  const rl = limiter.check(clientIp(req));
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfterSeconds) } }
+    );
+  }
 
   // Re-serialize query params via URLSearchParams: this re-encodes any
   // sketchy characters and drops malformed pairs that browsers tolerate.

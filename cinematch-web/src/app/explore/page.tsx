@@ -8,6 +8,9 @@ import dynamic from "next/dynamic";
 import MovieCard from "@/components/MovieCard";
 import type { DetailMovie } from "@/components/modals/MovieDetailModal";
 import MobileMenu from "@/components/MobileMenu";
+import BackButton from "@/components/ui/BackButton";
+import EmptyState from "@/components/ui/EmptyState";
+import { SkeletonGrid, SkeletonRail } from "@/components/ui/Skeleton";
 
 const MovieDetailModal = dynamic(() => import("@/components/modals/MovieDetailModal"), { ssr: false });
 import { useSession } from "@/context/SessionContext";
@@ -151,16 +154,7 @@ export default function ExplorePage() {
       {/* Header */}
       <header className="glass" style={{ position: "sticky", top: 0, zIndex: 40 }}>
         <div style={{ width: "100%", padding: "12px 20px 10px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <button
-            onClick={() => router.push("/dashboard")}
-            className="glass-button"
-            aria-label="Back"
-            style={{ width: "40px", height: "40px", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-text-primary)", padding: 0, cursor: "pointer" }}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="15 18 9 12 15 6" />
-            </svg>
-          </button>
+          <BackButton href="/dashboard" />
 
           <h1
             className="heading-display"
@@ -293,13 +287,9 @@ function Rail({
       </div>
 
       {loading ? (
-        <div style={{ padding: "20px", color: "var(--color-text-muted)", fontSize: "13px", textAlign: "center" }}>
-          Loading…
-        </div>
+        <SkeletonRail count={6} />
       ) : movies.length === 0 ? (
-        <div style={{ padding: "20px", color: "var(--color-text-muted)", fontSize: "13px", textAlign: "center" }}>
-          Nothing here yet.
-        </div>
+        <EmptyState title="Nothing here yet" description="Check back soon — TMDB updates this list often." />
       ) : (
         <div
           style={{
@@ -344,10 +334,10 @@ function Grid({
   categoryId?: string;
 }) {
   if (movies.length === 0 && loading) {
-    return <div style={{ padding: "40px 20px", textAlign: "center", color: "var(--color-text-muted)" }}>Loading…</div>;
+    return <div style={{ padding: "0 20px" }}><SkeletonGrid count={12} /></div>;
   }
   if (movies.length === 0) {
-    return <div style={{ padding: "40px 20px", textAlign: "center", color: "var(--color-text-muted)" }}>Nothing here yet.</div>;
+    return <EmptyState title="No results" description="Try a different category or filter." />;
   }
   return (
     <div style={{ padding: "0 20px" }}>
@@ -593,9 +583,9 @@ function Discover({
 
       {/* Results */}
       {results.length === 0 && loading ? (
-        <div style={{ padding: "40px 0", textAlign: "center", color: "var(--color-text-muted)" }}>Loading…</div>
+        <SkeletonGrid count={12} />
       ) : results.length === 0 ? (
-        <div style={{ padding: "40px 0", textAlign: "center", color: "var(--color-text-muted)" }}>No results match those filters.</div>
+        <EmptyState title="No results" description="Try widening your filters or clearing the genre selection." cta={{ kind: "button", label: "Reset filters", onClick: reset }} />
       ) : (
         <>
           <div

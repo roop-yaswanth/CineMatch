@@ -8,6 +8,7 @@ import { motion } from "framer-motion";
 
 import dynamic from "next/dynamic";
 import MobileMenu from "@/components/MobileMenu";
+import BackButton from "@/components/ui/BackButton";
 import type { DetailMovie } from "@/components/modals/MovieDetailModal";
 import { useSession } from "@/context/SessionContext";
 
@@ -15,12 +16,17 @@ const MovieDetailModal = dynamic(() => import("@/components/modals/MovieDetailMo
 import {
   apiSearchMulti,
   languageLabel,
+  peekMultiSearchCache,
   posterUrl,
   type MultiSearchMovie,
   type MultiSearchPerson,
   type MultiSearchResponse,
   type MultiSearchTv,
 } from "@/lib/api";
+import { getRecentSearches, rememberRecentSearch, clearRecentSearches } from "@/lib/recent-searches";
+import HighlightedText from "@/components/ui/HighlightedText";
+import EmptyState from "@/components/ui/EmptyState";
+import { SkeletonGrid } from "@/components/ui/Skeleton";
 
 type Tab = "all" | "movies" | "tv" | "people";
 
@@ -48,39 +54,76 @@ function SearchPage() {
   const [query, setQuery] = useState(initialQ);
   const [debounced, setDebounced] = useState(initialQ);
   const [tab, setTab] = useState<Tab>("all");
-  // Tag results with the query they were fetched for; `loading` and the
-  // displayed `results` are derived without effect-driven setState.
-  const [resultRecord, setResultRecord] = useState<{ forQuery: string; data: MultiSearchResponse } | null>(null);
+  // Holds the most recent successful response. Crucially we keep showing the
+  // last results while the user types — only when *new* results land for the
+  // current query do we swap them in. No flash of empty state on every keystroke.
+  const [resultRecord, setResultRecord] = useState<{ forQuery: string; data: MultiSearchResponse } | null>(
+    () => {
+      // Seed from cache so a deep-link to ?q=… renders instantly with no fetch wait.
+      if (initialQ) {
+        const cached = peekMultiSearchCache(initialQ);
+        if (cached) return { forQuery: initialQ.trim(), data: cached };
+      }
+      return null;
+    }
+  );
   const [active, setActive] = useState<DetailMovie | null>(null);
+  const [recents, setRecents] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Debounce
+  // Debounce. Shorter (200ms) — the cache-peek covers cheap re-types; the
+  // debounce only matters for genuinely new fetches.
   useEffect(() => {
-    const t = setTimeout(() => setDebounced(query.trim()), 300);
+    const t = setTimeout(() => setDebounced(query.trim()), 200);
     return () => clearTimeout(t);
   }, [query]);
 
-  // Reflect query in URL
+  // Reflect query in URL.
   useEffect(() => {
     const url = debounced ? `/search?q=${encodeURIComponent(debounced)}` : "/search";
     window.history.replaceState(null, "", url);
   }, [debounced]);
 
-  // Fetch
+  // Synchronous cache-peek when the user's query changes — applies before the
+  // debounced fetch, so re-typing a recent query feels truly instant.
+  useEffect(() => {
+    if (!debounced) return;
+    const cached = peekMultiSearchCache(debounced);
+    if (cached) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setResultRecord({ forQuery: debounced, data: cached });
+    }
+  }, [debounced]);
+
+  // Fetch (de-duped + cached by apiSearchMulti).
   useEffect(() => {
     if (!debounced) return;
     let cancelled = false;
     apiSearchMulti(debounced)
-      .then((r) => { if (!cancelled) setResultRecord({ forQuery: debounced, data: r }); })
+      .then((r) => {
+        if (cancelled) return;
+        setResultRecord({ forQuery: debounced, data: r });
+        rememberRecentSearch(debounced);
+        setRecents(getRecentSearches());
+      })
       .catch(() => {});
     return () => { cancelled = true; };
   }, [debounced]);
 
-  const results: MultiSearchResponse = !debounced
-    ? { movies: [], tv: [], people: [] }
-    : resultRecord && resultRecord.forQuery === debounced
-    ? resultRecord.data
-    : { movies: [], tv: [], people: [] };
+  // Hydrate recents on mount.
+  useEffect(() => { setRecents(getRecentSearches()); }, []);
+
+  // While the user is typing, show stale results from the previous successful
+  // fetch. Loading indicator shows only when there's a true mismatch and we
+  // don't have anything to display yet.
+  const showingStale =
+    !!debounced && (!!resultRecord && resultRecord.forQuery !== debounced);
+  const results: MultiSearchResponse =
+    !debounced
+      ? { movies: [], tv: [], people: [] }
+      : resultRecord
+      ? resultRecord.data
+      : { movies: [], tv: [], people: [] };
   const loading =
     !!debounced && (!resultRecord || resultRecord.forQuery !== debounced);
 
@@ -112,16 +155,7 @@ function SearchPage() {
       {/* Header */}
       <header className="glass" style={{ position: "sticky", top: 0, zIndex: 40 }}>
         <div style={{ width: "100%", padding: "12px 20px 10px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <button
-            onClick={() => router.back()}
-            className="glass-button"
-            aria-label="Back"
-            style={{ width: "40px", height: "40px", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-text-primary)", padding: 0, cursor: "pointer" }}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="15 18 9 12 15 6" />
-            </svg>
-          </button>
+          <BackButton />
 
           <h1
             className="heading-display"
@@ -214,20 +248,30 @@ function SearchPage() {
       </header>
 
       {/* Body */}
-      <div className="app-container" style={{ flex: 1, width: "100%", padding: "20px 20px 80px" }}>
+      <div className="app-container" style={{ flex: 1, width: "100%", padding: "20px 20px 120px" }}>
         {!debounced ? (
-          <div style={{ padding: "60px 0", textAlign: "center", color: "var(--color-text-muted)" }}>
-            Search for movies, TV shows, or people.
-          </div>
+          <RecentSearchesPanel
+            recents={recents}
+            onPick={(q) => { setQuery(q); inputRef.current?.focus(); }}
+            onClear={() => { clearRecentSearches(); setRecents([]); }}
+          />
         ) : loading && totalCount === 0 ? (
-          <div style={{ padding: "40px 0", textAlign: "center", color: "var(--color-text-muted)" }}>Searching…</div>
+          <SkeletonGrid count={12} />
         ) : totalCount === 0 ? (
-          <div style={{ padding: "40px 0", textAlign: "center", color: "var(--color-text-muted)" }}>No results for &ldquo;{debounced}&rdquo;.</div>
+          <EmptyState
+            title={`No results for "${debounced}"`}
+            description="Try a different spelling or shorten the query."
+          />
         ) : (
-          <>
+          <div
+            style={{
+              opacity: showingStale ? 0.6 : 1,
+              transition: "opacity 160ms ease",
+            }}
+          >
             {(tab === "all" || tab === "movies") && results.movies.length > 0 && (
               <Section title={tab === "all" ? "Movies" : null}>
-                <MovieGrid movies={tab === "all" ? results.movies.slice(0, 12) : results.movies} onSelect={openMovie} />
+                <MovieGrid movies={tab === "all" ? results.movies.slice(0, 12) : results.movies} onSelect={openMovie} query={debounced} />
                 {tab === "all" && results.movies.length > 12 && (
                   <ShowMore label={`Show all ${results.movies.length} movies`} onClick={() => setTab("movies")} />
                 )}
@@ -235,7 +279,7 @@ function SearchPage() {
             )}
             {(tab === "all" || tab === "tv") && results.tv.length > 0 && (
               <Section title={tab === "all" ? "TV Shows" : null}>
-                <TvGrid items={tab === "all" ? results.tv.slice(0, 8) : results.tv} />
+                <TvGrid items={tab === "all" ? results.tv.slice(0, 8) : results.tv} query={debounced} />
                 {tab === "all" && results.tv.length > 8 && (
                   <ShowMore label={`Show all ${results.tv.length} TV results`} onClick={() => setTab("tv")} />
                 )}
@@ -243,13 +287,28 @@ function SearchPage() {
             )}
             {(tab === "all" || tab === "people") && results.people.length > 0 && (
               <Section title={tab === "all" ? "People" : null}>
-                <PeopleGrid people={tab === "all" ? results.people.slice(0, 8) : results.people} />
+                <PeopleGrid people={tab === "all" ? results.people.slice(0, 8) : results.people} query={debounced} />
                 {tab === "all" && results.people.length > 8 && (
                   <ShowMore label={`Show all ${results.people.length} people`} onClick={() => setTab("people")} />
                 )}
               </Section>
             )}
-          </>
+          </div>
+        )}
+
+        {/* Subtle inline loading bar visible while a fetch races for stale results. */}
+        {loading && totalCount > 0 && (
+          <div
+            aria-hidden
+            style={{
+              marginTop: 16,
+              height: 2,
+              borderRadius: 1,
+              background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent)",
+              backgroundSize: "200% 100%",
+              animation: "shimmer 1.2s linear infinite",
+            }}
+          />
         )}
       </div>
 
@@ -298,8 +357,63 @@ function ShowMore({ label, onClick }: { label: string; onClick: () => void }) {
   );
 }
 
+/* ─── Recent searches panel (empty input state) ─── */
+function RecentSearchesPanel({
+  recents,
+  onPick,
+  onClear,
+}: {
+  recents: string[];
+  onPick: (q: string) => void;
+  onClear: () => void;
+}) {
+  if (recents.length === 0) {
+    return (
+      <EmptyState
+        title="Find a movie, show, or person"
+        description="Search the CineMatch library plus everything on TMDB."
+      />
+    );
+  }
+  return (
+    <section style={{ padding: "20px 0" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+        <h2 style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--color-text-muted)", fontWeight: 600, margin: 0 }}>
+          Recent
+        </h2>
+        <button
+          onClick={onClear}
+          style={{ background: "none", border: "none", color: "var(--color-text-muted)", fontSize: 12, cursor: "pointer", padding: 4 }}
+        >
+          Clear
+        </button>
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+        {recents.map((r) => (
+          <button
+            key={r}
+            onClick={() => onPick(r)}
+            style={{
+              padding: "8px 14px",
+              borderRadius: 999,
+              border: "1px solid rgba(255,255,255,0.10)",
+              background: "rgba(28,30,36,0.66)",
+              color: "var(--color-text-primary)",
+              fontSize: 13,
+              cursor: "pointer",
+              transition: "background 160ms ease",
+            }}
+          >
+            {r}
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 /* ─── Movie grid ─── */
-function MovieGrid({ movies, onSelect }: { movies: MultiSearchMovie[]; onSelect: (m: MultiSearchMovie) => void }) {
+function MovieGrid({ movies, onSelect, query }: { movies: MultiSearchMovie[]; onSelect: (m: MultiSearchMovie) => void; query: string }) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: "20px 14px" }}>
       {movies.map((m) => (
@@ -316,7 +430,7 @@ function MovieGrid({ movies, onSelect }: { movies: MultiSearchMovie[]; onSelect:
           </div>
           <div style={{ padding: "8px 2px 0" }}>
             <div style={{ fontSize: "13px", fontWeight: 500, color: "var(--color-text-primary)", lineHeight: 1.25, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
-              {m.title}
+              <HighlightedText text={m.title} query={query} />
             </div>
             <div style={{ marginTop: "3px", fontSize: "11px", color: "var(--color-text-muted)" }}>
               {m.year || ""}{m.year && m.original_language ? " · " : ""}{m.original_language ? languageLabel(m.original_language) : ""}
@@ -329,7 +443,7 @@ function MovieGrid({ movies, onSelect }: { movies: MultiSearchMovie[]; onSelect:
 }
 
 /* ─── TV grid (TMDB only — open TMDB page in new tab) ─── */
-function TvGrid({ items }: { items: MultiSearchTv[] }) {
+function TvGrid({ items, query }: { items: MultiSearchTv[]; query: string }) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: "20px 14px" }}>
       {items.map((t) => (
@@ -350,7 +464,7 @@ function TvGrid({ items }: { items: MultiSearchTv[] }) {
           </div>
           <div style={{ padding: "8px 2px 0" }}>
             <div style={{ fontSize: "13px", fontWeight: 500, color: "var(--color-text-primary)", lineHeight: 1.25, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
-              {t.name}
+              <HighlightedText text={t.name} query={query} />
             </div>
             <div style={{ marginTop: "3px", fontSize: "11px", color: "var(--color-text-muted)" }}>
               {t.year || ""}{t.year && t.original_language ? " · " : ""}{t.original_language ? languageLabel(t.original_language) : ""}
@@ -363,7 +477,7 @@ function TvGrid({ items }: { items: MultiSearchTv[] }) {
 }
 
 /* ─── People grid ─── */
-function PeopleGrid({ people }: { people: MultiSearchPerson[] }) {
+function PeopleGrid({ people, query }: { people: MultiSearchPerson[]; query: string }) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: "24px 14px" }}>
       {people.map((p) => (
@@ -383,7 +497,7 @@ function PeopleGrid({ people }: { people: MultiSearchPerson[] }) {
           </div>
           <div style={{ padding: "10px 4px 0" }}>
             <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--color-text-primary)", lineHeight: 1.25 }}>
-              {p.name}
+              <HighlightedText text={p.name} query={query} />
             </div>
             {p.known_for_department && (
               <div style={{ marginTop: "3px", fontSize: "11px", color: "var(--color-text-muted)" }}>

@@ -767,6 +767,21 @@ textarea,
   }
 }
 
+/* Used by the shared <Skeleton*> components in components/ui/Skeleton.tsx.
+   A traveling sheen indicates "loading" without spinner-fatigue. */
+.skeleton-shimmer-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.06) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+}
+
 @keyframes glow-pulse {
 
   0%,

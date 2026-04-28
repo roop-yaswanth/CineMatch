@@ -5,6 +5,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import { apiGetHistory, languageLabel, type HistoryItem } from "@/lib/api";
 import { usePoster } from "@/lib/usePoster";
+import BackButton from "@/components/ui/BackButton";
+import EmptyState from "@/components/ui/EmptyState";
 
 interface Props {
   sessionId: string;
@@ -108,12 +110,15 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
   const [languageFilter, setLanguageFilter] = useState<string>("all");
 
   useEffect(() => {
-    // Always fetch fresh data on mount - don't rely on stale cache
+    // Standard data-fetch on mount. The synchronous setLoading calls are
+    // intentional — they reflect the initial fetch state. The set-state-in-effect
+    // rule flags this pattern but the alternative (tag-by-input pattern) is
+    // overkill for a single mount-time fetch keyed by sessionId.
+    /* eslint-disable react-hooks/set-state-in-effect */
     if (initialCache?.isFresh) {
       setLoading(false);
       return;
     }
-
     setLoading(true);
     apiGetHistory(sessionId)
       .then((data) => {
@@ -124,6 +129,7 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
       })
       .catch(console.error)
       .finally(() => setLoading(false));
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Extract unique genres and languages from items
@@ -206,23 +212,7 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <button
-              onClick={onClose}
-              style={{
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                color: "var(--color-text-muted)",
-                display: "flex",
-                alignItems: "center",
-                padding: "4px",
-              }}
-              aria-label="Go back"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="15 18 9 12 15 6" />
-              </svg>
-            </button>
+            <BackButton onClick={onClose} ariaLabel="Go back" />
             <span style={{ color: "var(--color-like)", display: "flex" }}>
               <IconHeart />
             </span>
@@ -324,28 +314,36 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
           )}
 
           {!loading && filteredItems.length === 0 && (
-            <div style={{ textAlign: "center", padding: "80px 0" }}>
-              <p
-                style={{
-                  fontSize: "16px",
-                  color: "var(--color-text-muted)",
-                  fontWeight: 400,
-                }}
-              >
-                No movies found.
-              </p>
-              <p
-                style={{
-                  fontSize: "13px",
-                  color: "var(--color-text-muted)",
-                  marginTop: "8px",
-                }}
-              >
-                {interactionFilter !== "all" || genreFilter !== "all" || languageFilter !== "all"
-                  ? "Try adjusting your filters"
-                  : "Rate some movies to see them here"}
-              </p>
-            </div>
+            (() => {
+              const hasFilters =
+                interactionFilter !== "all" ||
+                genreFilter !== "all" ||
+                languageFilter !== "all";
+              if (hasFilters) {
+                return (
+                  <EmptyState
+                    title="No matches"
+                    description="Try resetting one of the filters above to see more."
+                    cta={{
+                      kind: "button",
+                      label: "Reset filters",
+                      onClick: () => {
+                        setInteractionFilter("all");
+                        setGenreFilter("all");
+                        setLanguageFilter("all");
+                      },
+                    }}
+                  />
+                );
+              }
+              return (
+                <EmptyState
+                  title="Your collection is empty"
+                  description="Rate movies you've seen and add titles to your watchlist — they'll show up here."
+                  cta={{ kind: "link", href: "/explore", label: "Browse Trending" }}
+                />
+              );
+            })()
           )}
 
           {!loading && filteredItems.length > 0 && (
