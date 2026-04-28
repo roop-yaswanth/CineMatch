@@ -810,6 +810,30 @@ export default function RecommendationsView({
                       </div>
                     ))
                   )}
+                  {searchQuery.trim().length > 0 && !searchLoading && (
+                    <button
+                      onClick={() => {
+                        router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+                        setShowSearch(false);
+                        setSearchQuery("");
+                      }}
+                      style={{
+                        marginTop: "6px",
+                        width: "100%",
+                        textAlign: "center",
+                        padding: "10px",
+                        borderRadius: "8px",
+                        background: "rgba(255,255,255,0.06)",
+                        border: "1px solid rgba(255,255,255,0.10)",
+                        color: "var(--color-text-primary)",
+                        fontSize: "13px",
+                        fontWeight: 500,
+                        cursor: "pointer",
+                      }}
+                    >
+                      Search movies, TV &amp; people for &ldquo;{searchQuery.trim()}&rdquo; →
+                    </button>
+                  )}
                 </div>
               )}
             </div>

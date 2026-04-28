@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState, useRef } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { createPortal } from "react-dom";
 import { posterUrl, languageLabel, apiSimilarMovies, apiCredits, type Recommendation, type CastMember, type CrewMember } from "@/lib/api";
 import WatchProvidersPanel, { REGION_TO_COUNTRY } from "@/components/WatchProvidersPanel";
@@ -53,6 +54,7 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
   const [showTrailerPlayer, setShowTrailerPlayer] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const similarRowRef = useRef<HTMLDivElement>(null);
+  const castRowRef = useRef<HTMLDivElement>(null);
 
   // Treat phones + small tablets as compact layout
   useEffect(() => {
@@ -969,7 +971,14 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                           {directors.length > 1 ? "Directors" : "Director"}
                         </div>
                         <div style={{ color: "var(--color-text-primary)", fontWeight: 500 }}>
-                          {directors.map((d) => d.name).join(", ")}
+                          {directors.map((d, i) => (
+                            <span key={`${d.id}-${i}`}>
+                              <Link href={`/person/${d.id}`} style={{ color: "inherit", textDecoration: "none", borderBottom: "1px dotted rgba(255,255,255,0.25)" }}>
+                                {d.name}
+                              </Link>
+                              {i < directors.length - 1 ? ", " : ""}
+                            </span>
+                          ))}
                         </div>
                       </div>
                     )}
@@ -979,7 +988,22 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                           {writers.length > 1 ? "Writers" : "Writer"}
                         </div>
                         <div style={{ color: "var(--color-text-primary)", fontWeight: 500 }}>
-                          {Array.from(new Set(writers.map((w) => w.name))).slice(0, 4).join(", ")}
+                          {(() => {
+                            const seen = new Set<number>();
+                            const uniq = writers.filter((w) => {
+                              if (seen.has(w.id)) return false;
+                              seen.add(w.id);
+                              return true;
+                            }).slice(0, 4);
+                            return uniq.map((w, i) => (
+                              <span key={`${w.id}-${i}`}>
+                                <Link href={`/person/${w.id}`} style={{ color: "inherit", textDecoration: "none", borderBottom: "1px dotted rgba(255,255,255,0.25)" }}>
+                                  {w.name}
+                                </Link>
+                                {i < uniq.length - 1 ? ", " : ""}
+                              </span>
+                            ));
+                          })()}
                         </div>
                       </div>
                     )}
@@ -988,15 +1012,35 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
 
                 {(creditsLoading || cast.length > 0) && (
                   <div>
-                    <h4 style={{ margin: "0 0 12px", fontSize: "12px", textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--color-text-muted)", fontWeight: 600 }}>
-                      Cast
-                    </h4>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+                      <h4 style={{ margin: 0, fontSize: "12px", textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--color-text-muted)", fontWeight: 600 }}>
+                        Cast
+                      </h4>
+                      {!creditsLoading && cast.length > 0 && (
+                        <div style={{ display: "flex", gap: "6px" }}>
+                          <button
+                            onClick={() => castRowRef.current?.scrollBy({ left: -(window.innerWidth * 0.6), behavior: "smooth" })}
+                            aria-label="Scroll cast left"
+                            style={{ width: "28px", height: "28px", borderRadius: "50%", border: "1px solid var(--color-border-subtle)", background: "rgba(255,255,255,0.06)", color: "var(--color-text-secondary)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+                          </button>
+                          <button
+                            onClick={() => castRowRef.current?.scrollBy({ left: (window.innerWidth * 0.6), behavior: "smooth" })}
+                            aria-label="Scroll cast right"
+                            style={{ width: "28px", height: "28px", borderRadius: "50%", border: "1px solid var(--color-border-subtle)", background: "rgba(255,255,255,0.06)", color: "var(--color-text-secondary)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+                          </button>
+                        </div>
+                      )}
+                    </div>
                     {creditsLoading && cast.length === 0 ? (
                       <div style={{ color: "var(--color-text-muted)", fontSize: "13px", padding: "8px 0" }}>Loading…</div>
                     ) : (
-                      <div style={{ display: "flex", gap: "12px", overflowX: "auto", paddingBottom: "0", scrollbarWidth: "none", msOverflowStyle: "none" }}>
+                      <div ref={castRowRef} style={{ display: "flex", gap: "12px", overflowX: "auto", paddingBottom: "0", scrollbarWidth: "none", msOverflowStyle: "none" }}>
                         {cast.map((c) => (
-                          <div key={c.id} style={{ width: "92px", flexShrink: 0, textAlign: "center" }}>
+                          <Link key={c.id} href={`/person/${c.id}`} style={{ width: "92px", flexShrink: 0, textAlign: "center", textDecoration: "none", color: "inherit" }}>
                             <div style={{
                               width: "92px",
                               height: "92px",
@@ -1029,7 +1073,7 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                                 {c.character}
                               </div>
                             )}
-                          </div>
+                          </Link>
                         ))}
                       </div>
                     )}

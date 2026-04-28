@@ -20,6 +20,13 @@ const IconCompass = () => (
   </svg>
 );
 
+const IconSearch = () => (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="11" cy="11" r="8" />
+    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+  </svg>
+);
+
 const IconBookmark = () => (
   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
@@ -208,6 +215,11 @@ export default function MobileMenu({
               )}
 
               <div className="menu-divider" />
+
+              <button className="menu-btn" onClick={() => handleAction(() => router.push("/search"))}>
+                <span className="menu-btn-icon"><IconSearch /></span>
+                Search TMDB
+              </button>
 
               <button className="menu-btn" onClick={() => handleAction(() => router.push("/explore"))}>
                 <span className="menu-btn-icon"><IconCompass /></span>

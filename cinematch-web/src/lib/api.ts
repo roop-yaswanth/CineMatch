@@ -383,6 +383,42 @@ export interface SearchResponse {
   total: number;
 }
 
+export interface MultiSearchMovie extends SearchResult {
+  primary_genre?: string;
+  vote_average?: number;
+  source: "db" | "tmdb";
+}
+export interface MultiSearchTv {
+  tmdb_id: number;
+  name: string;
+  year?: number;
+  original_language?: string;
+  poster_path?: string;
+  backdrop_path?: string;
+  overview?: string;
+  genres: string[];
+  vote_average?: number;
+}
+export interface MultiSearchPerson {
+  tmdb_id: number;
+  name: string;
+  profile_path?: string;
+  known_for_department?: string;
+  popularity?: number;
+  known_for: Array<{ id: number; title: string; media_type?: string; poster_path?: string }>;
+}
+export interface MultiSearchResponse {
+  movies: MultiSearchMovie[];
+  tv: MultiSearchTv[];
+  people: MultiSearchPerson[];
+}
+
+export async function apiSearchMulti(query: string): Promise<MultiSearchResponse> {
+  const res = await fetch(`/api/search/multi?q=${encodeURIComponent(query)}`);
+  if (!res.ok) return { movies: [], tv: [], people: [] };
+  return res.json();
+}
+
 export async function apiSearchMovies(
   query: string,
   limit: number = 20
@@ -504,6 +540,45 @@ export interface CreditsResponse {
   cast: CastMember[];
   directors: CrewMember[];
   writers: CrewMember[];
+}
+
+export interface PersonCredit {
+  id: number;
+  tmdb_id: number;
+  title: string;
+  year?: number;
+  release_date?: string | null;
+  poster_path?: string;
+  media_type: "movie" | "tv";
+  character?: string | null;
+  job?: string | null;
+  department?: string | null;
+  vote_average?: number;
+  popularity?: number;
+}
+
+export interface PersonDetail {
+  id: number;
+  name: string;
+  biography: string;
+  birthday: string | null;
+  deathday: string | null;
+  place_of_birth: string | null;
+  gender: number;
+  known_for_department: string | null;
+  profile_path: string | null;
+  also_known_as: string[];
+  homepage: string | null;
+  imdb_id: string | null;
+  cast: PersonCredit[];
+  crew: PersonCredit[];
+  known_for: PersonCredit[];
+}
+
+export async function apiPerson(personId: number): Promise<PersonDetail | null> {
+  const res = await fetch(`/api/tmdb/person?id=${personId}`);
+  if (!res.ok) return null;
+  return res.json();
 }
 
 export async function apiCredits(tmdbId: number, kind: "movie" | "tv" = "movie"): Promise<CreditsResponse> {
