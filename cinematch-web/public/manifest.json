@@ -9,7 +9,7 @@
   "orientation": "portrait",
   "icons": [
     {
-      "src": "/globe.svg",
+      "src": "/vercel.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"

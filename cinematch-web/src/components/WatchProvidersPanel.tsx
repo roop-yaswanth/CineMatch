@@ -71,11 +71,7 @@ function countryLabel(iso: string): string {
   return `${flagEmoji(code)} ${countryName(code)}`;
 }
 
-/**
- * Convert a movie title to a JustWatch URL slug.
- * JustWatch accepts slugified titles and auto-redirects near-misses.
- * e.g. "Bāhubali 2: The Conclusion" → "bahubali-2-the-conclusion"
- */
+
 function toJustWatchSlug(title: string): string {
   return title
     .toLowerCase()
