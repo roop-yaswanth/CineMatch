@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { createPortal } from "react-dom";
 import { posterUrl, languageLabel, apiSimilarMovies, apiCredits, type Recommendation, type CastMember, type CrewMember } from "@/lib/api";
+import { PersonDetailOverlay } from "./PersonDetailOverlay";
 import WatchProvidersPanel, { REGION_TO_COUNTRY } from "@/components/WatchProvidersPanel";
 import { pushBackHandler } from "@/lib/backStack";
 
@@ -53,6 +54,7 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
   const [trailerLoading, setTrailerLoading] = useState(false);
   const [trailerFetched, setTrailerFetched] = useState(false);
   const [showTrailerPlayer, setShowTrailerPlayer] = useState(false);
+  const [activePersonId, setActivePersonId] = useState<number | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const similarRowRef = useRef<HTMLDivElement>(null);
   const castRowRef = useRef<HTMLDivElement>(null);
@@ -124,14 +126,14 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
   useEffect(() => {
     const id = movie?.tmdb_id ?? movie?.id;
     if (!isOpen || !id) {
-      setTimeout(() => { setCast([]); setDirectors([]); setWriters([]); }, 0);
+      setCast([]); setDirectors([]); setWriters([]);
+      setActivePersonId(null);
       return;
     }
     let cancelled = false;
-    setTimeout(() => {
-      setCreditsLoading(true);
-      setCast([]); setDirectors([]); setWriters([]);
-    }, 0);
+    setCreditsLoading(true);
+    setCast([]); setDirectors([]); setWriters([]);
+    
     apiCredits(id, "movie")
       .then((c) => {
         if (cancelled) return;
@@ -954,9 +956,12 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                         <div style={{ color: "var(--color-text-primary)", fontWeight: 500 }}>
                           {directors.map((d, i) => (
                             <span key={`${d.id}-${i}`}>
-                              <Link href={`/person/${d.id}`} style={{ color: "inherit", textDecoration: "none", borderBottom: "1px dotted rgba(255,255,255,0.25)" }}>
+                              <button
+                                onClick={() => setActivePersonId(d.id)}
+                                style={{ padding: 0, background: "none", borderBottom: "1px dotted rgba(255,255,255,0.25)", cursor: "pointer", color: "inherit", textDecoration: "none", fontSize: "inherit", fontFamily: "inherit" }}
+                              >
                                 {d.name}
-                              </Link>
+                              </button>
                               {i < directors.length - 1 ? ", " : ""}
                             </span>
                           ))}
@@ -978,9 +983,12 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                             }).slice(0, 4);
                             return uniq.map((w, i) => (
                               <span key={`${w.id}-${i}`}>
-                                <Link href={`/person/${w.id}`} style={{ color: "inherit", textDecoration: "none", borderBottom: "1px dotted rgba(255,255,255,0.25)" }}>
+                                <button
+                                  onClick={() => setActivePersonId(w.id)}
+                                  style={{ padding: 0, background: "none", borderBottom: "1px dotted rgba(255,255,255,0.25)", cursor: "pointer", color: "inherit", textDecoration: "none", fontSize: "inherit", fontFamily: "inherit" }}
+                                >
                                   {w.name}
-                                </Link>
+                                </button>
                                 {i < uniq.length - 1 ? ", " : ""}
                               </span>
                             ));
@@ -1021,7 +1029,14 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                     ) : (
                       <div ref={castRowRef} style={{ display: "flex", gap: "12px", overflowX: "auto", paddingBottom: "0", scrollbarWidth: "none", msOverflowStyle: "none" }}>
                         {cast.map((c) => (
-                          <Link key={c.id} href={`/person/${c.id}`} style={{ width: "92px", flexShrink: 0, textAlign: "center", textDecoration: "none", color: "inherit" }}>
+                          <button
+                            key={c.id}
+                            onClick={() => setActivePersonId(c.id)}
+                            style={{
+                              width: "92px", flexShrink: 0, textAlign: "center", textDecoration: "none", color: "inherit",
+                              background: "none", border: "none", padding: 0, cursor: "pointer", outline: "none", fontFamily: "inherit"
+                            }}
+                          >
                             <div style={{
                               width: "92px",
                               height: "92px",
@@ -1054,7 +1069,7 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                                 {c.character}
                               </div>
                             )}
-                          </Link>
+                          </button>
                         ))}
                       </div>
                     )}
@@ -1173,6 +1188,18 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
               </div>
             )}
 
+            <AnimatePresence>
+              {activePersonId && (
+                <PersonDetailOverlay
+                  personId={activePersonId}
+                  onClose={() => setActivePersonId(null)}
+                  onSelectMovie={(m) => {
+                    setActivePersonId(null);
+                    if (onMovieSelect) onMovieSelect(m);
+                  }}
+                />
+              )}
+            </AnimatePresence>
           </motion.div>
         </div>
       )}

@@ -192,8 +192,9 @@ interface RecsCache {
 }
 
 function readRecsCache(sessionId: string): RecsCache | null {
+  if (typeof window === "undefined") return null;
   try {
-    const raw = sessionStorage.getItem(`${RECS_CACHE_KEY}_${sessionId}`);
+    const raw = localStorage.getItem(`${RECS_CACHE_KEY}_${sessionId}`);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as RecsCache;
     if (!parsed || !Array.isArray(parsed.stacks) || Date.now() - parsed.ts > RECS_CACHE_TTL_MS) {
@@ -206,12 +207,13 @@ function readRecsCache(sessionId: string): RecsCache | null {
 }
 
 function writeRecsCache(sessionId: string, data: Omit<RecsCache, "ts">) {
+  if (typeof window === "undefined") return;
   try {
-    sessionStorage.setItem(
+    localStorage.setItem(
       `${RECS_CACHE_KEY}_${sessionId}`,
       JSON.stringify({ ...data, ts: Date.now() })
     );
-  } catch { /* sessionStorage full — non-critical */ }
+  } catch { /* localStorage full — non-critical */ }
 }
 
 export default function RecommendationsView({
