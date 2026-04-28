@@ -555,6 +555,7 @@ export interface PersonCredit {
   department?: string | null;
   vote_average?: number;
   popularity?: number;
+  overview?: string;
 }
 
 export interface PersonDetail {

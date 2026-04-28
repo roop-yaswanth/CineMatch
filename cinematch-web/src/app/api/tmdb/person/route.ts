@@ -19,6 +19,7 @@ interface TmdbCredit {
   vote_average?: number;
   media_type?: string;
   popularity?: number;
+  overview?: string;
 }
 
 export async function GET(req: NextRequest) {
@@ -58,6 +59,7 @@ export async function GET(req: NextRequest) {
         department: c.department || null,
         vote_average: c.vote_average,
         popularity: c.popularity,
+        overview: c.overview || undefined,
       };
     };
 

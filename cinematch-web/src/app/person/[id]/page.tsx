@@ -81,6 +81,7 @@ export default function PersonPage() {
         poster_path: c.poster_path,
         year: c.year,
         vote_average: c.vote_average,
+        overview: c.overview,
       });
     } else {
       window.open(`https://www.themoviedb.org/tv/${c.tmdb_id}`, "_blank", "noopener,noreferrer");
