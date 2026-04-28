@@ -79,6 +79,37 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
     };
   }, [isOpen]);
 
+  // Keep a stable ref to onClose so the history effect never re-runs just
+  // because the parent re-created the callback (e.g. after onMovieSelect).
+  const onCloseRef = useRef(onClose);
+  useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
+
+  // Browser-back gesture closes the modal (mobile back swipe + desktop back button).
+  // We push a sentinel history entry on open; popping it triggers onClose.
+  // The flag avoids treating our own history.back() in onClose as a "real" back-nav.
+  useEffect(() => {
+    if (!isOpen) return;
+    let dismissedByBack = false;
+    const sentinel = { __movieModal: true, ts: Date.now() };
+    window.history.pushState(sentinel, "");
+
+    const handlePop = () => {
+      dismissedByBack = true;
+      onCloseRef.current();
+    };
+    window.addEventListener("popstate", handlePop);
+
+    return () => {
+      window.removeEventListener("popstate", handlePop);
+      // If the modal was closed by anything other than a back-nav (X, swipe,
+      // backdrop click), pop the sentinel ourselves so the back button doesn't
+      // re-open the modal afterward.
+      if (!dismissedByBack && window.history.state && (window.history.state as { __movieModal?: boolean }).__movieModal) {
+        window.history.back();
+      }
+    };
+  }, [isOpen]); // ← intentionally NOT depending on onClose (captured via ref above)
+
   // Fetch similar movies whenever the movie changes
   useEffect(() => {
     const id = movie?.tmdb_id ?? movie?.id;
@@ -175,6 +206,112 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
     transition: "all 0.3s ease",
   };
 
+  // Watch Trailer node — extracted so it can sit at a fixed spot above the
+  // overview (consistent placement = muscle memory) instead of after it.
+  const trailerNode = (() => {
+    const notFound = trailerFetched && !trailerLoading && !trailerKey;
+    const isMultiLang = trailerLanguages.length > 1;
+
+    if (trailerLoading) {
+      return (
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "center",
+          gap: "10px", padding: "12px 18px", borderRadius: "12px",
+          background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
+          color: "var(--color-text-muted)", fontSize: "13px",
+        }}>
+          <div style={{
+            width: "14px", height: "14px", borderRadius: "50%",
+            border: "2px solid rgba(255,255,255,0.15)",
+            borderTopColor: "rgba(255,255,255,0.6)",
+            animation: "spin 0.8s linear infinite", flexShrink: 0,
+          }} />
+          <style>{"@keyframes spin{to{transform:rotate(360deg)}}"}</style>
+          <span>Finding trailer...</span>
+        </div>
+      );
+    }
+
+    if (notFound) {
+      return (
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "center",
+          gap: "8px", padding: "12px 18px", borderRadius: "12px",
+          background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)",
+          color: "rgba(255,255,255,0.35)", fontSize: "12px",
+        }}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+          <span>No trailer available</span>
+        </div>
+      );
+    }
+
+    if (isMultiLang) {
+      return (
+        <div>
+          <p style={{ margin: "0 0 8px", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.07em", color: "var(--color-text-muted)", opacity: 0.6 }}>
+            Watch Trailer in
+          </p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+            {trailerLanguages.map((tl) => {
+              const isActive = tl.key === selectedTrailerLang;
+              return (
+                <motion.button
+                  key={tl.lang}
+                  whileHover={{ scale: 1.04 }}
+                  whileTap={{ scale: 0.96 }}
+                  onClick={() => handleWatchTrailer(tl.key)}
+                  style={{
+                    display: "flex", alignItems: "center", gap: "6px",
+                    padding: "9px 16px", borderRadius: "100px",
+                    background: isActive ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.06)",
+                    border: `1px solid ${isActive ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.1)"}`,
+                    color: isActive ? "var(--color-text-primary)" : "var(--color-text-muted)",
+                    fontSize: "13px", fontWeight: isActive ? 600 : 500,
+                    cursor: "pointer", transition: "all 0.18s",
+                  }}
+                >
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" style={{ opacity: isActive ? 1 : 0.7 }}>
+                    <polygon points="5 3 19 12 5 21 5 3" />
+                  </svg>
+                  {tl.label}
+                </motion.button>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <motion.button
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.97 }}
+        onClick={() => handleWatchTrailer()}
+        style={{
+          display: "flex", alignItems: "center", justifyContent: "center",
+          gap: "10px", width: "100%", padding: "12px 18px", borderRadius: "12px",
+          background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)",
+          color: "var(--color-text-primary)", cursor: "pointer",
+          fontSize: "14px", fontWeight: 600, letterSpacing: "0.01em",
+        }}
+      >
+        <div style={{
+          width: "28px", height: "28px", borderRadius: "50%",
+          background: "rgba(255,255,255,0.12)",
+          display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+        }}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+            <polygon points="5 3 19 12 5 21 5 3" />
+          </svg>
+        </div>
+        <span>Watch Trailer</span>
+      </motion.button>
+    );
+  })();
+
   if (typeof document === 'undefined') return null;
 
   return createPortal(
@@ -196,7 +333,9 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={onClose}
+            // Only close when the backdrop itself is clicked, not when events
+            // bubble up from inside the modal (e.g. SimilarCard buttons).
+            onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
             style={{
               position: "absolute",
               inset: 0,
@@ -216,8 +355,8 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
               position: "relative",
               width: isMobile ? "100%" : "94vw",
               maxWidth: isMobile ? "100%" : "980px",
-              maxHeight: isMobile ? "100vh" : "92vh",
-              height: isMobile ? "100vh" : "auto",
+              maxHeight: isMobile ? "100dvh" : "92vh",
+              height: isMobile ? "100dvh" : "auto",
               minHeight: isMobile ? undefined : "72vh",
               borderRadius: isMobile ? "0" : undefined,
               boxShadow: isMobile ? "none" : "0 25px 80px -12px rgba(0, 0, 0, 0.8)",
@@ -226,32 +365,7 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
               flexDirection: "column",
             }}
           >
-            <button
-              onClick={onClose}
-              style={{
-                position: "absolute",
-                top: isMobile ? "calc(env(safe-area-inset-top) + 10px)" : "12px",
-                right: isMobile ? "10px" : "12px",
-                zIndex: 30,
-                background: "rgba(0,0,0,0.6)",
-                border: "none",
-                borderRadius: "50%",
-                width: "36px",
-                height: "36px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "#fff",
-                cursor: "pointer",
-                backdropFilter: "blur(4px)",
-                transition: "all 0.2s ease",
-              }}
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </button>
+            {/* No sticky header — close X lives on the poster itself (see below) */}
 
             {/* Content wrapper - no top padding to remove excess space */}
             <div style={{ display: "flex", flexDirection: "row", flexWrap: "wrap", position: "relative", zIndex: 1 }}>
@@ -274,7 +388,7 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                     // On compact screens: tall hero area with full poster visibility
                     // On desktop: maintain 2:3 aspect ratio, capped at 50vh.
                     ...(isMobile
-                      ? { height: "56vh", maxHeight: "560px", minHeight: "320px" }
+                      ? { height: "62vh", maxHeight: "620px", minHeight: "340px" }
                       : { aspectRatio: "2/3", maxHeight: "62vh" }),
                     width: "100%",
                     background: "var(--color-surface)",
@@ -283,113 +397,111 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                     boxShadow: isMobile ? "none" : "0 12px 32px -8px rgba(0,0,0,0.6)",
                   }}
                 >
-                  {isMobile && (
-                    <>
-                      <Image
-                        src={poster}
-                        alt=""
-                        aria-hidden
-                        fill
-                        style={{
-                          objectFit: "cover",
-                          objectPosition: "center center",
-                          filter: "blur(18px) saturate(1.15) brightness(0.52)",
-                          transform: "scale(1.08)",
-                        }}
-                        unoptimized
-                      />
-                      <div
-                        style={{
-                          position: "absolute",
-                          inset: 0,
-                          background: "linear-gradient(180deg, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0.22) 100%)",
-                          zIndex: 1,
-                        }}
-                      />
-                    </>
-                  )}
+                  {/* Unified poster area: blurred bg + sharp centred poster + buttons.
+                      Same layout on both mobile and desktop — no branching needed. */}
 
-                  {isMobile ? (
+                  {/* Blurred background fill (mobile only visually useful, harmless on desktop) */}
+                  <Image
+                    src={poster}
+                    alt=""
+                    aria-hidden
+                    fill
+                    style={{
+                      objectFit: "cover",
+                      objectPosition: "center center",
+                      filter: "blur(20px) saturate(1.1) brightness(0.45)",
+                      transform: "scale(1.08)",
+                      zIndex: 0,
+                    }}
+                    unoptimized
+                  />
+                  <div
+                    style={{
+                      position: "absolute",
+                      inset: 0,
+                      background: "linear-gradient(180deg, rgba(0,0,0,0.12) 0%, rgba(0,0,0,0.28) 100%)",
+                      zIndex: 1,
+                    }}
+                  />
+
+                  {/* Sharp centred poster */}
+                  <div
+                    style={{
+                      position: "absolute",
+                      inset: 0,
+                      zIndex: 2,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
                     <div
                       style={{
-                        position: "absolute",
-                        inset: 0,
-                        zIndex: 2,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        pointerEvents: "none",
+                        position: "relative",
+                        height: "100%",
+                        maxWidth: "100%",
+                        aspectRatio: "2 / 3",
                       }}
                     >
-                      <div
-                        style={{
-                          position: "relative",
-                          width: "auto",
-                          height: "100%",
-                          maxWidth: "100%",
-                          maxHeight: "100%",
-                          aspectRatio: "2 / 3",
-                          pointerEvents: "auto",
-                        }}
-                      >
-                        <Image
-                          src={poster}
-                          alt={movie.title}
-                          fill
-                          style={{ objectFit: "cover", objectPosition: "center center" }}
-                          unoptimized
-                        />
-
-                        {/* Watch Providers Button - Inside poster frame on mobile */}
-                        {(movie.tmdb_id ?? movie.id) > 0 && (
-                          <motion.button
-                            onClick={() => setShowWatchProviders((s) => !s)}
-                            whileHover={{ scale: 1.05, y: -1 }}
-                            whileTap={{ scale: 0.95 }}
-                            style={watchButtonStyle}
-                            aria-expanded={showWatchProviders}
-                          >
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                              <rect x="2" y="5" width="20" height="14" rx="3" ry="3" />
-                              <line x1="8" y1="3" x2="6" y2="5" />
-                              <line x1="13" y1="3" x2="11" y2="5" />
-                              <line x1="18" y1="3" x2="16" y2="5" />
-                              <polygon points="10,10 15,12 10,14" fill="currentColor" stroke="none" />
-                            </svg>
-                            <span>{showWatchProviders ? "Hide" : "Where to Watch"}</span>
-                          </motion.button>
-                        )}
-                      </div>
-                    </div>
-                  ) : (
-                    <>
                       <Image
                         src={poster}
                         alt={movie.title}
                         fill
-                        style={{ objectFit: "cover", objectPosition: "center center", zIndex: 2 }}
+                        style={{ objectFit: "cover", objectPosition: "center center" }}
                         unoptimized
                       />
+                    </div>
+                  </div>
 
-                      {(movie.tmdb_id ?? movie.id) > 0 && (
-                        <motion.button
-                          onClick={() => setShowWatchProviders((s) => !s)}
-                          whileHover={{ scale: 1.05, y: -1 }}
-                          whileTap={{ scale: 0.95 }}
-                          style={watchButtonStyle}
-                          aria-expanded={showWatchProviders}
-                        >
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                            <rect x="2" y="5" width="20" height="14" rx="3" ry="3" />
-                            <line x1="8" y1="3" x2="6" y2="5" />
-                            <line x1="13" y1="3" x2="11" y2="5" />
-                            <line x1="18" y1="3" x2="16" y2="5" />
-                            <polygon points="10,10 15,12 10,14" fill="currentColor" stroke="none" />
-                          </svg>
-                          <span>{showWatchProviders ? "Hide" : "Where to Watch"}</span>
-                        </motion.button>
-                      )}
-                    </>
+                  {/* Smart X button — floats top-right of the poster.
+                      Closes WatchProviders overlay if open, otherwise closes the modal. */}
+                  <button
+                    onClick={() => showWatchProviders ? setShowWatchProviders(false) : onClose()}
+                    aria-label={showWatchProviders ? "Close streaming info" : "Close"}
+                    style={{
+                      position: "absolute",
+                      top: isMobile ? "calc(env(safe-area-inset-top) + 10px)" : "10px",
+                      right: "10px",
+                      zIndex: 25,
+                      width: "32px",
+                      height: "32px",
+                      borderRadius: "50%",
+                      background: "rgba(0,0,0,0.55)",
+                      border: "1px solid rgba(255,255,255,0.18)",
+                      backdropFilter: "blur(8px)",
+                      WebkitBackdropFilter: "blur(8px)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "#fff",
+                      cursor: "pointer",
+                      transition: "background 0.2s",
+                    }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
+
+                  {/* Where to Watch button — same design on mobile + desktop */}
+                  {(movie.tmdb_id ?? movie.id) > 0 && (
+                    <motion.button
+                      onClick={() => setShowWatchProviders((s) => !s)}
+                      whileHover={{ scale: 1.05, y: -1 }}
+                      whileTap={{ scale: 0.95 }}
+                      style={watchButtonStyle}
+                      aria-expanded={showWatchProviders}
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="2" y="5" width="20" height="14" rx="3" ry="3" />
+                        <line x1="8" y1="3" x2="6" y2="5" />
+                        <line x1="13" y1="3" x2="11" y2="5" />
+                        <line x1="18" y1="3" x2="16" y2="5" />
+                        <polygon points="10,10 15,12 10,14" fill="currentColor" stroke="none" />
+                      </svg>
+                      <span>{showWatchProviders ? "Hide" : "Where to Watch"}</span>
+                    </motion.button>
                   )}
 
                   {/* Watch Providers Overlay on Poster */}
@@ -406,46 +518,22 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                         WebkitBackdropFilter: "blur(14px) saturate(1.35) brightness(1.06)",
                         display: "flex",
                         flexDirection: "column",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        padding: "16px",
+                        padding: isMobile ? "calc(env(safe-area-inset-top) + 10px) 16px 16px" : "16px",
                         zIndex: 20,
                         borderRadius: isMobile ? "0" : "12px",
                         border: "1px solid rgba(255, 255, 255, 0.14)",
+                        overflowY: "auto",
                       }}
                     >
                       <motion.div
                         initial={{ scale: 0.9, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
                         transition={{ type: "spring", damping: 20 }}
-                        style={{
-                          width: "100%",
-                          maxHeight: "80%",
-                          overflowY: "auto",
-                        }}
+                        style={{ width: "100%" }}
                       >
-                        <div style={{ marginBottom: "12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        {/* Header row: title + close button always visible */}
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
                           <h3 style={{ margin: 0, fontSize: "14px", fontWeight: 600, color: "#fff" }}>Where to Watch</h3>
-                          <button
-                            onClick={() => setShowWatchProviders(false)}
-                            style={{
-                              background: "rgba(255,255,255,0.1)",
-                              border: "none",
-                              borderRadius: "50%",
-                              width: "28px",
-                              height: "28px",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              color: "#fff",
-                              cursor: "pointer",
-                            }}
-                          >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                              <line x1="18" y1="6" x2="6" y2="18" />
-                              <line x1="6" y1="6" x2="18" y2="18" />
-                            </svg>
-                          </button>
                         </div>
                         <WatchProvidersPanel
                           tmdbId={(movie.tmdb_id ?? movie.id) as number}
@@ -527,6 +615,9 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                   )}
                 </div>
 
+                {/* Watch Trailer — fixed position above overview for muscle memory */}
+                {trailerNode}
+
                 <div style={{ fontSize: "13px", lineHeight: 1.6, color: "var(--color-text-secondary)" }}>
                   {overview}
                 </div>
@@ -547,116 +638,6 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                     </p>
                   </div>
                 )}
-
-                {/* Watch Trailer — single button or multilingual pill group */}
-                {(() => {
-                  const notFound = trailerFetched && !trailerLoading && !trailerKey;
-                  const isMultiLang = trailerLanguages.length > 1;
-
-                  // ── Loading state ──────────────────────────────────────────
-                  if (trailerLoading) {
-                    return (
-                      <div style={{
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        gap: "10px", padding: "14px 20px", borderRadius: "12px",
-                        background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
-                        color: "var(--color-text-muted)", fontSize: "14px",
-                      }}>
-                        <div style={{
-                          width: "15px", height: "15px", borderRadius: "50%",
-                          border: "2px solid rgba(255,255,255,0.15)",
-                          borderTopColor: "rgba(255,255,255,0.6)",
-                          animation: "spin 0.8s linear infinite", flexShrink: 0,
-                        }} />
-                        <style>{"@keyframes spin{to{transform:rotate(360deg)}}"}</style>
-                        <span>Finding trailer...</span>
-                      </div>
-                    );
-                  }
-
-                  // ── Not found ──────────────────────────────────────────────
-                  if (notFound) {
-                    return (
-                      <div style={{
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        gap: "8px", padding: "13px 20px", borderRadius: "12px",
-                        background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)",
-                        color: "rgba(255,255,255,0.25)", fontSize: "13px",
-                      }}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-                        </svg>
-                        <span>No trailer available</span>
-                      </div>
-                    );
-                  }
-
-                  // ── Multilingual pills ─────────────────────────────────────
-                  if (isMultiLang) {
-                    return (
-                      <div>
-                        <p style={{ margin: "0 0 8px", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.07em", color: "var(--color-text-muted)", opacity: 0.6 }}>
-                          Watch Trailer in
-                        </p>
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-                          {trailerLanguages.map((tl) => {
-                            const isActive = tl.key === selectedTrailerLang;
-                            return (
-                              <motion.button
-                                key={tl.lang}
-                                whileHover={{ scale: 1.04 }}
-                                whileTap={{ scale: 0.96 }}
-                                onClick={() => handleWatchTrailer(tl.key)}
-                                style={{
-                                  display: "flex", alignItems: "center", gap: "6px",
-                                  padding: "9px 16px", borderRadius: "100px",
-                                  background: isActive ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.06)",
-                                  border: `1px solid ${isActive ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.1)"}`,
-                                  color: isActive ? "var(--color-text-primary)" : "var(--color-text-muted)",
-                                  fontSize: "13px", fontWeight: isActive ? 600 : 500,
-                                  cursor: "pointer", transition: "all 0.18s",
-                                }}
-                              >
-                                <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" style={{ opacity: isActive ? 1 : 0.7 }}>
-                                  <polygon points="5 3 19 12 5 21 5 3" />
-                                </svg>
-                                {tl.label}
-                              </motion.button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  // ── Single language / idle ─────────────────────────────────
-                  return (
-                    <motion.button
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.97 }}
-                      onClick={() => handleWatchTrailer()}
-                      style={{
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        gap: "10px", width: "100%", padding: "14px 20px", borderRadius: "12px",
-                        background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)",
-                        color: "var(--color-text-primary)", cursor: "pointer",
-                        fontSize: "14px", fontWeight: 600, letterSpacing: "0.01em",
-                      }}
-                    >
-                      <div style={{
-                        width: "32px", height: "32px", borderRadius: "50%",
-                        background: "rgba(255,255,255,0.12)",
-                        display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-                      }}>
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
-                          <polygon points="5 3 19 12 5 21 5 3" />
-                        </svg>
-                      </div>
-                      <span>Watch Trailer</span>
-                    </motion.button>
-                  );
-                })()}
-
 
                 {onAction && (
                     <div style={{ marginTop: "auto", paddingTop: "16px", borderTop: "1px solid var(--color-border-subtle)" }}>

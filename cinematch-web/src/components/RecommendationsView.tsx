@@ -555,7 +555,10 @@ export default function RecommendationsView({
         flexDirection: "column",
         fontFamily: "var(--font-sans)",
         width: "100%",
-        maxWidth: "100vw",
+        // Note: don't use 100vw here — vw units don't scale with html { zoom },
+        // so on desktop the page would only fill 85% of physical viewport.
+        // width: 100% inherits correctly from the zoomed html element.
+        maxWidth: "100%",
         overflowX: "hidden",
         position: "relative",
       }}
@@ -647,7 +650,7 @@ export default function RecommendationsView({
               <div style={{ position: "relative" }}>
                 <input
                   type="text"
-                  placeholder="Search movies, directors, languages..."
+                  placeholder="Search Movies...."
                   value={searchQuery}
                   onChange={(e) => handleSearch(e.target.value)}
                   style={{

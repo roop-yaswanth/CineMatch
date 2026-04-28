@@ -491,7 +491,7 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
 
       <div className="onboarding-rating-layout" style={{
         display: "flex", flexDirection: "column", alignItems: "center",
-        position: "fixed", inset: 0, padding: "16px 16px",
+        position: "fixed", inset: 0, padding: "10px 12px 12px",
         fontFamily: "var(--font-sans)", width: "100%", overflow: "hidden",
       }}>
         {/* Header */}
@@ -580,7 +580,7 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
                   custom={lastSwipe}
                   variants={cardVariants}
                   initial="enter" animate="center" exit="exit"
-                  style={{ width: "clamp(260px, min(75vw, 55vh), 540px)", maxWidth: "100%", cursor: "grab", touchAction: "none", position: "relative", borderRadius: "var(--radius-poster)", boxShadow: cardGlow }}
+                  style={{ width: "clamp(220px, min(72vw, 36vh), 460px)", maxWidth: "100%", maxHeight: "100%", cursor: "grab", touchAction: "none", position: "relative", borderRadius: "var(--radius-poster)", boxShadow: cardGlow }}
                   drag
                   dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
                   dragElastic={0.65}
