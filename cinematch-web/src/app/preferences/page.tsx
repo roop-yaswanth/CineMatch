@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import PreferencesModal from "@/components/PreferencesModal";
 import { useSession } from "@/context/SessionContext";
@@ -9,7 +9,6 @@ import { preferencesFromProfile, type RecommendationPreferences } from "@/lib/ap
 export default function PreferencesPage() {
   const router = useRouter();
   const { session, isLoading } = useSession();
-  const [preferences, setPreferences] = useState<RecommendationPreferences | null>(null);
 
   // Route protection
   useEffect(() => {
@@ -18,12 +17,12 @@ export default function PreferencesPage() {
     }
   }, [session, isLoading, router]);
 
-  // Initialize preferences from session profile
-  useEffect(() => {
-    if (session) {
-      setPreferences(preferencesFromProfile(session.profile));
-    }
-  }, [session]);
+  // Preferences are derived directly from the session profile — no local state
+  // is needed (PreferencesModal owns its own draft state internally).
+  const preferences: RecommendationPreferences | null = useMemo(
+    () => (session ? preferencesFromProfile(session.profile) : null),
+    [session]
+  );
 
   const handleUpdate = (prefs: RecommendationPreferences) => {
     // Store updated preferences in sessionStorage so the dashboard can pick them up

@@ -267,7 +267,7 @@ function HistoryItemCard({
           fill
           sizes="44px"
           className="object-cover"
-          unoptimized
+
         />
       </div>
 

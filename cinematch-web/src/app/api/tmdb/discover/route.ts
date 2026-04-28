@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getGenreMap, REGION_TO_ISO } from "@/lib/tmdb-server";
+import { getGenreMap, parseBoundedInt, REGION_TO_ISO, tmdbCacheHeaders } from "@/lib/tmdb-server";
 
 const TMDB_BEARER = process.env.TMDB_BEARER_TOKEN || "";
 const TMDB_HEADERS = {
@@ -45,14 +45,15 @@ export async function GET(req: NextRequest) {
 
   const params = new URLSearchParams({
     language: "en-US",
-    page: sp.get("page") || "1",
+    page: String(parseBoundedInt(sp.get("page"), 1, 500, 1)),
     sort_by: sort,
     include_adult: "false",
     include_video: "false",
   });
 
+  // with_genres: comma-separated list of TMDB genre ids; allow only digits + commas.
   const genres = sp.get("with_genres");
-  if (genres) params.set("with_genres", genres);
+  if (genres && /^[0-9]+(,[0-9]+){0,30}$/.test(genres)) params.set("with_genres", genres);
 
   const year = sp.get("year");
   if (year && /^\d{4}$/.test(year)) params.set("primary_release_year", year);
@@ -62,15 +63,23 @@ export async function GET(req: NextRequest) {
   if (yearFrom && /^\d{4}$/.test(yearFrom)) params.set("primary_release_date.gte", `${yearFrom}-01-01`);
   if (yearTo && /^\d{4}$/.test(yearTo)) params.set("primary_release_date.lte", `${yearTo}-12-31`);
 
+  // Language code: 2-letter ISO 639-1 only.
   const lang = sp.get("with_original_language");
-  if (lang) params.set("with_original_language", lang);
+  if (lang && /^[a-z]{2}$/.test(lang)) params.set("with_original_language", lang);
 
+  // Numeric thresholds: bounded floats / ints to prevent injection.
   const minVoteAvg = sp.get("vote_average_gte");
-  if (minVoteAvg) params.set("vote_average.gte", minVoteAvg);
+  if (minVoteAvg && /^[0-9]+(\.[0-9])?$/.test(minVoteAvg)) {
+    const v = Number(minVoteAvg);
+    if (v >= 0 && v <= 10) params.set("vote_average.gte", String(v));
+  }
 
   const minVoteCount = sp.get("vote_count_gte");
-  if (minVoteCount) params.set("vote_count.gte", minVoteCount);
-  else if (sort.startsWith("vote_average")) params.set("vote_count.gte", "300"); // sane default
+  if (minVoteCount && /^[0-9]{1,7}$/.test(minVoteCount)) {
+    params.set("vote_count.gte", minVoteCount);
+  } else if (sort.startsWith("vote_average")) {
+    params.set("vote_count.gte", "300"); // sane default
+  }
 
   const region = sp.get("region") || "";
   const iso = REGION_TO_ISO[region];
@@ -111,11 +120,10 @@ export async function GET(req: NextRequest) {
         primary_genre: gn[0],
       };
     });
-    return NextResponse.json({
-      results,
-      page: data.page,
-      total_pages: data.total_pages,
-    });
+    return NextResponse.json(
+      { results, page: data.page, total_pages: data.total_pages },
+      { headers: tmdbCacheHeaders(1800) }
+    );
   } catch {
     return NextResponse.json({ error: "TMDB fetch failed" }, { status: 502 });
   }

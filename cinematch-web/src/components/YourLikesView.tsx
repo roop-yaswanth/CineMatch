@@ -97,8 +97,10 @@ const IconHeart = () => (
 
 export default function YourLikesView({ sessionId, onClose, initialFilter = "all" }: Props) {
   const initialCache = readHistoryCache(sessionId);
+  // Always start in loading state when there's no fresh cache data
+  // This prevents the "No movies found" flash before API responds
   const [items, setItems] = useState<HistoryListItem[]>(() => initialCache?.data ?? []);
-  const [loading, setLoading] = useState(!initialCache);
+  const [loading, setLoading] = useState(!initialCache?.isFresh);
   
   // Filters
   const [interactionFilter, setInteractionFilter] = useState<InteractionFilter>(initialFilter);
@@ -106,8 +108,13 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
   const [languageFilter, setLanguageFilter] = useState<string>("all");
 
   useEffect(() => {
-    if (initialCache?.isFresh) return;
+    // Always fetch fresh data on mount - don't rely on stale cache
+    if (initialCache?.isFresh) {
+      setLoading(false);
+      return;
+    }
 
+    setLoading(true);
     apiGetHistory(sessionId)
       .then((data) => {
         setItems(data);
@@ -117,7 +124,7 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [sessionId, initialCache]);
+  }, [sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Extract unique genres and languages from items
   const { genres, languages } = useMemo(() => {
@@ -459,7 +466,7 @@ function MovieCard({ item, idx }: { item: HistoryItem; idx: number }) {
           fill
           sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 20vw"
           className="object-cover"
-          unoptimized
+
         />
         
         {/* Rating Badge */}

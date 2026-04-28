@@ -14,7 +14,10 @@ import { AnimatePresence, motion } from "framer-motion";
 import Image from "next/image";
 
 
-import MovieDetailModal, { type DetailMovie } from "@/components/modals/MovieDetailModal";
+import dynamic from "next/dynamic";
+import type { DetailMovie } from "@/components/modals/MovieDetailModal";
+
+const MovieDetailModal = dynamic(() => import("@/components/modals/MovieDetailModal"), { ssr: false });
 import MobileMenu from "@/components/MobileMenu";
 import {
   apiMultiRecommendations,
@@ -49,6 +52,46 @@ interface Stack {
   subtitle: string;
   movies: Recommendation[];
 }
+
+// ── Language keyword extractor ──────────────────────────────────────────────
+// Allows queries like "rebel telugu", "parasite korean", "intouchables french"
+// to be interpreted as: search "rebel" and boost/filter by language "te".
+const LANG_KEYWORDS: Record<string, string> = {
+  telugu: "te", hindi: "hi", tamil: "ta", malayalam: "ml", kannada: "kn",
+  marathi: "mr", bengali: "bn", gujarati: "gu", punjabi: "pa", urdu: "ur",
+  korean: "ko", japanese: "ja", chinese: "zh", mandarin: "zh", cantonese: "cn",
+  french: "fr", spanish: "es", german: "de", italian: "it", portuguese: "pt",
+  russian: "ru", arabic: "ar", turkish: "tr", thai: "th", indonesian: "id",
+  persian: "fa", farsi: "fa", swedish: "sv", danish: "da", dutch: "nl",
+  polish: "pl", ukrainian: "uk", greek: "el", hebrew: "he", english: "en",
+};
+
+function extractLangKeyword(query: string): { cleanQuery: string; langCode: string | null; year: number | null } {
+  let working = query;
+  let langCode: string | null = null;
+  let year: number | null = null;
+
+  // Detect language keyword
+  const tokens = working.toLowerCase().split(/\s+/);
+  for (const token of tokens) {
+    const code = LANG_KEYWORDS[token];
+    if (code) {
+      langCode = code;
+      working = working.replace(new RegExp(`\\b${token}\\b`, "gi"), "").replace(/\s{2,}/g, " ").trim();
+      break;
+    }
+  }
+
+  // Detect 4-digit year (1888–2099)
+  const yearMatch = working.match(/\b(18[89]\d|19\d{2}|20\d{2})\b/);
+  if (yearMatch) {
+    year = parseInt(yearMatch[1], 10);
+    working = working.replace(yearMatch[0], "").replace(/\s{2,}/g, " ").trim();
+  }
+
+  return { cleanQuery: working || query, langCode, year };
+}
+// ────────────────────────────────────────────────────────────────────────────
 
 function toDetailMovie(movie: Recommendation): DetailMovie {
   return { ...movie };
@@ -198,7 +241,9 @@ export default function RecommendationsView({
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
+  const [showSearchOverlay, setShowSearchOverlay] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   // Detail Modal state
   const [activeMovie, setActiveMovie] = useState<DetailMovie | null>(null);
@@ -248,15 +293,32 @@ export default function RecommendationsView({
       setSearchLoading(true);
       setShowSearch(true);
       try {
-        const resp = await apiSearchMovies(query.trim(), 15);
-        setSearchResults(resp.results);
+        // Detect language keywords ("telugu", "hindi", "korean") and 4-digit years
+        // from the query. E.g. "rebel telugu 2012" → search "rebel", lang="te", year=2012.
+        const { cleanQuery, langCode, year } = extractLangKeyword(query.trim());
+        const resp = await apiSearchMovies(cleanQuery, 15);
+
+        // Re-sort: apply language boost then year proximity boost
+        let results = resp.results;
+        if (langCode) {
+          const match = results.filter((r) => r.original_language === langCode);
+          const rest  = results.filter((r) => r.original_language !== langCode);
+          results = [...match, ...rest];
+        }
+        if (year) {
+          // Float exact/near-year matches (±1) to the very top within each language group
+          const exact = results.filter((r) => r.year && Math.abs(r.year - year) <= 1);
+          const other = results.filter((r) => !r.year || Math.abs(r.year - year) > 1);
+          results = [...exact, ...other];
+        }
+        setSearchResults(results);
       } catch (err) {
         console.error("Search error:", err);
         setSearchResults([]);
       } finally {
         setSearchLoading(false);
       }
-    }, 1500); // 1.5s debounce — only call after user stops typing
+    }, 250); // 250ms debounce — fast search
   }, []);
 
   const applyFilters = useCallback((arr: Recommendation[], prefs: RecommendationPreferences): Recommendation[] => {
@@ -572,24 +634,191 @@ export default function RecommendationsView({
           }}
         >
 
-          {/* Search Backdrop Scrim — lives OUTSIDE header so it covers all stacks */}
-          {showSearch && (
+          {/* ─── Full-Page Search Overlay ─── */}
+          {showSearchOverlay && (
             <div
-              onClick={() => {
-                setShowSearch(false);
-                setSearchQuery("");
-                setSearchResults([]);
-              }}
               style={{
                 position: "fixed",
                 inset: 0,
-                zIndex: 39,
-                background: "rgba(0, 0, 0, 0.80)",
-                backdropFilter: "blur(6px)",
-                WebkitBackdropFilter: "blur(6px)",
+                zIndex: 9000,
+                background: "rgba(8, 8, 12, 0.96)",
+                backdropFilter: "blur(32px) saturate(1.2)",
+                WebkitBackdropFilter: "blur(32px) saturate(1.2)",
+                display: "flex",
+                flexDirection: "column",
+                padding: "env(safe-area-inset-top, 0px) 0 0 0",
               }}
-            />
+            >
+              {/* Overlay header with search input */}
+              <div style={{
+                padding: "16px 20px 12px",
+                display: "flex",
+                alignItems: "center",
+                gap: "12px",
+                borderBottom: "1px solid rgba(255,255,255,0.08)",
+              }}>
+                {/* Back / close */}
+                <button
+                  onClick={() => {
+                    setShowSearchOverlay(false);
+                    setSearchQuery("");
+                    setSearchResults([]);
+                    setShowSearch(false);
+                  }}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    color: "var(--color-text-muted)",
+                    display: "flex",
+                    alignItems: "center",
+                    padding: "6px",
+                    flexShrink: 0,
+                  }}
+                  aria-label="Close search"
+                >
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="15 18 9 12 15 6" />
+                  </svg>
+                </button>
+
+                {/* Search input */}
+                <div style={{ flex: 1, position: "relative" }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}>
+                    <circle cx="11" cy="11" r="8" />
+                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                  </svg>
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    placeholder="Search movies, shows, people…"
+                    value={searchQuery}
+                    autoFocus
+                    onChange={(e) => handleSearch(e.target.value)}
+                    style={{
+                      width: "100%",
+                      padding: "13px 44px 13px 44px",
+                      borderRadius: "14px",
+                      border: "1px solid rgba(255,255,255,0.15)",
+                      background: "rgba(255,255,255,0.07)",
+                      color: "var(--color-text-primary)",
+                      fontSize: "16px",
+                      fontWeight: 400,
+                      letterSpacing: "-0.005em",
+                      outline: "none",
+                    }}
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => { setSearchQuery(""); setSearchResults([]); setShowSearch(false); }}
+                      style={{
+                        position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)",
+                        background: "rgba(255,255,255,0.15)", border: "none", cursor: "pointer",
+                        padding: "3px", borderRadius: "50%", color: "rgba(255,255,255,0.7)",
+                        width: "22px", height: "22px", display: "flex", alignItems: "center", justifyContent: "center",
+                      }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Results area */}
+              <div style={{ flex: 1, overflowY: "auto", padding: "8px 12px" }}>
+                {/* Query hint */}
+                {searchQuery && !searchLoading && (
+                  <div style={{ padding: "10px 8px 4px", fontSize: "12px", color: "var(--color-text-muted)", fontWeight: 500 }}>
+                    {searchQuery}
+                  </div>
+                )}
+
+                {searchLoading && (
+                  <div style={{ padding: "40px", textAlign: "center", color: "var(--color-text-muted)" }}>Searching…</div>
+                )}
+
+                {!searchLoading && searchQuery && searchResults.length === 0 && (
+                  <div style={{ padding: "40px", textAlign: "center", color: "var(--color-text-muted)" }}>No results for &ldquo;{searchQuery}&rdquo;</div>
+                )}
+
+                {!searchLoading && searchResults.map((movie) => (
+                  <div
+                    key={movie.tmdb_id}
+                    style={{
+                      display: "flex",
+                      gap: "14px",
+                      padding: "12px 12px",
+                      borderRadius: "14px",
+                      background: "transparent",
+                      cursor: "pointer",
+                      borderBottom: "1px solid rgba(255,255,255,0.05)",
+                      transition: "background 0.15s ease",
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                    onClick={() => {
+                      setActiveMovie({ ...movie, id: movie.tmdb_id });
+                      setShowSearchOverlay(false);
+                      setSearchQuery("");
+                      setSearchResults([]);
+                    }}
+                  >
+                    <div style={{ width: "52px", height: "78px", borderRadius: "8px", overflow: "hidden", flexShrink: 0, background: "rgba(255,255,255,0.06)" }}>
+                      {movie.poster_path && (
+                        <Image src={posterUrl(movie.poster_path, "w92")} alt={movie.title} width={52} height={78} style={{ objectFit: "cover", width: "100%", height: "100%" }} />
+                      )}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", justifyContent: "center" }}>
+                      <div style={{ fontWeight: 600, color: "var(--color-text-primary)", fontSize: "15px", marginBottom: "4px" }}>{movie.title}</div>
+                      <div style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>
+                        {[movie.original_language ? languageLabel(movie.original_language) : null, movie.year].filter(Boolean).join(" · ")}
+                      </div>
+                      {movie.imdb_rating && (
+                        <div style={{ fontSize: "11px", color: "#fbbf24", marginTop: "4px" }}>IMDb {movie.imdb_rating.toFixed(1)}</div>
+                      )}
+                    </div>
+                    {/* Play icon */}
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: "rgba(255,255,255,0.35)" }}>
+                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                        <circle cx="12" cy="12" r="10" />
+                        <polygon points="10 8 16 12 10 16 10 8" fill="currentColor" stroke="none" />
+                      </svg>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Full search link */}
+                {searchQuery.trim().length > 0 && !searchLoading && (
+                  <button
+                    onClick={() => {
+                      router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+                      setShowSearchOverlay(false);
+                      setSearchQuery("");
+                    }}
+                    style={{
+                      marginTop: "12px",
+                      width: "100%",
+                      textAlign: "center",
+                      padding: "12px",
+                      borderRadius: "12px",
+                      background: "rgba(255,255,255,0.06)",
+                      border: "1px solid rgba(255,255,255,0.10)",
+                      color: "var(--color-text-primary)",
+                      fontSize: "13px",
+                      fontWeight: 500,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Search movies, TV &amp; people for &ldquo;{searchQuery.trim()}&rdquo; →
+                  </button>
+                )}
+              </div>
+            </div>
           )}
+
           {/* Header */}
           <header
             className="glass"
@@ -602,18 +831,22 @@ export default function RecommendationsView({
             <div
               style={{
                 width: "100%",
-                padding: "12px 20px 10px",
+                padding: "12px 16px 12px",
                 display: "flex",
                 alignItems: "center",
-                justifyContent: "space-between",
+                position: "relative",   // needed for absolute title centering
               }}
             >
-              <div style={{ width: "40px", flexShrink: 0 }} />
+              {/* Left: empty flex spacer */}
+              <div style={{ flex: 1 }} />
 
+              {/* Center: title — absolutely positioned so it's always truly centered */}
               <h1
                 className="heading-display"
                 style={{
-                  flex: 1,
+                  position: "absolute",
+                  left: "50%",
+                  transform: "translateX(-50%)",
                   fontSize: "21px",
                   fontWeight: 700,
                   letterSpacing: "-0.035em",
@@ -622,220 +855,72 @@ export default function RecommendationsView({
                   WebkitTextFillColor: "transparent",
                   backgroundClip: "text",
                   margin: 0,
-                  textAlign: "center",
+                  whiteSpace: "nowrap",
+                  pointerEvents: "none",
                 }}
               >
                 CineMatch
               </h1>
 
-              <div style={{ width: "40px", flexShrink: 0, display: "flex", justifyContent: "flex-end" }}>
-                <div>
-                  <MobileMenu
-                    onLogout={onLogout}
-                    onReset={onBackToOnboarding}
-                    onPreferences={openPrefs}
-                    onYourLikes={openYourLikes}
-                    onWatchlist={openWatchlist}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Search Bar */}
-            <div style={{ padding: "0 20px 14px", position: "relative", zIndex: 41 }}>
-              <div style={{ position: "relative" }}>
-                <input
-                  type="text"
-                  placeholder="Search Movies...."
-                  value={searchQuery}
-                  onChange={(e) => handleSearch(e.target.value)}
+              {/* Right: search + hamburger */}
+              <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "4px" }}>
+                {/* Desktop mini search box — hidden on mobile via CSS */}
+                <button
+                  className="header-search-box"
+                  onClick={() => setShowSearchOverlay(true)}
                   style={{
-                    width: "100%",
-                    padding: "12px 40px 12px 42px",
-                    borderRadius: "14px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    padding: "8px 14px 8px 12px",
+                    borderRadius: "10px",
                     border: "1px solid rgba(255,255,255,0.12)",
-                    background: "rgba(28, 30, 36, 0.82)",
-                    backdropFilter: "blur(24px) saturate(1.5)",
-                    WebkitBackdropFilter: "blur(24px) saturate(1.5)",
-                    color: "var(--color-text-primary)",
-                    fontSize: "15px",
-                    fontWeight: 400,
-                    letterSpacing: "-0.005em",
-                    outline: "none",
-                    boxShadow: "0 1px 0 0 rgba(255,255,255,0.06) inset, 0 2px 12px rgba(0,0,0,0.4)",
-                    transition: "border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease",
+                    background: "rgba(255,255,255,0.06)",
+                    color: "rgba(255,255,255,0.45)",
+                    fontSize: "13px",
+                    cursor: "pointer",
+                    minWidth: "220px",
+                    textAlign: "left",
                   }}
-                  onFocus={(e) => {
-                    e.currentTarget.style.borderColor = "rgba(255,255,255,0.30)";
-                    e.currentTarget.style.background = "rgba(36, 38, 46, 0.92)";
-                    e.currentTarget.style.boxShadow = "0 1px 0 0 rgba(255,255,255,0.06) inset, 0 0 0 3px rgba(255,255,255,0.10)";
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)";
-                    e.currentTarget.style.background = "rgba(28, 30, 36, 0.82)";
-                    e.currentTarget.style.boxShadow = "0 1px 0 0 rgba(255,255,255,0.06) inset, 0 2px 12px rgba(0,0,0,0.4)";
-                  }}
-                />
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="var(--color-text-muted)"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)" }}
                 >
-                  <circle cx="11" cy="11" r="8" />
-                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                </svg>
-                {searchQuery && (
-                  <button
-                    onClick={() => {
-                      setSearchQuery("");
-                      setSearchResults([]);
-                      setShowSearch(false);
-                    }}
-                    style={{
-                      position: "absolute",
-                      right: "12px",
-                      top: "50%",
-                      transform: "translateY(-50%)",
-                      background: "none",
-                      border: "none",
-                      cursor: "pointer",
-                      padding: "4px",
-                      color: "var(--color-text-muted)",
-                    }}
-                  >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="18" y1="6" x2="6" y2="18" />
-                      <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
-                  </button>
-                )}
-              </div>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="11" cy="11" r="8" />
+                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                  </svg>
+                  Search…
+                </button>
 
-              {/* Search Results Dropdown */}
-              {showSearch && (
-                <div
+                {/* Mobile search icon only */}
+                <button
+                  className="header-search-icon"
+                  onClick={() => setShowSearchOverlay(true)}
+                  aria-label="Search"
                   style={{
-                    position: "absolute",
-                    top: "calc(100% + 6px)",
-                    left: "20px",
-                    right: "20px",
-                    maxHeight: "420px",
-                    overflowY: "auto",
-                    zIndex: 50,
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    color: "var(--color-text-primary)",
                     padding: "6px",
-                    background: "rgba(10, 12, 18, 0.74)",
-                    backdropFilter: "blur(72px) saturate(1.25)",
-                    WebkitBackdropFilter: "blur(72px) saturate(1.25)",
-                    borderRadius: "16px",
-                    border: "1px solid rgba(255,255,255,0.18)",
-                    boxShadow: "0 12px 36px rgba(0,0,0,0.62), 0 1px 0 0 rgba(255,255,255,0.08) inset",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
                   }}
                 >
-                  {searchLoading ? (
-                    <div style={{ padding: "20px", textAlign: "center", color: "var(--color-text-muted)" }}>
-                      Searching...
-                    </div>
-                  ) : searchResults.length === 0 ? (
-                    <div style={{ padding: "20px", textAlign: "center", color: "var(--color-text-muted)" }}>
-                      No movies found
-                    </div>
-                  ) : (
-                    searchResults.map((movie) => (
-                      <div
-                        key={movie.tmdb_id}
-                        style={{
-                          display: "flex",
-                          gap: "12px",
-                          padding: "10px 12px",
-                          borderRadius: "10px",
-                          background: "rgba(12, 14, 22, 0.58)",
-                          cursor: "pointer",
-                          transition: "background 0.15s ease",
-                        }}
-                        onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(24, 27, 38, 0.78)"; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(12, 14, 22, 0.58)"; }}
-                        onClick={() => {
-                          setActiveMovie({ ...movie, id: movie.tmdb_id });
-                          setShowSearch(false);
-                          setSearchQuery("");
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: "48px",
-                            height: "72px",
-                            borderRadius: "6px",
-                            overflow: "hidden",
-                            flexShrink: 0,
-                            background: "var(--color-bg)",
-                          }}
-                        >
-                          {movie.poster_path && (
-                            <Image
-                              src={posterUrl(movie.poster_path, "w92")}
-                              alt={movie.title}
-                              width={48}
-                              height={72}
-                              style={{ objectFit: "cover" }}
-                              unoptimized
-                            />
-                          )}
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontWeight: 600, color: "var(--color-text-primary)", fontSize: "14px" }}>
-                            {movie.title}
-                          </div>
-                          <div style={{ fontSize: "12px", color: "var(--color-text-muted)", marginTop: "2px" }}>
-                            {movie.year && <span>{movie.year}</span>}
-                            {movie.year && movie.original_language && <span> · </span>}
-                            {movie.original_language && <span>{languageLabel(movie.original_language)}</span>}
-                          </div>
-                          {movie.imdb_rating && (
-                            <div style={{ fontSize: "11px", color: "#fbbf24", marginTop: "4px" }}>
-                              IMDb {movie.imdb_rating.toFixed(1)} ({movie.imdb_votes?.toLocaleString()} votes)
-                            </div>
-                          )}
-                          {movie.genres && movie.genres.length > 0 && (
-                            <div style={{ fontSize: "11px", color: "var(--color-text-muted)", marginTop: "2px" }}>
-                              {movie.genres.join(", ")}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))
-                  )}
-                  {searchQuery.trim().length > 0 && !searchLoading && (
-                    <button
-                      onClick={() => {
-                        router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
-                        setShowSearch(false);
-                        setSearchQuery("");
-                      }}
-                      style={{
-                        marginTop: "6px",
-                        width: "100%",
-                        textAlign: "center",
-                        padding: "10px",
-                        borderRadius: "8px",
-                        background: "rgba(255,255,255,0.06)",
-                        border: "1px solid rgba(255,255,255,0.10)",
-                        color: "var(--color-text-primary)",
-                        fontSize: "13px",
-                        fontWeight: 500,
-                        cursor: "pointer",
-                      }}
-                    >
-                      Search movies, TV &amp; people for &ldquo;{searchQuery.trim()}&rdquo; →
-                    </button>
-                  )}
-                </div>
-              )}
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="11" cy="11" r="8" />
+                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                  </svg>
+                </button>
+
+                {/* Hamburger menu — right of search */}
+                <MobileMenu
+                  onLogout={onLogout}
+                  onReset={onBackToOnboarding}
+                  onPreferences={openPrefs}
+                  onYourLikes={openYourLikes}
+                  onWatchlist={openWatchlist}
+                />
+              </div>
             </div>
           </header>
 
@@ -1097,6 +1182,21 @@ function StackDetailView({
       document.body.style.overflow = originalOverflow;
     };
   }, []);
+
+  // Push a fake history entry so PWA back-swipe closes the overlay
+  // instead of navigating away from the app entirely.
+  useEffect(() => {
+    window.history.pushState({ stackDetail: true }, "");
+    const handlePop = (e: PopStateEvent) => {
+      // Only intercept if we pushed this state (not an actual route change)
+      if (!e.state?.stackDetail) return;
+      onBack();
+    };
+    window.addEventListener("popstate", handlePop);
+    return () => {
+      window.removeEventListener("popstate", handlePop);
+    };
+  }, [onBack]);
 
   const content = (
     <motion.div
@@ -1592,7 +1692,7 @@ function PosterCard({
           >
             {/* The Image Header (Poster or Backdrop) */}
             <div style={{ position: "relative", width: "100%", height: expandedImgHeight, flexShrink: 0 }}>
-              <Image src={hasBackdrop ? backdrop : poster} alt={movie.title} fill sizes="400px" style={{ objectFit: "cover", objectPosition: "center 20%" }} unoptimized />
+              <Image src={hasBackdrop ? backdrop : poster} alt={movie.title} fill sizes="400px" style={{ objectFit: "cover", objectPosition: "center 20%" }} />
               <div style={{ position: "absolute", bottom: -2, left: 0, right: 0, height: "65%", background: "linear-gradient(to top, #18191c 0%, rgba(24,25,28,0.95) 20%, rgba(24,25,28,0.6) 50%, rgba(24,25,28,0) 100%)", pointerEvents: "none" }} />
               {imdb && (
                 <div style={{ position: "absolute", top: "12px", right: "12px", padding: "4px 8px", borderRadius: "8px", background: "rgba(0,0,0,0.7)", fontSize: "11px", fontWeight: 700, color: "#e8c84a", display: "flex", alignItems: "center", gap: "4px", boxShadow: "0 4px 12px rgba(0,0,0,0.4)" }}>
@@ -1670,7 +1770,7 @@ function PosterCard({
           className="poster-container"
           style={{ position: "relative", aspectRatio: "2 / 3", borderRadius: "12px", overflow: "hidden", background: "transparent", cursor: "pointer", border: "1px solid transparent", transition: "border-color 0.22s ease" }}
         >
-          <Image src={poster} alt={movie.title} fill sizes="(max-width: 640px) 48vw, 180px" style={{ objectFit: "cover" }} unoptimized priority={priority} />
+          <Image src={poster} alt={movie.title} fill sizes="(max-width: 640px) 48vw, 180px" style={{ objectFit: "cover" }} priority={priority} />
           {imdb && (
             <div style={{ position: "absolute", top: "8px", right: "8px", padding: "4px 8px", borderRadius: "8px", background: "rgba(0,0,0,0.82)", fontSize: "10px", fontWeight: 700, color: "#e8c84a", display: "flex", alignItems: "center", gap: "3px" }}>
               <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>

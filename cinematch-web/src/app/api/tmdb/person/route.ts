@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { parseTmdbId, tmdbCacheHeaders } from "@/lib/tmdb-server";
 
 const TMDB_BEARER = process.env.TMDB_BEARER_TOKEN || "";
 const TMDB_HEADERS = {
@@ -23,8 +24,8 @@ interface TmdbCredit {
 }
 
 export async function GET(req: NextRequest) {
-  const id = req.nextUrl.searchParams.get("id");
-  if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
+  const id = parseTmdbId(req.nextUrl.searchParams.get("id"));
+  if (!id) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   if (!TMDB_BEARER) return NextResponse.json({ error: "TMDB not configured" }, { status: 503 });
 
   try {
@@ -71,23 +72,26 @@ export async function GET(req: NextRequest) {
       .sort((a, b) => (b.popularity || 0) - (a.popularity || 0))
       .slice(0, 12);
 
-    return NextResponse.json({
-      id: person.id,
-      name: person.name,
-      biography: person.biography || "",
-      birthday: person.birthday || null,
-      deathday: person.deathday || null,
-      place_of_birth: person.place_of_birth || null,
-      gender: person.gender,
-      known_for_department: person.known_for_department || null,
-      profile_path: person.profile_path || null,
-      also_known_as: person.also_known_as || [],
-      homepage: person.homepage || null,
-      imdb_id: person.imdb_id || null,
-      cast,
-      crew,
-      known_for: knownFor,
-    });
+    return NextResponse.json(
+      {
+        id: person.id,
+        name: person.name,
+        biography: person.biography || "",
+        birthday: person.birthday || null,
+        deathday: person.deathday || null,
+        place_of_birth: person.place_of_birth || null,
+        gender: person.gender,
+        known_for_department: person.known_for_department || null,
+        profile_path: person.profile_path || null,
+        also_known_as: person.also_known_as || [],
+        homepage: person.homepage || null,
+        imdb_id: person.imdb_id || null,
+        cast,
+        crew,
+        known_for: knownFor,
+      },
+      { headers: tmdbCacheHeaders(86400) }
+    );
   } catch {
     return NextResponse.json({ error: "TMDB fetch failed" }, { status: 502 });
   }

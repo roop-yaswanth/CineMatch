@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getGenreMap } from "@/lib/tmdb-server";
+import { getGenreMap, sanitizeQuery, tmdbCacheHeaders } from "@/lib/tmdb-server";
 
 const TMDB_BEARER = process.env.TMDB_BEARER_TOKEN || "";
 const HF_API_URL = process.env.HF_API_URL ?? "http://localhost:8000";
@@ -9,6 +9,79 @@ const TMDB_HEADERS = {
   Authorization: `Bearer ${TMDB_BEARER}`,
   accept: "application/json",
 };
+
+// ── Language keyword detection ────────────────────────────────────────────────
+// Maps common language names / demonyms to TMDB ISO 639-1 codes.
+const LANG_KEYWORD_MAP: Record<string, string> = {
+  telugu: "te",
+  hindi: "hi",
+  tamil: "ta",
+  malayalam: "ml",
+  kannada: "kn",
+  marathi: "mr",
+  bengali: "bn",
+  gujarati: "gu",
+  punjabi: "pa",
+  urdu: "ur",
+  korean: "ko",
+  japanese: "ja",
+  chinese: "zh",
+  mandarin: "zh",
+  cantonese: "cn",
+  french: "fr",
+  spanish: "es",
+  german: "de",
+  italian: "it",
+  portuguese: "pt",
+  russian: "ru",
+  arabic: "ar",
+  turkish: "tr",
+  thai: "th",
+  indonesian: "id",
+  persian: "fa",
+  farsi: "fa",
+  swedish: "sv",
+  danish: "da",
+  dutch: "nl",
+  polish: "pl",
+  ukrainian: "uk",
+  greek: "el",
+  hebrew: "he",
+  english: "en",
+};
+
+/**
+ * Detects a language keyword and/or 4-digit year anywhere in the query string.
+ * Returns { cleanQuery, langCode, year } — cleanQuery has keywords/year removed.
+ */
+function extractLangFromQuery(raw: string): { cleanQuery: string; langCode: string | null; year: number | null } {
+  let working = raw;
+  let langCode: string | null = null;
+  let year: number | null = null;
+
+  // Language keyword detection
+  const lower = working.toLowerCase();
+  const tokens = lower.split(/\s+/);
+  for (const token of tokens) {
+    const code = LANG_KEYWORD_MAP[token];
+    if (code) {
+      langCode = code;
+      working = working.replace(new RegExp(`\\b${token}\\b`, "gi"), "").replace(/\s{2,}/g, " ").trim();
+      break;
+    }
+  }
+
+  // Year detection (1888–2099)
+  const yearMatch = working.match(/\b(18[89]\d|19\d{2}|20\d{2})\b/);
+  if (yearMatch) {
+    year = parseInt(yearMatch[1], 10);
+    working = working.replace(yearMatch[0], "").replace(/\s{2,}/g, " ").trim();
+  }
+
+  return { cleanQuery: working || raw, langCode, year };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 interface DbMovieResult {
   tmdb_id: number;
@@ -60,9 +133,11 @@ interface TmdbPerson {
   known_for?: Array<{ id: number; title?: string; name?: string; media_type?: string; poster_path?: string | null }>;
 }
 
-async function searchDbMovies(q: string, limit: number): Promise<DbMovieResult[]> {
+async function searchDbMovies(q: string, limit: number, langCode?: string | null): Promise<DbMovieResult[]> {
   try {
-    const url = `${HF_API_URL}/api/search?q=${encodeURIComponent(q)}&limit=${limit}`;
+    const params = new URLSearchParams({ q, limit: String(limit) });
+    if (langCode) params.set("language", langCode);
+    const url = `${HF_API_URL}/api/search?${params.toString()}`;
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
       ...(HF_TOKEN ? { Authorization: `Bearer ${HF_TOKEN}` } : {}),
@@ -76,7 +151,7 @@ async function searchDbMovies(q: string, limit: number): Promise<DbMovieResult[]
   }
 }
 
-async function searchTmdb(kind: "movie" | "tv" | "person", q: string) {
+async function searchTmdb(kind: "movie" | "tv" | "person", q: string, langCode?: string | null, year?: number | null) {
   if (!TMDB_BEARER) return [];
   try {
     const params = new URLSearchParams({
@@ -85,6 +160,13 @@ async function searchTmdb(kind: "movie" | "tv" | "person", q: string) {
       language: "en-US",
       page: "1",
     });
+    // TMDB supports with_original_language for movie/tv searches
+    if (langCode && kind !== "person") {
+      params.set("with_original_language", langCode);
+    }
+    // TMDB supports year filtering for movies, first_air_date_year for TV
+    if (year && kind === "movie") params.set("year", String(year));
+    if (year && kind === "tv") params.set("first_air_date_year", String(year));
     const res = await fetch(
       `https://api.themoviedb.org/3/search/${kind}?${params.toString()}`,
       { headers: TMDB_HEADERS, next: { revalidate: 600 } }
@@ -98,14 +180,18 @@ async function searchTmdb(kind: "movie" | "tv" | "person", q: string) {
 }
 
 export async function GET(req: NextRequest) {
-  const q = (req.nextUrl.searchParams.get("q") || "").trim();
-  if (!q) return NextResponse.json({ movies: [], tv: [], people: [] });
+  const rawQ = sanitizeQuery(req.nextUrl.searchParams.get("q"), 500);
+  if (!rawQ) return NextResponse.json({ movies: [], tv: [], people: [] });
+
+  // Detect and strip language keyword + year (e.g. "rebel telugu 2012" → query="rebel", lang="te", year=2012)
+  const { cleanQuery: q, langCode, year } = extractLangFromQuery(rawQ);
 
   const [dbMovies, tmdbMovies, tmdbTv, tmdbPeople, genreMap] = await Promise.all([
-    searchDbMovies(q, 20),
-    searchTmdb("movie", q),
-    searchTmdb("tv", q),
-    searchTmdb("person", q),
+    searchDbMovies(q, 20, langCode),
+    searchTmdb("movie", q, langCode, year),
+    searchTmdb("tv", q, langCode, year),
+    // People search: still use full raw query so language/year words don't break actor lookups
+    searchTmdb("person", rawQ),
     getGenreMap(),
   ]);
 
@@ -131,10 +217,25 @@ export async function GET(req: NextRequest) {
         source: "tmdb" as const,
       };
     });
-  const mergedMovies = [
+
+  let mergedMovies = [
     ...dbMovies.map((m) => ({ ...m, source: "db" as const })),
     ...fallback,
   ];
+
+  // If a language was detected, boost same-language results to the top.
+  // Results that DON'T match the target language are demoted to the end.
+  if (langCode) {
+    const matching = mergedMovies.filter((m) => m.original_language === langCode);
+    const others = mergedMovies.filter((m) => m.original_language !== langCode);
+    mergedMovies = [...matching, ...others];
+  }
+  // Year boost: float ±1 year matches to the very top within language group
+  if (year) {
+    const exact = mergedMovies.filter((m) => m.year && Math.abs(m.year - year) <= 1);
+    const other = mergedMovies.filter((m) => !m.year || Math.abs(m.year - year) > 1);
+    mergedMovies = [...exact, ...other];
+  }
 
   const tv = (tmdbTv as TmdbTv[]).map((t) => {
     const dateStr = t.first_air_date || "";
@@ -167,5 +268,8 @@ export async function GET(req: NextRequest) {
     })),
   }));
 
-  return NextResponse.json({ movies: mergedMovies, tv, people });
+  return NextResponse.json(
+    { movies: mergedMovies, tv, people },
+    { headers: tmdbCacheHeaders(600) }
+  );
 }

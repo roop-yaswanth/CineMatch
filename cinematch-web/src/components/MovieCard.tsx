@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import Image from "next/image";
 import {
   languageLabel,
+  prefetchMovieDetails,
   recommendationId,
   type Movie,
   type Recommendation,
@@ -24,7 +25,11 @@ interface Props {
 }
 
 export default function MovieCard({ movie, priority = false, className = "", compact = false, overlay = false, noLayout = false, showFullDate = false }: Props) {
-  const poster = usePoster(movie.poster_path, recommendationId(movie), "w780");
+  // Pick the smallest TMDB size that still looks crisp on the rendered card.
+  // compact rails ≈ 130–140px, default cards ≈ 360px hero. Account for 2×/3×
+  // DPR by going one size up.
+  const posterSize = compact ? "w342" : "w500";
+  const poster = usePoster(movie.poster_path, recommendationId(movie), posterSize);
   
   let fullDate = "";
   if (showFullDate && "release_date" in movie && movie.release_date) {
@@ -63,7 +68,7 @@ export default function MovieCard({ movie, priority = false, className = "", com
             priority={priority}
             sizes={compact ? "(max-width: 640px) 45vw, 20vw" : "(max-width: 640px) 85vw, 360px"}
             className="object-cover"
-            unoptimized
+
           />
           
           {/* Gradient overlay at bottom */}
@@ -111,6 +116,7 @@ export default function MovieCard({ movie, priority = false, className = "", com
       layout={!noLayout}
       whileHover={{ scale: 1.03, y: -4 }}
       transition={{ type: "spring", stiffness: 300, damping: 20 }}
+      onHoverStart={() => prefetchMovieDetails(recommendationId(movie))}
       className={`relative flex flex-col items-center no-select ${className}`}
     >
       {/* Poster */}
@@ -125,7 +131,7 @@ export default function MovieCard({ movie, priority = false, className = "", com
           priority={priority}
           sizes={compact ? "(max-width: 640px) 45vw, 20vw" : "(max-width: 640px) 85vw, 360px"}
           className="object-cover"
-          unoptimized
+
         />
       </div>
 

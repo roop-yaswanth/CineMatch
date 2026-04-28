@@ -48,7 +48,7 @@ export default function RootLayout({
     <html lang="en" className={`${inter.variable}`} suppressHydrationWarning>
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-        <meta name="theme-color" content="#1C1C1E" />
+        <meta name="theme-color" content="#000000" />
       </head>
       <body className="bg-[var(--color-bg)] text-[var(--color-text-primary)] antialiased">
         <SessionProvider>
@@ -56,7 +56,21 @@ export default function RootLayout({
         </SessionProvider>
         <Analytics />
         <SpeedInsights />
+        {/* PWA Service Worker Registration */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ('serviceWorker' in navigator) {
+                window.addEventListener('load', function() {
+                  navigator.serviceWorker.register('/sw.js', { scope: '/' })
+                    .catch(function(err) { console.warn('SW registration failed:', err); });
+                });
+              }
+            `,
+          }}
+        />
       </body>
     </html>
   );
 }
+

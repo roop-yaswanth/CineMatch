@@ -8,7 +8,8 @@ import { useSession } from "@/context/SessionContext";
 function YourLikesContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const filter = searchParams.get("filter") as "watchlist" | "like" | "okay" | "dislike" | "not_watched" | "all" | undefined;
+  const rawFilter = searchParams.get("filter");
+  const filter = (rawFilter ?? "all") as "watchlist" | "like" | "okay" | "dislike" | "not_watched" | "all";
   const { session, isLoading } = useSession();
 
   // Route protection

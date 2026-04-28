@@ -3,10 +3,14 @@
   "short_name": "CineMatch",
   "description": "Cross Cultural Movie Recommendations",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#18191c",
-  "theme_color": "#18191c",
-  "orientation": "portrait",
+  "display_override": ["standalone", "minimal-ui"],
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "orientation": "portrait-primary",
+  "categories": ["entertainment", "lifestyle"],
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "/icon-192.png",

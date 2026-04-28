@@ -5,8 +5,11 @@ import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import { motion } from "framer-motion";
 
+import dynamic from "next/dynamic";
 import MobileMenu from "@/components/MobileMenu";
-import MovieDetailModal, { type DetailMovie } from "@/components/modals/MovieDetailModal";
+import type { DetailMovie } from "@/components/modals/MovieDetailModal";
+
+const MovieDetailModal = dynamic(() => import("@/components/modals/MovieDetailModal"), { ssr: false });
 import { useSession } from "@/context/SessionContext";
 import {
   apiPerson,
@@ -40,20 +43,24 @@ export default function PersonPage() {
   const params = useParams<{ id: string }>();
   const personId = Number(params.id);
   const { session, isLoading, logout } = useSession();
-  const [data, setData] = useState<PersonDetail | null>(null);
-  const [loading, setLoading] = useState(true);
+  // We tag the fetched result with the id it was fetched for. `loading` is
+  // derived as "no result yet for the current personId" — no setState-in-effect
+  // for the loading flag.
+  const [result, setResult] = useState<{ forId: number; data: PersonDetail | null } | null>(null);
   const [bioExpanded, setBioExpanded] = useState(false);
   const [active, setActive] = useState<DetailMovie | null>(null);
 
   useEffect(() => {
     if (!personId) return;
     let cancelled = false;
-    setTimeout(() => setLoading(true), 0);
-    apiPerson(personId)
-      .then((d) => { if (!cancelled) setData(d); })
-      .finally(() => { if (!cancelled) setLoading(false); });
+    apiPerson(personId).then((d) => {
+      if (!cancelled) setResult({ forId: personId, data: d });
+    });
     return () => { cancelled = true; };
   }, [personId]);
+
+  const data = result && result.forId === personId ? result.data : null;
+  const loading = !result || result.forId !== personId;
 
   // Group acting credits by year, descending
   const actingByYear = useMemo(() => {
@@ -189,7 +196,7 @@ function PersonContent({
               sizes="280px"
               style={{ objectFit: "cover" }}
               priority
-              unoptimized
+
             />
           ) : (
             <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-text-muted)", fontSize: "60px" }}>
@@ -387,7 +394,7 @@ function KnownForCard({ credit, onClick }: { credit: PersonCredit; onClick: () =
     >
       <div style={{ position: "relative", width: "100%", aspectRatio: "2 / 3", borderRadius: "12px", overflow: "hidden", background: "var(--color-surface)" }}>
         {credit.poster_path ? (
-          <Image src={posterUrl(credit.poster_path, "w342")} alt={credit.title} fill sizes="130px" style={{ objectFit: "cover" }} unoptimized />
+          <Image src={posterUrl(credit.poster_path, "w342")} alt={credit.title} fill sizes="130px" style={{ objectFit: "cover" }} />
         ) : null}
         {credit.media_type === "tv" && (
           <div style={{ position: "absolute", top: "6px", right: "6px", background: "rgba(0,0,0,0.7)", color: "#fff", fontSize: "9px", padding: "2px 6px", borderRadius: "4px", letterSpacing: "0.04em" }}>TV</div>

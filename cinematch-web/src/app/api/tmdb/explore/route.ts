@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getGenreMap, REGION_TO_ISO } from "@/lib/tmdb-server";
+import { getGenreMap, parseBoundedInt, REGION_TO_ISO, tmdbCacheHeaders } from "@/lib/tmdb-server";
 
 const TMDB_BEARER = process.env.TMDB_BEARER_TOKEN || "";
 const TMDB_HEADERS = {
@@ -34,8 +34,11 @@ interface TmdbMovie {
 
 export async function GET(req: NextRequest) {
   const category = req.nextUrl.searchParams.get("category") || "popular";
-  const page = req.nextUrl.searchParams.get("page") || "1";
-  const region = req.nextUrl.searchParams.get("region") || "";
+  const page = String(parseBoundedInt(req.nextUrl.searchParams.get("page"), 1, 500, 1));
+  // Region: only allow a tight allow-list of keys (REGION_TO_ISO). Anything
+  // else is silently treated as no-region.
+  const regionParam = req.nextUrl.searchParams.get("region") || "";
+  const region = regionParam in REGION_TO_ISO ? regionParam : "";
 
   const path = CATEGORY_PATHS[category];
   if (!path) {
@@ -105,11 +108,10 @@ export async function GET(req: NextRequest) {
         primary_genre: genres[0],
       };
     });
-    return NextResponse.json({
-      results,
-      page: data.page,
-      total_pages: data.total_pages,
-    });
+    return NextResponse.json(
+      { results, page: data.page, total_pages: data.total_pages },
+      { headers: tmdbCacheHeaders(3600) }
+    );
   } catch {
     return NextResponse.json({ error: "TMDB fetch failed" }, { status: 502 });
   }

@@ -16,7 +16,7 @@ export default function NotFound() {
       <div style={{ zIndex: 1, position: "relative", display: "flex", flexDirection: "column", alignItems: "center" }}>
         <h2 style={{ fontSize: "28px", fontWeight: 700, marginBottom: "16px" }}>Page Not Found</h2>
         <p style={{ color: "var(--color-text-muted)", marginBottom: "32px", maxWidth: "400px" }}>
-          We couldn't find the page you're looking for. It might have been moved or deleted.
+          We couldn&rsquo;t find the page you&rsquo;re looking for. It might have been moved or deleted.
         </p>
         <Link href="/dashboard" style={{
             padding: "12px 28px",

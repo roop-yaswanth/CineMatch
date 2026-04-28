@@ -13,8 +13,10 @@
 
   /* ─── Base Canvas ────────────────────────────── */
 
-  --color-bg: #1f1f1f;
-  --color-bg-raised: #1f1f1f;
+  /* --color-bg: #1f1f1f; */       /* EXPERIMENT: changed to black */
+  /* --color-bg-raised: #1f1f1f; */
+  --color-bg: #000000;
+  --color-bg-raised: #000000;
 
 
   --tint-gold: 212, 175, 55;
@@ -148,7 +150,7 @@ html {
 }
 
 body {
-  background: var(--color-bg);
+  background: #000000;
   color: var(--color-text-primary);
   min-height: 100dvh;
   overflow-x: hidden;
@@ -1077,5 +1079,31 @@ body:has(.onboarding-rating-layout) {
 
   body::before {
     animation: none;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Search header — responsive (Netflix-style)
+   Mobile : icon only  →  tap → full-page overlay
+   Desktop: mini search box + icon (box visible, icon hidden)
+   ═══════════════════════════════════════════════════════════ */
+
+/* Mobile default: show icon, hide the desktop search box */
+.header-search-box {
+  display: none !important;
+}
+
+.header-search-icon {
+  display: flex;
+}
+
+/* Desktop: show the search box, hide the standalone icon */
+@media (min-width: 768px) {
+  .header-search-box {
+    display: flex !important;
+  }
+
+  .header-search-icon {
+    display: none !important;
   }
 }

@@ -444,13 +444,13 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                       src={mobileHero}
                       alt={movie.title}
                       fill
+                      sizes="100vw"
                       style={{
                         objectFit: "cover",
                         objectPosition: movie.backdrop_path ? "center center" : "center top",
                         zIndex: 0,
                       }}
                       priority
-                      unoptimized
                     />
                   ) : (
                     /* Desktop: blurred bg fill */
@@ -459,6 +459,7 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                       alt=""
                       aria-hidden
                       fill
+                      sizes="340px"
                       style={{
                         objectFit: "cover",
                         objectPosition: "center center",
@@ -466,7 +467,6 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                         transform: "scale(1.08)",
                         zIndex: 0,
                       }}
-                      unoptimized
                     />
                   )}
                   <div
@@ -534,8 +534,8 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                           src={poster}
                           alt={movie.title}
                           fill
+                          sizes="340px"
                           style={{ objectFit: "cover", objectPosition: "center center" }}
-                          unoptimized
                         />
                       </div>
                     </div>
@@ -1057,7 +1057,7 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                                   fill
                                   sizes="92px"
                                   style={{ objectFit: "cover" }}
-                                  unoptimized
+
                                 />
                               ) : (
                                 <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-text-muted)", fontSize: "24px" }}>
@@ -1339,7 +1339,7 @@ function SimilarCard({ movie, onClick }: { movie: Recommendation; onClick: () =>
           fill
           sizes="90px"
           style={{ objectFit: "cover" }}
-          unoptimized
+
           onError={() => {
             if (imgSrc !== fallbackSrc) setImgSrc(fallbackSrc);
           }}

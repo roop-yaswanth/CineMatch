@@ -6,9 +6,12 @@ import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
 
+import dynamic from "next/dynamic";
 import MobileMenu from "@/components/MobileMenu";
-import MovieDetailModal, { type DetailMovie } from "@/components/modals/MovieDetailModal";
+import type { DetailMovie } from "@/components/modals/MovieDetailModal";
 import { useSession } from "@/context/SessionContext";
+
+const MovieDetailModal = dynamic(() => import("@/components/modals/MovieDetailModal"), { ssr: false });
 import {
   apiSearchMulti,
   languageLabel,
@@ -45,8 +48,9 @@ function SearchPage() {
   const [query, setQuery] = useState(initialQ);
   const [debounced, setDebounced] = useState(initialQ);
   const [tab, setTab] = useState<Tab>("all");
-  const [results, setResults] = useState<MultiSearchResponse>({ movies: [], tv: [], people: [] });
-  const [loading, setLoading] = useState(false);
+  // Tag results with the query they were fetched for; `loading` and the
+  // displayed `results` are derived without effect-driven setState.
+  const [resultRecord, setResultRecord] = useState<{ forQuery: string; data: MultiSearchResponse } | null>(null);
   const [active, setActive] = useState<DetailMovie | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -64,18 +68,21 @@ function SearchPage() {
 
   // Fetch
   useEffect(() => {
-    if (!debounced) {
-      setTimeout(() => setResults({ movies: [], tv: [], people: [] }), 0);
-      return;
-    }
+    if (!debounced) return;
     let cancelled = false;
-    setTimeout(() => setLoading(true), 0);
     apiSearchMulti(debounced)
-      .then((r) => { if (!cancelled) setResults(r); })
-      .catch(() => {})
-      .finally(() => { if (!cancelled) setLoading(false); });
+      .then((r) => { if (!cancelled) setResultRecord({ forQuery: debounced, data: r }); })
+      .catch(() => {});
     return () => { cancelled = true; };
   }, [debounced]);
+
+  const results: MultiSearchResponse = !debounced
+    ? { movies: [], tv: [], people: [] }
+    : resultRecord && resultRecord.forQuery === debounced
+    ? resultRecord.data
+    : { movies: [], tv: [], people: [] };
+  const loading =
+    !!debounced && (!resultRecord || resultRecord.forQuery !== debounced);
 
   useEffect(() => { inputRef.current?.focus(); }, []);
 
@@ -304,7 +311,7 @@ function MovieGrid({ movies, onSelect }: { movies: MultiSearchMovie[]; onSelect:
         >
           <div style={{ position: "relative", width: "100%", aspectRatio: "2 / 3", borderRadius: "14px", overflow: "hidden", background: "var(--color-surface)" }}>
             {m.poster_path ? (
-              <Image src={posterUrl(m.poster_path, "w342")} alt={m.title} fill sizes="140px" style={{ objectFit: "cover" }} unoptimized />
+              <Image src={posterUrl(m.poster_path, "w342")} alt={m.title} fill sizes="140px" style={{ objectFit: "cover" }} />
             ) : null}
           </div>
           <div style={{ padding: "8px 2px 0" }}>
@@ -335,7 +342,7 @@ function TvGrid({ items }: { items: MultiSearchTv[] }) {
         >
           <div style={{ position: "relative", width: "100%", aspectRatio: "2 / 3", borderRadius: "14px", overflow: "hidden", background: "var(--color-surface)" }}>
             {t.poster_path ? (
-              <Image src={posterUrl(t.poster_path, "w342")} alt={t.name} fill sizes="140px" style={{ objectFit: "cover" }} unoptimized />
+              <Image src={posterUrl(t.poster_path, "w342")} alt={t.name} fill sizes="140px" style={{ objectFit: "cover" }} />
             ) : (
               <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-text-muted)", fontSize: "12px" }}>No poster</div>
             )}
@@ -367,7 +374,7 @@ function PeopleGrid({ people }: { people: MultiSearchPerson[] }) {
         >
           <div style={{ position: "relative", width: "120px", height: "120px", borderRadius: "50%", overflow: "hidden", background: "var(--color-surface)" }}>
             {p.profile_path ? (
-              <Image src={posterUrl(p.profile_path, "w185")} alt={p.name} fill sizes="120px" style={{ objectFit: "cover" }} unoptimized />
+              <Image src={posterUrl(p.profile_path, "w185")} alt={p.name} fill sizes="120px" style={{ objectFit: "cover" }} />
             ) : (
               <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-text-muted)", fontSize: "32px" }}>
                 {p.name?.[0] || "?"}

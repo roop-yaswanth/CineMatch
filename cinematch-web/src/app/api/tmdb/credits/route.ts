@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { parseTmdbId, tmdbCacheHeaders } from "@/lib/tmdb-server";
 
 const TMDB_BEARER = process.env.TMDB_BEARER_TOKEN || "";
 const TMDB_HEADERS = {
@@ -23,9 +24,9 @@ interface TmdbCrew {
 }
 
 export async function GET(req: NextRequest) {
-  const id = req.nextUrl.searchParams.get("id");
+  const id = parseTmdbId(req.nextUrl.searchParams.get("id"));
   const kind = req.nextUrl.searchParams.get("kind") === "tv" ? "tv" : "movie";
-  if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
+  if (!id) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   if (!TMDB_BEARER) return NextResponse.json({ cast: [], directors: [], writers: [] });
 
   try {
@@ -53,7 +54,10 @@ export async function GET(req: NextRequest) {
       .filter((c) => c.department === "Writing" && (c.job === "Writer" || c.job === "Screenplay" || c.job === "Story"))
       .map((c) => ({ id: c.id, name: c.name, job: c.job, profile_path: c.profile_path || null }));
 
-    return NextResponse.json({ cast, directors, writers });
+    return NextResponse.json(
+      { cast, directors, writers },
+      { headers: tmdbCacheHeaders(86400) }
+    );
   } catch {
     return NextResponse.json({ cast: [], directors: [], writers: [] });
   }

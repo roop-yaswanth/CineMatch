@@ -413,10 +413,31 @@ export interface MultiSearchResponse {
   people: MultiSearchPerson[];
 }
 
+// Tiny LRU keyed by query string. Multi-search is heavy (5 parallel TMDB calls
+// per request); when the user types-deletes-types the same query we want an
+// instant response. Cap is small because each entry can hold ~80 result objects.
+const MULTI_SEARCH_CACHE_MAX = 30;
+const multiSearchCache = new Map<string, MultiSearchResponse>();
+
 export async function apiSearchMulti(query: string): Promise<MultiSearchResponse> {
+  const key = query.trim().toLowerCase();
+  const hit = multiSearchCache.get(key);
+  if (hit) {
+    // Refresh recency by re-inserting (Map preserves insertion order).
+    multiSearchCache.delete(key);
+    multiSearchCache.set(key, hit);
+    return hit;
+  }
   const res = await fetch(`/api/search/multi?q=${encodeURIComponent(query)}`);
   if (!res.ok) return { movies: [], tv: [], people: [] };
-  return res.json();
+  const data: MultiSearchResponse = await res.json();
+  multiSearchCache.set(key, data);
+  if (multiSearchCache.size > MULTI_SEARCH_CACHE_MAX) {
+    // Evict oldest entry.
+    const oldest = multiSearchCache.keys().next().value;
+    if (oldest !== undefined) multiSearchCache.delete(oldest);
+  }
+  return data;
 }
 
 export async function apiSearchMovies(
@@ -442,17 +463,42 @@ export async function apiUpdatePreferences(
   });
 }
 
+// Similar-movies cache. Keyed by (tmdbId, sessionId or "anon", n) since results
+// are personalized when a session is provided.
+const SIMILAR_CACHE_MAX = 200;
+const similarCache = new Map<string, Recommendation[]>();
+const similarInflight = new Map<string, Promise<Recommendation[]>>();
+
 export async function apiSimilarMovies(
   tmdbId: number,
   sessionId?: string | null,
   n = 10
 ): Promise<Recommendation[]> {
-  const params = new URLSearchParams({ tmdb_id: String(tmdbId), n: String(n) });
-  if (sessionId) params.set("session_id", sessionId);
-  const data = await request<{ results: Recommendation[] }>(
-    `/api/movies/similar?${params.toString()}`
-  );
-  return data.results ?? [];
+  const key = `${tmdbId}:${sessionId ?? "anon"}:${n}`;
+  const cached = similarCache.get(key);
+  if (cached) return cached;
+  const inflight = similarInflight.get(key);
+  if (inflight) return inflight;
+  const p = (async () => {
+    try {
+      const params = new URLSearchParams({ tmdb_id: String(tmdbId), n: String(n) });
+      if (sessionId) params.set("session_id", sessionId);
+      const data = await request<{ results: Recommendation[] }>(
+        `/api/movies/similar?${params.toString()}`
+      );
+      const results = data.results ?? [];
+      similarCache.set(key, results);
+      if (similarCache.size > SIMILAR_CACHE_MAX) {
+        const oldest = similarCache.keys().next().value;
+        if (oldest !== undefined) similarCache.delete(oldest);
+      }
+      return results;
+    } finally {
+      similarInflight.delete(key);
+    }
+  })();
+  similarInflight.set(key, p);
+  return p;
 }
 
 export type ExploreCategory =
@@ -582,10 +628,47 @@ export async function apiPerson(personId: number): Promise<PersonDetail | null> 
   return res.json();
 }
 
+// Per-movie credits cache. Server already caches at the edge; this avoids
+// re-parsing the JSON on repeat opens of the same movie modal.
+const CREDITS_CACHE_MAX = 200;
+const creditsCache = new Map<string, CreditsResponse>();
+const creditsInflight = new Map<string, Promise<CreditsResponse>>();
+
 export async function apiCredits(tmdbId: number, kind: "movie" | "tv" = "movie"): Promise<CreditsResponse> {
-  const res = await fetch(`/api/tmdb/credits?id=${tmdbId}&kind=${kind}`);
-  if (!res.ok) return { cast: [], directors: [], writers: [] };
-  return res.json();
+  const key = `${kind}:${tmdbId}`;
+  const cached = creditsCache.get(key);
+  if (cached) return cached;
+  const inflight = creditsInflight.get(key);
+  if (inflight) return inflight;
+  const p = (async () => {
+    try {
+      const res = await fetch(`/api/tmdb/credits?id=${tmdbId}&kind=${kind}`);
+      if (!res.ok) return { cast: [], directors: [], writers: [] };
+      const data: CreditsResponse = await res.json();
+      creditsCache.set(key, data);
+      if (creditsCache.size > CREDITS_CACHE_MAX) {
+        const oldest = creditsCache.keys().next().value;
+        if (oldest !== undefined) creditsCache.delete(oldest);
+      }
+      return data;
+    } finally {
+      creditsInflight.delete(key);
+    }
+  })();
+  creditsInflight.set(key, p);
+  return p;
+}
+
+/**
+ * Fire-and-forget warmer used on hover. Kicks off the credits + similar fetches
+ * so the modal opens with data ready. Safe to call repeatedly — both targets
+ * dedupe in-flight requests.
+ */
+export function prefetchMovieDetails(tmdbId: number): void {
+  if (!tmdbId) return;
+  // No await: we just want the underlying cache to fill in the background.
+  void apiCredits(tmdbId, "movie").catch(() => {});
+  void apiSimilarMovies(tmdbId, null, 20).catch(() => {});
 }
 
 export interface TmdbGenre { id: number; name: string }
@@ -619,33 +702,52 @@ export function posterUrl(path: string | null | undefined, size = "w500"): strin
 
 /* ─── TMDB Poster Fallback ──────────────────────── */
 
-const posterCache: Record<number, string | null> = {};
-const pendingFetches: Record<number, Promise<string | null>> = {};
+// LRU-capped poster cache. A long browse session (Explore + Discover paging)
+// can easily touch 500+ ids; without a cap this grows unbounded for the page
+// lifetime. Map preserves insertion order, which we use as recency.
+const POSTER_CACHE_MAX = 500;
+const posterCache = new Map<number, string | null>();
+const pendingFetches = new Map<number, Promise<string | null>>();
+
+function rememberPoster(tmdbId: number, path: string | null): void {
+  posterCache.set(tmdbId, path);
+  if (posterCache.size > POSTER_CACHE_MAX) {
+    const oldest = posterCache.keys().next().value;
+    if (oldest !== undefined) posterCache.delete(oldest);
+  }
+}
 
 export async function fetchTmdbPoster(tmdbId: number): Promise<string | null> {
-  if (tmdbId in posterCache) return posterCache[tmdbId];
-  if (tmdbId in pendingFetches) return pendingFetches[tmdbId];
+  if (posterCache.has(tmdbId)) {
+    const v = posterCache.get(tmdbId) ?? null;
+    // Touch for recency.
+    posterCache.delete(tmdbId);
+    posterCache.set(tmdbId, v);
+    return v;
+  }
+  const inflight = pendingFetches.get(tmdbId);
+  if (inflight) return inflight;
 
   const promise = (async () => {
     try {
       const res = await fetch(`/api/tmdb?id=${tmdbId}`);
       if (!res.ok) {
-        posterCache[tmdbId] = null;
+        rememberPoster(tmdbId, null);
         return null;
       }
       const data = await res.json();
       const path = data.poster_path || null;
-      posterCache[tmdbId] = path;
+      rememberPoster(tmdbId, path);
       return path;
     } catch {
-      posterCache[tmdbId] = null;
+      rememberPoster(tmdbId, null);
       return null;
     } finally {
-      delete pendingFetches[tmdbId];
+      pendingFetches.delete(tmdbId);
     }
   })();
 
-  pendingFetches[tmdbId] = promise;
+  pendingFetches.set(tmdbId, promise);
   return promise;
 }
 

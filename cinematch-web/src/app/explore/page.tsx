@@ -4,9 +4,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 
+import dynamic from "next/dynamic";
 import MovieCard from "@/components/MovieCard";
-import MovieDetailModal, { type DetailMovie } from "@/components/modals/MovieDetailModal";
+import type { DetailMovie } from "@/components/modals/MovieDetailModal";
 import MobileMenu from "@/components/MobileMenu";
+
+const MovieDetailModal = dynamic(() => import("@/components/modals/MovieDetailModal"), { ssr: false });
 import { useSession } from "@/context/SessionContext";
 import {
   apiDiscover,
