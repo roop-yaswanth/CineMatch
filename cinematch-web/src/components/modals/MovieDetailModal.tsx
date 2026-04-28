@@ -355,7 +355,7 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="glass-modal"
+            className={isMobile ? "" : "glass-modal"}
             style={{
               position: "relative",
               width: isMobile ? "100%" : "94vw",
@@ -363,6 +363,7 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
               maxHeight: isMobile ? "100dvh" : "92vh",
               height: isMobile ? "100dvh" : "auto",
               minHeight: isMobile ? undefined : "72vh",
+              background: isMobile ? "var(--color-bg)" : undefined,
               borderRadius: isMobile ? "0" : undefined,
               boxShadow: isMobile ? "none" : "0 25px 80px -12px rgba(0, 0, 0, 0.8)",
               overflowY: "auto",
@@ -446,6 +447,22 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                       zIndex: 1,
                     }}
                   />
+
+                  {/* Top gradient for safe-area and X button contrast (mobile only) */}
+                  {isMobile && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        height: "90px",
+                        background: "linear-gradient(to bottom, rgba(0,0,0,0.75) 0%, transparent 100%)",
+                        zIndex: 3,
+                        pointerEvents: "none",
+                      }}
+                    />
+                  )}
 
                   {/* Bottom gradient → bleeds into dark modal content below (mobile only) */}
                   {isMobile && (
@@ -661,10 +678,13 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                       justifyContent: "center",
                       gap: "10px",
                       background: showWatchProviders
-                        ? "rgba(255,255,255,0.10)"
-                        : "rgba(255,255,255,0.05)",
+                        ? "rgba(255,255,255,0.08)"
+                        : "linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%)",
+                      backdropFilter: "blur(12px)",
+                      WebkitBackdropFilter: "blur(12px)",
                       border: "none",
-                      borderBottom: "1px solid rgba(255,255,255,0.07)",
+                      borderTop: "1px solid rgba(255,255,255,0.05)",
+                      borderBottom: "1px solid rgba(255,255,255,0.08)",
                       color: "#fff",
                       fontSize: "14px",
                       fontWeight: 600,
@@ -913,7 +933,6 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
             {/* ── More Like This ───────────────────────── */}
             {(similarLoading || similar.length > 0) && (
               <div style={{
-                borderTop: "1px solid var(--color-border-subtle)",
                 padding: "16px 20px 20px",
                 position: "relative",
                 zIndex: 1,
@@ -932,7 +951,7 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                   {!similarLoading && similar.length > 0 && (
                     <div style={{ display: "flex", gap: "6px" }}>
                       <button
-                        onClick={() => similarRowRef.current?.scrollBy({ left: -600, behavior: "smooth" })}
+                        onClick={() => similarRowRef.current?.scrollBy({ left: -(window.innerWidth * 0.8), behavior: "smooth" })}
                         style={{
                           width: "28px", height: "28px", borderRadius: "50%",
                           border: "1px solid var(--color-border-subtle)",
@@ -946,7 +965,7 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                         </svg>
                       </button>
                       <button
-                        onClick={() => similarRowRef.current?.scrollBy({ left: 600, behavior: "smooth" })}
+                        onClick={() => similarRowRef.current?.scrollBy({ left: (window.innerWidth * 0.8), behavior: "smooth" })}
                         style={{
                           width: "28px", height: "28px", borderRadius: "50%",
                           border: "1px solid var(--color-border-subtle)",
@@ -984,7 +1003,6 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                       gap: "12px",
                       overflowX: "auto",
                       paddingBottom: "4px",
-                      scrollSnapType: "x mandatory",
                       msOverflowStyle: "none",
                       scrollbarWidth: "none",
                     }}
@@ -1144,7 +1162,6 @@ function SimilarCard({ movie, onClick }: { movie: Recommendation; onClick: () =>
         width: "90px",
         minWidth: "90px",
         maxWidth: "90px",
-        scrollSnapAlign: "start",
         background: "none",
         border: "none",
         padding: 0,
