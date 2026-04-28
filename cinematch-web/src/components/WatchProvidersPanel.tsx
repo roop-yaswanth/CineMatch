@@ -116,27 +116,37 @@ function CountryListContents({
 }) {
   return (
     <>
-      <input
-        type="text"
-        value={countryQuery}
-        onChange={(e) => setCountryQuery(e.target.value)}
-        placeholder="Search country..."
-        aria-label="Search country"
-        autoFocus
-        style={{
-          width: "100%",
-          background: "rgba(255,255,255,0.06)",
-          color: "#fff",
-          border: "1px solid rgba(255,255,255,0.10)",
-          borderRadius: "8px",
-          padding: "7px 10px",
-          // Must be ≥16px to prevent iOS Safari from auto-zooming on focus
-          fontSize: "16px",
-          outline: "none",
-          marginBottom: "6px",
-          boxSizing: "border-box",
-        }}
-      />
+      {/* Search field with magnifier icon */}
+      <div style={{ position: "relative", marginBottom: "6px" }}>
+        <svg
+          width="13" height="13" viewBox="0 0 24 24" fill="none"
+          stroke="rgba(255,255,255,0.4)" strokeWidth="2.5"
+          strokeLinecap="round" strokeLinejoin="round"
+          style={{ position: "absolute", left: "10px", top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}
+        >
+          <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+        </svg>
+        <input
+          type="text"
+          value={countryQuery}
+          onChange={(e) => setCountryQuery(e.target.value)}
+          placeholder="Search country..."
+          aria-label="Search country"
+          autoFocus
+          style={{
+            width: "100%",
+            background: "rgba(255,255,255,0.06)",
+            color: "#fff",
+            border: "1px solid rgba(255,255,255,0.10)",
+            borderRadius: "8px",
+            padding: "7px 10px 7px 30px",
+            // Must be ≥16px to prevent iOS Safari from auto-zooming on focus
+            fontSize: "16px",
+            outline: "none",
+            boxSizing: "border-box",
+          }}
+        />
+      </div>
       <div style={{ maxHeight: maxListHeight, overflowY: "auto" }}>
         {countries.length === 0 ? (
           <div style={{ padding: "10px", fontSize: "12px", color: "rgba(255,255,255,0.55)" }}>
@@ -195,8 +205,11 @@ function ProviderRow({ title, providers, link }: { title: string; providers?: Wa
   if (!providers || providers.length === 0) return null;
   return (
     <div style={{ marginTop: "10px" }}>
-      <div style={{ fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.55)", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.06em" }}>{title}</div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px" }}>
+        <span style={{ fontSize: "10px", fontWeight: 700, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.07em" }}>{title}</span>
+        <span style={{ fontSize: "10px", fontWeight: 700, color: "rgba(255,255,255,0.3)", background: "rgba(255,255,255,0.07)", borderRadius: "20px", padding: "1px 6px" }}>{providers.length}</span>
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
         {providers.map((p) => {
           const logoUrl = p.logo_path ? `https://image.tmdb.org/t/p/w92${p.logo_path}` : null;
           const node = (
@@ -204,26 +217,29 @@ function ProviderRow({ title, providers, link }: { title: string; providers?: Wa
               key={p.provider_id}
               title={p.provider_name}
               style={{
-                width: "38px",
-                height: "38px",
-                borderRadius: "8px",
+                width: "44px",
+                height: "44px",
+                borderRadius: "10px",
                 overflow: "hidden",
                 background: "rgba(255,255,255,0.06)",
-                border: "1px solid rgba(255,255,255,0.08)",
+                border: "1px solid rgba(255,255,255,0.10)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 position: "relative",
+                transition: "transform 0.15s, box-shadow 0.15s",
+                cursor: link ? "pointer" : "default",
               }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.transform = "scale(1.08)"; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.transform = "scale(1)"; }}
             >
               {logoUrl ? (
-                <Image src={logoUrl} alt={p.provider_name} fill sizes="38px" style={{ objectFit: "cover" }} unoptimized />
+                <Image src={logoUrl} alt={p.provider_name} fill sizes="44px" style={{ objectFit: "cover" }} unoptimized />
               ) : (
                 <span style={{ fontSize: "9px", color: "rgba(255,255,255,0.7)", padding: "2px", textAlign: "center", lineHeight: 1.1 }}>{p.provider_name}</span>
               )}
             </div>
           );
-          // Link to TMDB watch page (current.link) so the correct platform is shown
           return link ? (
             <a key={p.provider_id} href={link} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
               {node}
@@ -394,11 +410,9 @@ export default function WatchProvidersPanel({ tmdbId, defaultCountry, movieTitle
       backdropFilter: "blur(18px) saturate(1.4)",
       WebkitBackdropFilter: "blur(18px) saturate(1.4)",
     }}>
-      {/* Country pill — click to open the popover */}
+      {/* Country selector row — compact: no verbose label, just flag+name+chevron */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px" }}>
-        <span style={{ fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.08em", color: "rgba(255,255,255,0.45)", fontWeight: 700 }}>
-          Showing for
-        </span>
+        <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", letterSpacing: "0.02em" }}>Available in</span>
         <button
           ref={triggerRef}
           onClick={() => setPickerOpen((s) => !s)}
@@ -408,14 +422,15 @@ export default function WatchProvidersPanel({ tmdbId, defaultCountry, movieTitle
             display: "inline-flex",
             alignItems: "center",
             gap: "8px",
-            background: "rgba(255,255,255,0.08)",
-            border: "1px solid rgba(255,255,255,0.14)",
+            background: pickerOpen ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.08)",
+            border: `1px solid ${pickerOpen ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.14)"}`,
             borderRadius: "var(--radius-pill)",
             padding: "6px 12px",
             fontSize: "13px",
             fontWeight: 600,
             color: "#fff",
             cursor: "pointer",
+            transition: "background 0.15s, border-color 0.15s",
           }}
         >
           <span style={{ fontSize: "15px", lineHeight: 1 }}>{flagEmoji(country)}</span>

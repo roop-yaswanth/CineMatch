@@ -424,6 +424,22 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                     }}
                   />
 
+                  {/* Bottom gradient: bleeds poster into the modal content below — no hard cut */}
+                  {isMobile && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        height: "45%",
+                        background: "linear-gradient(to top, rgba(12,13,18,1) 0%, rgba(12,13,18,0.7) 40%, transparent 100%)",
+                        zIndex: 3,
+                        pointerEvents: "none",
+                      }}
+                    />
+                  )}
+
                   {/* Sharp centred poster */}
                   <div
                     style={{
@@ -452,6 +468,58 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                       />
                     </div>
                   </div>
+
+                  {/* Mobile: title + rating overlaid at the poster bottom (Netflix-style).
+                      Key info is visible without scrolling down. */}
+                  {/* {isMobile && !showWatchProviders && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        padding: "0 14px 52px", // 52px leaves room above the Where-to-Watch button
+                        zIndex: 4,
+                        pointerEvents: "none",
+                      }}
+                    >
+                      <h2
+                        style={{
+                          margin: "0 0 4px",
+                          fontSize: "clamp(18px, 5vw, 24px)",
+                          fontWeight: 700,
+                          color: "#fff",
+                          lineHeight: 1.15,
+                          textShadow: "0 2px 8px rgba(0,0,0,0.7)",
+                          letterSpacing: "-0.02em",
+                        }}
+                      >
+                        {movie.title}
+                      </h2>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                        {movie.year && (
+                          <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.65)", textShadow: "0 1px 4px rgba(0,0,0,0.6)" }}>
+                            {movie.year}
+                          </span>
+                        )}
+                        {imdb && (
+                          <span style={{
+                            display: "inline-flex", alignItems: "center", gap: "4px",
+                            fontSize: "12px", fontWeight: 700,
+                            color: "#fbbf24",
+                            textShadow: "0 1px 4px rgba(0,0,0,0.7)",
+                          }}>
+                            ⭐ {imdb}
+                          </span>
+                        )}
+                        {runtime && (
+                          <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.55)", textShadow: "0 1px 4px rgba(0,0,0,0.6)" }}>
+                            {runtime}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )} */} 
 
                   {/* Smart X button — floats top-right of the poster.
                       Closes WatchProviders overlay if open, otherwise closes the modal. */}
