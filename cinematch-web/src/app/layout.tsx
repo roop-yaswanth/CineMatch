@@ -15,6 +15,7 @@ export const metadata: Metadata = {
   title: "CineMatch — Discover Movies Across Cultures",
   description: "Cross-cultural movie recommendations that bridge cultures. Discover hidden gems from Korean, Japanese, Telugu, Spanish, and 20+ languages — curated by your taste profile.",
   keywords: ["movie recommendations", "cross-cultural cinema", "AI movie finder", "global cinema", "CineMatch"],
+  manifest: "/manifest.json",
   openGraph: {
     title: "CineMatch — Discover Movies Across Cultures",
     description: "Cross-cultural movie recommendations that bridge cultures. Find hidden gems from Korean, Japanese, Telugu, Spanish & more.",

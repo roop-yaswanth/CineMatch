@@ -10,7 +10,14 @@ interface MobileMenuProps {
   onReset?: () => void;
   onPreferences?: () => void;
   onYourLikes?: () => void;
+  onWatchlist?: () => void;
 }
+
+const IconBookmark = () => (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+  </svg>
+);
 
 const IconRefresh = () => (
   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -53,6 +60,7 @@ export default function MobileMenu({
   onReset,
   onPreferences,
   onYourLikes,
+  onWatchlist,
 }: MobileMenuProps) {
 
   const [isOpen, setIsOpen] = useState(false);
@@ -208,6 +216,11 @@ export default function MobileMenu({
               )}
 
               <div className="menu-divider" />
+
+              <button className="menu-btn" onClick={() => handleAction(onWatchlist)}>
+                <span className="menu-btn-icon"><IconBookmark /></span>
+                Watchlist
+              </button>
 
               <button className="menu-btn" onClick={() => handleAction(onYourLikes)}>
                 <span className="menu-btn-icon"><IconHeart /></span>

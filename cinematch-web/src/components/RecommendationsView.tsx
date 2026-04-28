@@ -205,6 +205,7 @@ export default function RecommendationsView({
 
   // Route-based navigation for sub-pages
   const openYourLikes = () => router.push("/your-likes");
+  const openWatchlist = () => router.push("/your-likes?filter=watchlist");
   const openPrefs = () => router.push("/preferences");
 
 
@@ -448,11 +449,6 @@ export default function RecommendationsView({
 
       seenIdsRef.current.add(tmdbId);
 
-      if (activeMovie && (activeMovie.id === tmdbId || activeMovie.tmdb_id === tmdbId)) {
-        setActiveMovie(null);
-      }
-
-      // Optimistic removal from stacks + cache replenish
       setMovies((prev) => prev.filter((m) => recommendationId(m) !== tmdbId));
       let targetStackId: StackId | null = null;
 
@@ -640,6 +636,7 @@ export default function RecommendationsView({
                     onReset={onBackToOnboarding}
                     onPreferences={openPrefs}
                     onYourLikes={openYourLikes}
+                    onWatchlist={openWatchlist}
                   />
                 </div>
               </div>
@@ -916,6 +913,38 @@ export default function RecommendationsView({
                   />
                 ))}
               </div>
+            )}
+
+            {/* TMDB Attribution Footer */}
+            {!loading && (
+              <footer style={{
+                marginTop: "40px",
+                padding: "24px 20px 0",
+                borderTop: "1px solid var(--color-border-subtle)",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: "12px",
+                textAlign: "center"
+              }}>
+                <a href="https://www.themoviedb.org/" target="_blank" rel="noopener noreferrer" style={{ transition: "opacity 0.2s", opacity: 0.8 }} onMouseOver={(e) => e.currentTarget.style.opacity = '1'} onMouseOut={(e) => e.currentTarget.style.opacity = '0.8'}>
+                  <img 
+                    src="https://www.themoviedb.org/assets/2/v4/logos/v2/blue_short-8e7b30f73a4020692ccca9c88bafe5dcb6f8a62a4c6bc55cd9ba82bb2cd95f6c.svg" 
+                    alt="TMDB Logo" 
+                    style={{ height: "18px", width: "auto" }} 
+                  />
+                </a>
+                <p style={{ 
+                  margin: 0, 
+                  fontSize: "11px", 
+                  color: "var(--color-text-muted)", 
+                  maxWidth: "500px",
+                  lineHeight: 1.4,
+                  fontWeight: 500
+                }}>
+                  This product uses the TMDB API but is not endorsed or certified by TMDB.
+                </p>
+              </footer>
             )}
           </div>
         </div>

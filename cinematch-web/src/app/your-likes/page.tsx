@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import YourLikesView from "@/components/YourLikesView";
 import { useSession } from "@/context/SessionContext";
 
-export default function YourLikesPage() {
+function YourLikesContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const filter = searchParams.get("filter") as "watchlist" | "like" | "okay" | "dislike" | "not_watched" | "all" | undefined;
   const { session, isLoading } = useSession();
 
   // Route protection
@@ -22,6 +24,15 @@ export default function YourLikesPage() {
     <YourLikesView
       sessionId={session.session_id}
       onClose={() => router.back()}
+      initialFilter={filter}
     />
+  );
+}
+
+export default function YourLikesPage() {
+  return (
+    <Suspense fallback={null}>
+      <YourLikesContent />
+    </Suspense>
   );
 }

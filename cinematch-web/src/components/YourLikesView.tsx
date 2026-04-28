@@ -9,6 +9,7 @@ import { usePoster } from "@/lib/usePoster";
 interface Props {
   sessionId: string;
   onClose: () => void;
+  initialFilter?: InteractionFilter;
 }
 
 type InteractionFilter = "all" | "like" | "okay" | "dislike" | "not_watched" | "watchlist";
@@ -94,13 +95,13 @@ const IconHeart = () => (
   </svg>
 );
 
-export default function YourLikesView({ sessionId, onClose }: Props) {
+export default function YourLikesView({ sessionId, onClose, initialFilter = "all" }: Props) {
   const initialCache = readHistoryCache(sessionId);
   const [items, setItems] = useState<HistoryListItem[]>(() => initialCache?.data ?? []);
   const [loading, setLoading] = useState(!initialCache);
   
   // Filters
-  const [interactionFilter, setInteractionFilter] = useState<InteractionFilter>("all");
+  const [interactionFilter, setInteractionFilter] = useState<InteractionFilter>(initialFilter);
   const [genreFilter, setGenreFilter] = useState<string>("all");
   const [languageFilter, setLanguageFilter] = useState<string>("all");
 
