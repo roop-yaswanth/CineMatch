@@ -154,6 +154,7 @@ body {
   color: var(--color-text-primary);
   min-height: 100dvh;
   overflow-x: hidden;
+  overscroll-behavior: none; /* Prevent iOS bounce/rubber-banding to top pill */
   position: relative;
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }

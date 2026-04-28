@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createPortal } from "react-dom";
 import { posterUrl, languageLabel, apiSimilarMovies, apiCredits, type Recommendation, type CastMember, type CrewMember } from "@/lib/api";
 import WatchProvidersPanel, { REGION_TO_COUNTRY } from "@/components/WatchProvidersPanel";
+import { pushBackHandler } from "@/lib/backStack";
 
 export interface DetailMovie {
   id: number;
@@ -90,31 +91,14 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
   const onCloseRef = useRef(onClose);
   useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
 
-  // Browser-back gesture closes the modal (mobile back swipe + desktop back button).
-  // We push a sentinel history entry on open; popping it triggers onClose.
-  // The flag avoids treating our own history.back() in onClose as a "real" back-nav.
+  // PWA back-gesture: push a fake history entry when the modal opens so that
+  // a back-swipe / back-button closes this modal instead of navigating away.
+  // Uses the centralized backStack so nested modals don't conflict.
   useEffect(() => {
     if (!isOpen) return;
-    let dismissedByBack = false;
-    const sentinel = { __movieModal: true, ts: Date.now() };
-    window.history.pushState(sentinel, "");
-
-    const handlePop = () => {
-      dismissedByBack = true;
-      onCloseRef.current();
-    };
-    window.addEventListener("popstate", handlePop);
-
-    return () => {
-      window.removeEventListener("popstate", handlePop);
-      // If the modal was closed by anything other than a back-nav (X, swipe,
-      // backdrop click), pop the sentinel ourselves so the back button doesn't
-      // re-open the modal afterward.
-      if (!dismissedByBack && window.history.state && (window.history.state as { __movieModal?: boolean }).__movieModal) {
-        window.history.back();
-      }
-    };
-  }, [isOpen]); // ← intentionally NOT depending on onClose (captured via ref above)
+    const cleanup = pushBackHandler(() => onCloseRef.current());
+    return cleanup; // called when isOpen flips false (via UI close, not back gesture)
+  }, [isOpen]);
 
   // Fetch similar movies whenever the movie changes
   useEffect(() => {
@@ -368,8 +352,6 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            // Only close when the backdrop itself is clicked, not when events
-            // bubble up from inside the modal (e.g. SimilarCard buttons).
             onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
             style={{
               position: "absolute",
@@ -397,6 +379,7 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
               borderRadius: isMobile ? "0" : undefined,
               boxShadow: isMobile ? "none" : "0 25px 80px -12px rgba(0, 0, 0, 0.8)",
               overflowY: "auto",
+              overscrollBehavior: "none",  // prevent iOS bounce revealing top pill
               display: "flex",
               flexDirection: "column",
             }}
@@ -421,9 +404,7 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                 <div
                   style={{
                     position: "relative",
-                    // Mobile: 16:9 landscape hero — far shorter than the
-                    // old 62vh portrait, freeing vertical space for content.
-                    // Desktop: 2:3 portrait aspect ratio, capped at 62vh.
+
                     ...(isMobile
                       ? { aspectRatio: "16/9", width: "100%" }
                       : { aspectRatio: "2/3", maxHeight: "62vh" }),

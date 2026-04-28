@@ -35,6 +35,7 @@ import {
   type UserSession,
 } from "@/lib/api";
 import { usePoster } from "@/lib/usePoster";
+import { pushBackHandler } from "@/lib/backStack";
 
 interface Props {
   session: UserSession;
@@ -1183,19 +1184,11 @@ function StackDetailView({
     };
   }, []);
 
-  // Push a fake history entry so PWA back-swipe closes the overlay
-  // instead of navigating away from the app entirely.
+  // Centralized back-handler: back swipe/button closes this overlay without
+  // conflicting with MovieDetailModal's own handler (they share one listener).
   useEffect(() => {
-    window.history.pushState({ stackDetail: true }, "");
-    const handlePop = (e: PopStateEvent) => {
-      // Only intercept if we pushed this state (not an actual route change)
-      if (!e.state?.stackDetail) return;
-      onBack();
-    };
-    window.addEventListener("popstate", handlePop);
-    return () => {
-      window.removeEventListener("popstate", handlePop);
-    };
+    const cleanup = pushBackHandler(onBack);
+    return cleanup;
   }, [onBack]);
 
   const content = (
@@ -1211,6 +1204,7 @@ function StackDetailView({
         background: "transparent",
         overflowY: "auto",
         overflowX: "hidden",
+        overscrollBehavior: "none",   // prevent iOS rubber-band bounce to top pill
       }}
     >
       {/* Detail header */}
