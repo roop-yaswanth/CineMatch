@@ -240,18 +240,46 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
             alignItems: "center",
           }}
         >
-          {/* Interaction Filter */}
-          <select
-            value={interactionFilter}
-            onChange={(e) => setInteractionFilter(e.target.value as InteractionFilter)}
-            className="filter-select"
+          {/* Interaction filter — pill tabs (more discoverable than the
+              previous dropdown). Stays inline-scrollable on narrow screens. */}
+          <div
+            role="tablist"
+            aria-label="Filter by interaction"
+            style={{
+              display: "flex",
+              gap: 6,
+              overflowX: "auto",
+              scrollbarWidth: "none",
+              msOverflowStyle: "none",
+              maxWidth: "100%",
+            }}
           >
-            {INTERACTION_FILTERS.map((filter) => (
-              <option key={filter.value} value={filter.value}>
-                {filter.label}
-              </option>
-            ))}
-          </select>
+            {INTERACTION_FILTERS.map((filter) => {
+              const active = interactionFilter === filter.value;
+              return (
+                <button
+                  key={filter.value}
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setInteractionFilter(filter.value)}
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: 999,
+                    border: active ? "1px solid rgba(255,255,255,0.30)" : "1px solid rgba(255,255,255,0.10)",
+                    background: active ? "rgba(255,255,255,0.12)" : "rgba(28,30,36,0.58)",
+                    color: active ? "var(--color-text-primary)" : "var(--color-text-secondary)",
+                    fontSize: 12,
+                    fontWeight: 500,
+                    whiteSpace: "nowrap",
+                    cursor: "pointer",
+                    transition: "all 160ms ease",
+                  }}
+                >
+                  {filter.label}
+                </button>
+              );
+            })}
+          </div>
 
           <div className="likes-filter-sep" style={{ width: "1px", height: "24px", background: "var(--color-border-subtle)" }} />
 

@@ -5,25 +5,28 @@
  *   - One pill-shaped glass bar holding the four primary destinations.
  *   - A separate floating glass circle to the right of the pill, dedicated
  *     to Search (matches Apple's pattern).
+ *   - The "active" highlight is a single shared element that magic-moves
+ *     between items via framer-motion's layoutId — gives the soft
+ *     liquid-glass slide that Apple uses.
  *
  * Visibility:
  *   - Only renders on viewports < 900px (desktop has its own header menu).
  *   - Auto-hides while the user scrolls down, slides back in on scroll up.
- *   - Hidden on auth-flow routes (/login, /onboarding) where chrome should
- *     stay out of the way.
+ *   - Hidden on auth-flow routes (/login, /onboarding).
  */
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 
 import { useSession } from "@/context/SessionContext";
 
 interface NavItem {
   href: string;
   label: string;
-  /** routes that should highlight this item as active */
-  matches: (pathname: string) => boolean;
+  /** stable key for the layout animation */
+  id: "home" | "explore" | "watchlist" | "likes";
   Icon: React.FC<{ active: boolean }>;
 }
 
@@ -61,51 +64,41 @@ const IconSearch = () => (
 );
 
 const NAV_ITEMS: NavItem[] = [
-  {
-    href: "/dashboard",
-    label: "Home",
-    matches: (p) => p === "/dashboard" || p === "/",
-    Icon: IconHome,
-  },
-  {
-    href: "/explore",
-    label: "Explore",
-    matches: (p) => p.startsWith("/explore"),
-    Icon: IconCompass,
-  },
-  {
-    href: "/your-likes?filter=watchlist",
-    label: "Watchlist",
-    matches: (p) =>
-      p.startsWith("/your-likes") &&
-      typeof window !== "undefined" &&
-      new URLSearchParams(window.location.search).get("filter") === "watchlist",
-    Icon: IconBookmark,
-  },
-  {
-    href: "/your-likes",
-    label: "Likes",
-    matches: (p) =>
-      p.startsWith("/your-likes") &&
-      (typeof window === "undefined" ||
-        new URLSearchParams(window.location.search).get("filter") !== "watchlist"),
-    Icon: IconHeart,
-  },
+  { id: "home", href: "/dashboard", label: "Home", Icon: IconHome },
+  { id: "explore", href: "/explore", label: "Explore", Icon: IconCompass },
+  { id: "watchlist", href: "/your-likes?filter=watchlist", label: "Watchlist", Icon: IconBookmark },
+  { id: "likes", href: "/your-likes", label: "Likes", Icon: IconHeart },
 ];
 
-// Routes where the nav should never appear.
 const HIDDEN_ROUTES: Array<(p: string) => boolean> = [
   (p) => p === "/login",
   (p) => p.startsWith("/onboarding"),
 ];
 
+/**
+ * Determine which nav id is active. usePathname alone isn't enough because
+ * Watchlist vs Likes share the /your-likes path and only differ by the
+ * `?filter=watchlist` search param.
+ */
+function activeIdFor(pathname: string, filterParam: string | null): NavItem["id"] | null {
+  if (pathname === "/dashboard" || pathname === "/") return "home";
+  if (pathname.startsWith("/explore")) return "explore";
+  if (pathname.startsWith("/your-likes")) {
+    return filterParam === "watchlist" ? "watchlist" : "likes";
+  }
+  return null;
+}
+
 export default function AppBottomNav() {
   const pathname = usePathname() ?? "/";
+  const searchParams = useSearchParams();
+  const filterParam = searchParams?.get("filter") ?? null;
   const { session } = useSession();
   const [hidden, setHidden] = useState(false);
 
-  // Track scroll direction; hide on scroll-down, reveal on scroll-up.
-  // Only updates state when crossing a meaningful delta to avoid jitter.
+  const activeId = activeIdFor(pathname, filterParam);
+  const searchActive = pathname.startsWith("/search");
+
   useEffect(() => {
     let lastY = window.scrollY;
     let ticking = false;
@@ -116,7 +109,6 @@ export default function AppBottomNav() {
         const y = window.scrollY;
         const dy = y - lastY;
         if (Math.abs(dy) > 6) {
-          // Always show near the very top of the page.
           if (y < 80) setHidden(false);
           else if (dy > 0) setHidden(true);
           else setHidden(false);
@@ -129,7 +121,7 @@ export default function AppBottomNav() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  if (!session) return null; // never show before login
+  if (!session) return null;
   if (HIDDEN_ROUTES.some((m) => m(pathname))) return null;
 
   return (
@@ -152,7 +144,6 @@ export default function AppBottomNav() {
         transition: "transform 280ms cubic-bezier(0.4, 0, 0.2, 1)",
       }}
     >
-      {/* Primary nav pill */}
       <nav
         aria-label="Primary navigation"
         style={{
@@ -169,15 +160,16 @@ export default function AppBottomNav() {
         }}
       >
         {NAV_ITEMS.map((item) => {
-          const active = item.matches(pathname);
+          const active = activeId === item.id;
           return (
             <Link
-              key={item.href}
+              key={item.id}
               href={item.href}
               prefetch
               aria-current={active ? "page" : undefined}
               aria-label={item.label}
               style={{
+                position: "relative",
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
@@ -189,13 +181,34 @@ export default function AppBottomNav() {
                 borderRadius: "999px",
                 textDecoration: "none",
                 color: active ? "var(--color-text-primary)" : "var(--color-text-muted)",
-                background: active ? "rgba(255,255,255,0.10)" : "transparent",
-                transition: "background 160ms ease, color 160ms ease",
+                transition: "color 220ms ease",
               }}
             >
-              <item.Icon active={active} />
+              {/* Sliding active indicator — single element shared between
+                  buttons via layoutId, so framer-motion physically tweens
+                  it from the previous active to the new one. */}
+              {active && (
+                <motion.div
+                  layoutId="bottom-nav-active-pill"
+                  transition={{ type: "spring", stiffness: 500, damping: 38, mass: 0.7 }}
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    borderRadius: "999px",
+                    background:
+                      "linear-gradient(180deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.06) 100%)",
+                    boxShadow: "0 1px 0 rgba(255,255,255,0.10) inset",
+                    zIndex: 0,
+                  }}
+                />
+              )}
+              <span style={{ position: "relative", zIndex: 1, display: "flex" }}>
+                <item.Icon active={active} />
+              </span>
               <span
                 style={{
+                  position: "relative",
+                  zIndex: 1,
                   fontSize: "10px",
                   fontWeight: active ? 600 : 500,
                   letterSpacing: "-0.005em",
@@ -221,25 +234,20 @@ export default function AppBottomNav() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          color: pathname.startsWith("/search")
-            ? "var(--color-text-primary)"
-            : "var(--color-text-muted)",
-          background: pathname.startsWith("/search")
-            ? "rgba(255,255,255,0.18)"
-            : "rgba(20, 22, 28, 0.72)",
+          color: searchActive ? "var(--color-text-primary)" : "var(--color-text-muted)",
+          background: searchActive ? "rgba(255,255,255,0.18)" : "rgba(20, 22, 28, 0.72)",
           backdropFilter: "blur(40px) saturate(1.6)",
           WebkitBackdropFilter: "blur(40px) saturate(1.6)",
           border: "1px solid rgba(255,255,255,0.10)",
           boxShadow: "0 12px 36px rgba(0,0,0,0.55), 0 1px 0 rgba(255,255,255,0.10) inset",
           textDecoration: "none",
-          transition: "background 160ms ease, color 160ms ease",
+          transition: "background 220ms ease, color 220ms ease",
         }}
       >
         <IconSearch />
       </Link>
 
       <style>{`
-        /* Hide on desktop — desktop uses the header MobileMenu instead. */
         @media (min-width: 900px) {
           .app-bottom-nav { display: none !important; }
         }

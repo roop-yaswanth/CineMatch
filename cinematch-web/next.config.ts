@@ -10,6 +10,12 @@ const nextConfig: NextConfig = {
         hostname: "image.tmdb.org",
         pathname: "/t/p/**",
       },
+      // http.cat illustrations used by the global ErrorView (404/500/etc.)
+      {
+        protocol: "https",
+        hostname: "http.cat",
+        pathname: "/images/**",
+      },
     ],
     // AVIF first, WebP fallback (Next auto-negotiates with the browser).
     formats: ["image/avif", "image/webp"],

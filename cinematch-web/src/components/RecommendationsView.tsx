@@ -15,6 +15,10 @@ import Image from "next/image";
 
 
 import dynamic from "next/dynamic";
+import BackButton from "@/components/ui/BackButton";
+import HeroFeature from "@/components/dashboard/HeroFeature";
+import CompactRail from "@/components/dashboard/CompactRail";
+import { toast } from "@/components/ui/Toast";
 import type { DetailMovie } from "@/components/modals/MovieDetailModal";
 
 const MovieDetailModal = dynamic(() => import("@/components/modals/MovieDetailModal"), { ssr: false });
@@ -1008,21 +1012,62 @@ export default function RecommendationsView({
               </div>
             )}
 
-            {/* Stacks */}
-            {!loading && (
-              <div style={{ display: "grid", gap: "48px" }}>
-                {stacks.map((stack) => (
-                  <StackRow
-                    key={stack.id}
-                    stack={stack}
-                    disabled={loading}
-                    onAction={handleAction}
-                    onOpenDetail={() => {
-                      setActiveStack(stack.id);
+            {/* Featured hero — drawn from the top of the user's most-targeted
+                bucket (Matched if present, else Hollywood, else Global). */}
+            {!loading && stacks.length > 0 && (() => {
+              const heroStack =
+                stacks.find((s) => s.id === "matched") ??
+                stacks.find((s) => s.id === "hollywood") ??
+                stacks[0];
+              if (!heroStack || heroStack.movies.length === 0) return null;
+              return (
+                <div style={{ marginBottom: 8 }}>
+                  <HeroFeature
+                    movies={heroStack.movies}
+                    onOpenDetail={(m) => setActiveMovie(toDetailMovie(m))}
+                    onWatchlist={(m) => {
+                      handleAction(m, "watchlist");
+                      toast({
+                        message: `Added "${m.title}" to your watchlist`,
+                        tone: "success",
+                        action: {
+                          label: "Undo",
+                          onClick: () => handleAction(m, "remove"),
+                        },
+                      });
                     }}
-                    onMovieClick={(m) => setActiveMovie(toDetailMovie(m))}
                   />
-                ))}
+                </div>
+              );
+            })()}
+
+            {/* Stacks
+                - "matched" stays as the big-card swipeable carousel (StackRow).
+                - "hollywood" / "other" become compact rails so users can
+                  passively browse without committing to ratings on every card. */}
+            {!loading && (
+              <div style={{ display: "grid", gap: "40px" }}>
+                {stacks.map((stack) =>
+                  stack.id === "matched" ? (
+                    <StackRow
+                      key={stack.id}
+                      stack={stack}
+                      disabled={loading}
+                      onAction={handleAction}
+                      onOpenDetail={() => setActiveStack(stack.id)}
+                      onMovieClick={(m) => setActiveMovie(toDetailMovie(m))}
+                    />
+                  ) : (
+                    <CompactRail
+                      key={stack.id}
+                      label={stack.label}
+                      subtitle={stack.subtitle}
+                      movies={stack.movies}
+                      onMovieClick={(m) => setActiveMovie(toDetailMovie(m))}
+                      onOpenDetail={() => setActiveStack(stack.id)}
+                    />
+                  )
+                )}
               </div>
             )}
 
@@ -1222,28 +1267,7 @@ function StackDetailView({
           gap: "14px",
         }}
       >
-        <button
-          className="glass-button"
-          onClick={onBack}
-          style={{
-            fontSize: "13px",
-            fontWeight: 600,
-            color: "var(--color-text-primary)",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            gap: "6px",
-            padding: "8px 14px 8px 12px",
-            letterSpacing: "-0.005em",
-          }}
-        >
-          <span style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="19" y1="12" x2="5" y2="12" />
-              <polyline points="12 19 5 12 12 5" />
-            </svg>
-          </span> Back
-        </button>
+        <BackButton onClick={onBack} />
         <div style={{ minWidth: 0 }}>
           <h2
             className="heading-section"

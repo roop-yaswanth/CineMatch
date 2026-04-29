@@ -121,7 +121,293 @@
   --blur-regular: 24px;
   --blur-thick: 40px;
   --blur-chrome: 60px;
+
+  /* ─── Spacing scale (4-px base) ──────────────── */
+  /* Use these in margins/paddings/gaps so vertical rhythm stays consistent
+     across the whole app. Components older than this commit still use raw
+     px values; new code should prefer tokens. */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-7: 32px;
+  --s-8: 40px;
+  --s-9: 48px;
+  --s-10: 64px;
+  --s-11: 80px;
+  --s-12: 96px;
+
+  /* ─── Type scale ─────────────────────────────── */
+  /* Geometric scale, ~1.18 ratio. Headings combine size + weight + tracking. */
+  --fs-2xs: 10px;
+  --fs-xs: 11px;
+  --fs-sm: 12px;
+  --fs-base: 13px;
+  --fs-md: 14px;
+  --fs-lg: 16px;
+  --fs-xl: 19px;
+  --fs-2xl: 24px;
+  --fs-3xl: 32px;
+  --fs-4xl: 44px;
+
+  --lh-tight: 1.15;
+  --lh-snug: 1.35;
+  --lh-base: 1.55;
+  --lh-loose: 1.7;
+
+  --tracking-tight: -0.025em;
+  --tracking-snug: -0.01em;
+  --tracking-wide: 0.04em;
+  --tracking-wider: 0.08em;
+
+  /* ─── Hairline borders ───────────────────────── */
+  --hl-soft: 1px solid rgba(255, 255, 255, 0.06);
+  --hl-medium: 1px solid rgba(255, 255, 255, 0.10);
+  --hl-strong: 1px solid rgba(255, 255, 255, 0.18);
+
+  /* ─── Focus ring (a single visible style for keyboard users) ─── */
+  --focus-ring: 0 0 0 2px rgba(110, 168, 254, 0.55);
 }
+
+/* ═══════════════════════════════════════════════════════════
+   Glass tiers — three canonical surfaces. Other .glass-*
+   classes below alias one of these so we have one place to
+   tune the material if the look changes.
+   ═══════════════════════════════════════════════════════════ */
+.glass-subtle {
+  background: rgba(28, 30, 36, 0.58);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  backdrop-filter: blur(20px) saturate(1.4);
+  border: var(--hl-medium);
+}
+.glass-medium {
+  background: rgba(20, 22, 28, 0.72);
+  -webkit-backdrop-filter: blur(40px) saturate(1.6);
+  backdrop-filter: blur(40px) saturate(1.6);
+  border: var(--hl-medium);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55), 0 1px 0 rgba(255, 255, 255, 0.10) inset;
+}
+.glass-strong {
+  background: linear-gradient(
+    145deg,
+    rgba(24, 26, 32, 0.96) 0%,
+    rgba(14, 16, 20, 0.98) 50%,
+    rgba(18, 20, 24, 0.97) 100%
+  );
+  -webkit-backdrop-filter: blur(60px) saturate(2.2) brightness(1.08);
+  backdrop-filter: blur(60px) saturate(2.2) brightness(1.08);
+  box-shadow: var(--shadow-xl);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Button system — three intents, used app-wide so callsites
+   don't need to ship inline styles.
+   ═══════════════════════════════════════════════════════════ */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-2);
+  padding: 11px 22px;
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-md);
+  font-weight: 600;
+  letter-spacing: var(--tracking-snug);
+  line-height: 1;
+  cursor: pointer;
+  border: none;
+  text-decoration: none;
+  transition:
+    background var(--dur-base) var(--ease-out),
+    color var(--dur-base) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out),
+    opacity var(--dur-base) var(--ease-out);
+  -webkit-tap-highlight-color: transparent;
+}
+.btn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.btn-primary {
+  background: #fff;
+  color: #0a0a0f;
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.45);
+}
+.btn-primary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.btn-secondary {
+  background: rgba(28, 30, 36, 0.66);
+  color: var(--color-text-primary);
+  border: var(--hl-strong);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  backdrop-filter: blur(20px) saturate(1.4);
+}
+.btn-secondary:hover:not(:disabled) {
+  background: rgba(40, 42, 50, 0.78);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--color-text-secondary);
+  padding: 8px 14px;
+}
+.btn-ghost:hover:not(:disabled) {
+  color: var(--color-text-primary);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* Compact size modifier — pairs with any of the above. */
+.btn-sm {
+  padding: 7px 14px;
+  font-size: var(--fs-sm);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Typography utilities — used by page headers and rail titles
+   so font sizes/weights stay aligned across the app.
+   ═══════════════════════════════════════════════════════════ */
+.h-page {
+  font-size: clamp(20px, 4.5vw, 28px);
+  font-weight: 700;
+  letter-spacing: var(--tracking-tight);
+  line-height: var(--lh-tight);
+  margin: 0;
+  color: var(--color-text-primary);
+}
+.h-page--brand {
+  background: linear-gradient(180deg, #fff 0%, #a0a0a0 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.h-section {
+  font-size: var(--fs-lg);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: var(--lh-tight);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.h-eyebrow {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.t-body {
+  font-size: var(--fs-md);
+  line-height: var(--lh-base);
+  color: var(--color-text-secondary);
+}
+.t-meta {
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+}
+
+/* Tabular numerals where columns of digits would otherwise jiggle. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Canonical search input — same shape on /search, dashboard inline search,
+   and any future input that holds a free-text query. */
+.app-search-input {
+  width: 100%;
+  padding: 13px 40px 13px 44px;
+  border-radius: 14px;
+  border: var(--hl-medium);
+  background: rgba(28, 30, 36, 0.82);
+  color: var(--color-text-primary);
+  font-size: 15px;
+  font-weight: 400;
+  letter-spacing: -0.005em;
+  outline: none;
+  transition:
+    border-color var(--dur-base) var(--ease-out),
+    background var(--dur-base) var(--ease-out),
+    box-shadow var(--dur-base) var(--ease-out);
+  -webkit-appearance: none;
+  appearance: none;
+}
+.app-search-input::placeholder {
+  color: var(--color-text-muted);
+}
+.app-search-input:focus {
+  border-color: rgba(255, 255, 255, 0.30);
+  background: rgba(36, 38, 46, 0.92);
+  box-shadow:
+    0 0 0 3px rgba(255, 255, 255, 0.08),
+    0 1px 0 0 rgba(255, 255, 255, 0.06) inset;
+}
+
+/* Footer link — subtle, hover brightens. */
+.app-footer-link {
+  color: var(--color-text-muted);
+  text-decoration: none;
+  transition: color var(--dur-base) var(--ease-out);
+}
+.app-footer-link:hover {
+  color: var(--color-text-primary);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Legal/about page typography. Comfortable reading column,
+   consistent heading rhythm.
+   ═══════════════════════════════════════════════════════════ */
+.legal-prose {
+  color: var(--color-text-secondary);
+  font-size: 15px;
+  line-height: 1.65;
+}
+.legal-prose h2 {
+  margin: 32px 0 12px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  letter-spacing: -0.01em;
+}
+.legal-prose h2:first-of-type { margin-top: 0; }
+.legal-prose h3 {
+  margin: 24px 0 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.legal-prose p { margin: 0 0 14px; }
+.legal-prose ul, .legal-prose ol {
+  margin: 0 0 14px;
+  padding-left: 22px;
+}
+.legal-prose li { margin: 4px 0; }
+.legal-prose a {
+  color: var(--color-text-primary);
+  text-decoration: underline;
+  text-decoration-color: rgba(255, 255, 255, 0.30);
+  text-underline-offset: 3px;
+}
+.legal-prose a:hover {
+  text-decoration-color: rgba(255, 255, 255, 0.65);
+}
+.legal-prose strong { color: var(--color-text-primary); font-weight: 600; }
 
 /* ═══════════════════════════════════════════════════════════
    Reset + base
@@ -612,11 +898,35 @@ textarea,
 }
 
 .poster-card {
-  transition: transform var(--dur-slow) var(--ease-spring);
+  transition: transform var(--dur-slow) var(--ease-spring), box-shadow var(--dur-base) var(--ease-out);
 }
 
 .poster-card:hover {
   transform: translateY(-4px) scale(1.02);
+}
+
+/* Keyboard focus ring on poster cards. We can't put :focus-visible on the
+   card directly because the click target is an inner div; the link/button
+   inside fires :focus-visible and we elevate the surrounding card. */
+.poster-card:focus-within {
+  outline: none;
+}
+.poster-card:has(:focus-visible) .poster-container {
+  box-shadow: var(--focus-ring);
+  border-color: rgba(110, 168, 254, 0.55) !important;
+}
+
+/* All bare button-as-card elements should drop the ugly default outline and
+   use our focus ring instead. Applied broadly because every list of cards
+   in the app uses buttons or links as the wrapper. */
+button:focus-visible,
+a:focus-visible {
+  outline: none;
+}
+button.poster-card-btn:focus-visible,
+a.poster-card-btn:focus-visible {
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-md);
 }
 
 .poster-card:not(.glass-card):hover .poster-container,
@@ -1104,22 +1414,16 @@ body:has(.onboarding-rating-layout) {
    Desktop: mini search box + icon (box visible, icon hidden)
    ═══════════════════════════════════════════════════════════ */
 
-/* Mobile default: show icon, hide the desktop search box */
-.header-search-box {
+/* Mobile: hide BOTH header search affordances — search lives in the
+   floating bottom-nav bubble on phones. */
+.header-search-box,
+.header-search-icon {
   display: none !important;
 }
 
-.header-search-icon {
-  display: flex;
-}
-
-/* Desktop: show the search box, hide the standalone icon */
+/* Desktop: only the inline search box appears in the page header. */
 @media (min-width: 768px) {
   .header-search-box {
     display: flex !important;
-  }
-
-  .header-search-icon {
-    display: none !important;
   }
 }

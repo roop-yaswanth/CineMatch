@@ -158,19 +158,8 @@ function SearchPage() {
           <BackButton />
 
           <h1
-            className="heading-display"
-            style={{
-              flex: 1,
-              fontSize: "21px",
-              fontWeight: 700,
-              letterSpacing: "-0.035em",
-              background: "linear-gradient(180deg, #ffffff 0%, #a0a0a0 100%)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-              backgroundClip: "text",
-              margin: 0,
-              textAlign: "center",
-            }}
+            className="h-page h-page--brand"
+            style={{ flex: 1, textAlign: "center" }}
           >
             Search
           </h1>
@@ -188,16 +177,7 @@ function SearchPage() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search movies, TV shows, people…"
-            style={{
-              width: "100%",
-              padding: "12px 40px 12px 42px",
-              borderRadius: "14px",
-              border: "1px solid rgba(255,255,255,0.12)",
-              background: "rgba(28, 30, 36, 0.82)",
-              color: "var(--color-text-primary)",
-              fontSize: "15px",
-              outline: "none",
-            }}
+            className="app-search-input"
           />
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position: "absolute", left: "34px", top: "11px" }}>
             <circle cx="11" cy="11" r="8" />

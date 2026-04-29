@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 
 import dynamic from "next/dynamic";
@@ -69,9 +69,35 @@ function toDetailMovie(m: ExploreMovie): DetailMovie {
 }
 
 export default function ExplorePage() {
+  return (
+    <Suspense fallback={null}>
+      <ExplorePageInner />
+    </Suspense>
+  );
+}
+
+function ExplorePageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { session, isLoading, logout } = useSession();
-  const [tab, setTab] = useState<TabId>("all");
+
+  // Initial tab read from URL (?tab=…) so deep links and back-nav restore the
+  // user's last view. We validate against the known TabId set and fall back
+  // to "all" for anything else.
+  const initialTab: TabId = (() => {
+    const t = searchParams?.get("tab") || "";
+    const known: TabId[] = ["all", "trending_day", "popular", "top_rated", "now_playing", "upcoming", "discover"];
+    return (known as string[]).includes(t) ? (t as TabId) : "all";
+  })();
+  const [tab, setTabState] = useState<TabId>(initialTab);
+
+  // Wrapped setter that mirrors the tab to the URL without a full reroute.
+  const setTab = (next: TabId) => {
+    setTabState(next);
+    const url = next === "all" ? "/explore" : `/explore?tab=${encodeURIComponent(next)}`;
+    window.history.replaceState(null, "", url);
+  };
+
   const [rails, setRails] = useState<Record<string, ExploreMovie[]>>({});
   const [railLoading, setRailLoading] = useState(false);
 
@@ -157,19 +183,8 @@ export default function ExplorePage() {
           <BackButton href="/dashboard" />
 
           <h1
-            className="heading-display"
-            style={{
-              flex: 1,
-              fontSize: "21px",
-              fontWeight: 700,
-              letterSpacing: "-0.035em",
-              background: "linear-gradient(180deg, #ffffff 0%, #a0a0a0 100%)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-              backgroundClip: "text",
-              margin: 0,
-              textAlign: "center",
-            }}
+            className="h-page h-page--brand"
+            style={{ flex: 1, textAlign: "center" }}
           >
             Explore
           </h1>

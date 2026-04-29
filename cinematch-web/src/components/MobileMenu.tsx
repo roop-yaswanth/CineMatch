@@ -216,22 +216,27 @@ export default function MobileMenu({
 
               <div className="menu-divider" />
 
-              <button className="menu-btn" onClick={() => handleAction(() => router.push("/search"))}>
+              {/* Items duplicated in the floating bottom nav (Search, Explore,
+                  Watchlist, Likes) are hidden on mobile via `.menu-mobile-hide`
+                  so the hamburger only carries actions you can't reach
+                  elsewhere. They remain visible on desktop where there is no
+                  bottom nav. */}
+              <button className="menu-btn menu-mobile-hide" onClick={() => handleAction(() => router.push("/search"))}>
                 <span className="menu-btn-icon"><IconSearch /></span>
                 Search TMDB
               </button>
 
-              <button className="menu-btn" onClick={() => handleAction(() => router.push("/explore"))}>
+              <button className="menu-btn menu-mobile-hide" onClick={() => handleAction(() => router.push("/explore"))}>
                 <span className="menu-btn-icon"><IconCompass /></span>
                 Explore
               </button>
 
-              <button className="menu-btn" onClick={() => handleAction(onWatchlist)}>
+              <button className="menu-btn menu-mobile-hide" onClick={() => handleAction(onWatchlist)}>
                 <span className="menu-btn-icon"><IconBookmark /></span>
                 Watchlist
               </button>
 
-              <button className="menu-btn" onClick={() => handleAction(onYourLikes)}>
+              <button className="menu-btn menu-mobile-hide" onClick={() => handleAction(onYourLikes)}>
                 <span className="menu-btn-icon"><IconHeart /></span>
                 Your Collection
               </button>
@@ -291,6 +296,12 @@ export default function MobileMenu({
           height: 1px;
           background: rgba(255,255,255,0.08);
           margin: 6px 4px;
+        }
+        /* On mobile (where the floating bottom nav already exposes Search,
+           Explore, Watchlist, and Likes), hide those duplicates from the
+           hamburger so it only carries unique actions. */
+        @media (max-width: 899px) {
+          .menu-mobile-hide { display: none !important; }
         }
         .menu-confirm-btn {
           flex: 1;

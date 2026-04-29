@@ -107,18 +107,30 @@ export default function LoginScreen({ onLogin }: Props) {
   const [posters] = useState(() => shuffled(ALL_POSTERS));
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Standard email-shape regex (RFC 5322 simplified). We don't try to be a
+  // full validator — backend has the source of truth — but we want to gate
+  // the submit button so a typo like "foo@" or trailing whitespace doesn't
+  // round-trip the API.
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const trimmedEmail = email.trim();
+  const emailValid = EMAIL_RE.test(trimmedEmail);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const trimmed = email.trim();
-    if (!trimmed) {
+    if (!trimmedEmail) {
       setError("Please enter your email.");
+      inputRef.current?.focus();
+      return;
+    }
+    if (!emailValid) {
+      setError("That email doesn't look right. Check for typos.");
       inputRef.current?.focus();
       return;
     }
     setError("");
     setLoading(true);
     try {
-      const session = await apiLogin(trimmed);
+      const session = await apiLogin(trimmedEmail);
       onLogin(session);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Connection failed. Is the backend running?");
@@ -276,15 +288,17 @@ export default function LoginScreen({ onLogin }: Props) {
 
         <motion.button
           type="submit"
-          disabled={loading}
-          whileTap={{ scale: 0.98 }}
+          disabled={loading || !emailValid}
+          whileTap={{ scale: emailValid ? 0.98 : 1 }}
           className="primary-button"
           style={{
             marginTop: "36px",
             width: "100%",
             padding: "15px 0",
             fontSize: "15px",
-            cursor: loading ? "not-allowed" : "pointer",
+            cursor: loading || !emailValid ? "not-allowed" : "pointer",
+            opacity: !emailValid && !loading ? 0.5 : 1,
+            transition: "opacity 200ms ease",
           }}
         >
           {loading ? (

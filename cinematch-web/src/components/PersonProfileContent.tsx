@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { posterUrl, type PersonCredit, type PersonDetail } from "@/lib/api";
@@ -126,29 +126,13 @@ export function PersonContent({
         <KnownForRail credits={data.known_for} onSelectCredit={onSelectCredit} />
       )}
 
-      {/* Acting filmography */}
-      {actingByYear.length > 0 && (
-        <section>
-          <h3 style={{ margin: "0 0 12px", fontSize: "14px", fontWeight: 600, color: "var(--color-text-primary)" }}>
-            Acting
-          </h3>
-          <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "12px", overflow: "hidden" }}>
-            {actingByYear.map(([year, credits], idx) => (
-              <div key={year} style={{ borderTop: idx === 0 ? "none" : "1px solid rgba(255,255,255,0.06)" }}>
-                {credits.map((c, i) => (
-                  <CreditRow
-                    key={`${c.tmdb_id}-${i}`}
-                    credit={c}
-                    showYear={i === 0}
-                    yearLabel={year}
-                    onClick={() => onSelectCredit(c)}
-                  />
-                ))}
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
+      <Filmography
+        cast={data.cast}
+        crew={data.crew}
+        defaultByYear={actingByYear}
+        onSelectCredit={onSelectCredit}
+      />
+
 
       <style>{`
         @media (max-width: 720px) {
@@ -308,7 +292,113 @@ function CreditRow({ credit, showYear, yearLabel, onClick }: { credit: PersonCre
             as {credit.character}
           </div>
         )}
+        {!credit.character && credit.job && (
+          <div style={{ fontSize: "11px", color: "var(--color-text-muted)", marginTop: "2px" }}>
+            {credit.job}
+          </div>
+        )}
       </div>
     </button>
+  );
+}
+
+/* Filmography section with an Acting / Crew / All toggle. We default to
+   Acting (matches TMDB's default) but let users flip to Crew for directors,
+   writers, producers, etc. — useful for people whose primary contribution
+   isn't in front of the camera. */
+type FilmoTab = "acting" | "crew" | "all";
+
+function Filmography({
+  cast,
+  crew,
+  defaultByYear,
+  onSelectCredit,
+}: {
+  cast: PersonCredit[];
+  crew: PersonCredit[];
+  defaultByYear: Array<[string, PersonCredit[]]>;
+  onSelectCredit: (c: PersonCredit) => void;
+}) {
+  // Pick the most useful default: if the person has many more crew credits
+  // than acting (e.g. a director), open on Crew.
+  const initialTab: FilmoTab = cast.length === 0 && crew.length > 0
+    ? "crew"
+    : crew.length > cast.length * 2
+    ? "crew"
+    : "acting";
+  const [tab, setTab] = useState<FilmoTab>(initialTab);
+
+  const grouped = useMemo<Array<[string, PersonCredit[]]>>(() => {
+    if (tab === "acting") return defaultByYear;
+    const list = tab === "crew" ? crew : [...cast, ...crew];
+    const groups: Record<string, PersonCredit[]> = {};
+    for (const c of list) {
+      const key = c.year ? String(c.year) : "—";
+      (groups[key] = groups[key] || []).push(c);
+    }
+    return Object.entries(groups).sort(([a], [b]) => {
+      if (a === "—") return 1;
+      if (b === "—") return -1;
+      return Number(b) - Number(a);
+    });
+  }, [tab, defaultByYear, cast, crew]);
+
+  const tabs: Array<{ id: FilmoTab; label: string; count: number }> = [
+    { id: "acting", label: "Acting", count: cast.length },
+    { id: "crew", label: "Crew", count: crew.length },
+    { id: "all", label: "All", count: cast.length + crew.length },
+  ];
+
+  if (cast.length === 0 && crew.length === 0) return null;
+
+  return (
+    <section>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
+        <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "var(--color-text-primary)", marginRight: 8 }}>
+          Filmography
+        </h3>
+        {tabs.filter((t) => t.count > 0).map((t) => {
+          const active = tab === t.id;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setTab(t.id)}
+              style={{
+                padding: "5px 11px",
+                borderRadius: 999,
+                border: active ? "1px solid rgba(255,255,255,0.30)" : "1px solid rgba(255,255,255,0.10)",
+                background: active ? "rgba(255,255,255,0.12)" : "rgba(28,30,36,0.58)",
+                color: active ? "var(--color-text-primary)" : "var(--color-text-secondary)",
+                fontSize: 12,
+                fontWeight: 500,
+                cursor: "pointer",
+                transition: "all 160ms ease",
+              }}
+            >
+              {t.label} <span style={{ opacity: 0.6, marginLeft: 3 }}>{t.count}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {grouped.length > 0 && (
+        <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, overflow: "hidden" }}>
+          {grouped.map(([year, credits], idx) => (
+            <div key={year} style={{ borderTop: idx === 0 ? "none" : "1px solid rgba(255,255,255,0.06)" }}>
+              {credits.map((c, i) => (
+                <CreditRow
+                  key={`${c.tmdb_id}-${i}-${tab}`}
+                  credit={c}
+                  showYear={i === 0}
+                  yearLabel={year}
+                  onClick={() => onSelectCredit(c)}
+                />
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
