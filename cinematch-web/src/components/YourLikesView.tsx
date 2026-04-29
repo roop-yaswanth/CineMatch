@@ -433,10 +433,10 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
           onClose={() => setActiveMovie(null)}
           movie={activeMovie}
           sessionId={sessionId}
-          onAction={async (mov, action) => {
+          onAction={async (action) => {
             // Update immediately via API
             try {
-              await apiRecommendationAction(sessionId, mov.id || mov.tmdb_id!, action);
+              await apiRecommendationAction(sessionId, activeMovie.id || activeMovie.tmdb_id!, action);
               // Refetch list in background to not flash UI
               const data = await apiGetHistory(sessionId);
               setItems(data);
