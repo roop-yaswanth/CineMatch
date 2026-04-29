@@ -663,6 +663,8 @@ const inputStyle: React.CSSProperties = {
   fontSize: "13px",
   outline: "none",
   width: "100%",
+  boxSizing: "border-box",
+  height: "36px",
 };
 
 function SelectInput({
