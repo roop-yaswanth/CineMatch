@@ -28,10 +28,12 @@ import HighlightedText from "@/components/ui/HighlightedText";
 import EmptyState from "@/components/ui/EmptyState";
 import { SkeletonGrid } from "@/components/ui/Skeleton";
 
-type Tab = "all" | "movies" | "tv" | "people";
+type Tab = "movies" | "tv" | "people";
 
 const TABS: Array<{ id: Tab; label: string }> = [
-  { id: "all", label: "All" },
+  // Movies first because (a) it's the default surface, and (b) it can
+  // answer instantly from the local CSV-backed library before we ever hit
+  // TMDB. TV / People always go through TMDB and are typically slower.
   { id: "movies", label: "Movies" },
   { id: "tv", label: "TV" },
   { id: "people", label: "People" },
@@ -53,7 +55,13 @@ function SearchPage() {
 
   const [query, setQuery] = useState(initialQ);
   const [debounced, setDebounced] = useState(initialQ);
-  const [tab, setTab] = useState<Tab>("all");
+  const [tab, setTab] = useState<Tab>("movies");
+  // Movies search starts with library (DB) results only; the user opts in to
+  // see TMDB matches with a "Show TMDB results" button. Keeps the page snappy
+  // and avoids paying TMDB latency unless the user asks for it.
+  const [showTmdbMovies, setShowTmdbMovies] = useState(false);
+  // Collapse on every fresh debounced query so each search starts library-first.
+  useEffect(() => { setShowTmdbMovies(false); }, [debounced]);
   // Holds the most recent successful response. Crucially we keep showing the
   // last results while the user types — only when *new* results land for the
   // current query do we swap them in. No flash of empty state on every keystroke.
@@ -179,11 +187,30 @@ function SearchPage() {
             placeholder="Search movies, TV shows, people…"
             className="app-search-input"
           />
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position: "absolute", left: "34px", top: "11px" }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position: "absolute", left: "34px", top: "13px" }}>
             <circle cx="11" cy="11" r="8" />
             <line x1="21" y1="21" x2="16.65" y2="16.65" />
           </svg>
-          {query && (
+          {/* Inline loading spinner — sits in place of the clear button while
+              a fetch is in flight, so users always have a visible signal that
+              search is working. Backend latency on cold paths can hit ~1s. */}
+          {loading && (
+            <div
+              aria-hidden
+              style={{
+                position: "absolute",
+                right: "34px",
+                top: "16px",
+                width: 14,
+                height: 14,
+                border: "2px solid rgba(255,255,255,0.18)",
+                borderTopColor: "rgba(255,255,255,0.85)",
+                borderRadius: "50%",
+                animation: "spin 0.7s linear infinite",
+              }}
+            />
+          )}
+          {query && !loading && (
             <button
               onClick={() => setQuery("")}
               aria-label="Clear"
@@ -200,10 +227,15 @@ function SearchPage() {
         <div style={{ padding: "0 20px 12px", display: "flex", gap: "8px", overflowX: "auto", scrollbarWidth: "none" }}>
           {TABS.map((t) => {
             const isActive = tab === t.id;
-            const count = t.id === "all" ? totalCount
-              : t.id === "movies" ? results.movies.length
-              : t.id === "tv" ? results.tv.length
-              : results.people.length;
+            // Movies count: only the library hits are shown by default, so
+            // the badge reflects that. TMDB matches are opt-in via the
+            // "Search TMDB" button below the library results.
+            const count =
+              t.id === "movies"
+                ? results.movies.filter((m) => m.source === "db").length
+                : t.id === "tv"
+                ? results.tv.length
+                : results.people.length;
             return (
               <button
                 key={t.id}
@@ -249,29 +281,68 @@ function SearchPage() {
               transition: "opacity 160ms ease",
             }}
           >
-            {(tab === "all" || tab === "movies") && results.movies.length > 0 && (
-              <Section title={tab === "all" ? "Movies" : null}>
-                <MovieGrid movies={tab === "all" ? results.movies.slice(0, 12) : results.movies} onSelect={openMovie} query={debounced} />
-                {tab === "all" && results.movies.length > 12 && (
-                  <ShowMore label={`Show all ${results.movies.length} movies`} onClick={() => setTab("movies")} />
-                )}
-              </Section>
+            {tab === "movies" && (() => {
+              // Split results by source so the local-library hits feel
+              // immediate and TMDB-only matches are opt-in.
+              const dbMovies = results.movies.filter((m) => m.source === "db");
+              const tmdbMovies = results.movies.filter((m) => m.source === "tmdb");
+              const hasDb = dbMovies.length > 0;
+              const hasTmdb = tmdbMovies.length > 0;
+              return (
+                <>
+                  {hasDb && (
+                    <Section title={null}>
+                      <MovieGrid movies={dbMovies} onSelect={openMovie} query={debounced} />
+                    </Section>
+                  )}
+
+                  {hasTmdb && !showTmdbMovies && (
+                    <div style={{ display: "flex", justifyContent: "center", padding: "12px 0 4px" }}>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => setShowTmdbMovies(true)}
+                      >
+                        Search TMDB ({tmdbMovies.length})
+                      </button>
+                    </div>
+                  )}
+
+                  {hasTmdb && showTmdbMovies && (
+                    <Section title="From TMDB">
+                      <MovieGrid movies={tmdbMovies} onSelect={openMovie} query={debounced} />
+                    </Section>
+                  )}
+
+                  {!hasDb && !hasTmdb && (
+                    <EmptyState
+                      title={`No movies for "${debounced}"`}
+                      tone="search"
+                      description="Try a different spelling or shorten the query."
+                    />
+                  )}
+                </>
+              );
+            })()}
+
+            {tab === "tv" && (
+              results.tv.length > 0 ? (
+                <Section title={null}>
+                  <TvGrid items={results.tv} query={debounced} />
+                </Section>
+              ) : (
+                <EmptyState title={`No TV results for "${debounced}"`} tone="search" />
+              )
             )}
-            {(tab === "all" || tab === "tv") && results.tv.length > 0 && (
-              <Section title={tab === "all" ? "TV Shows" : null}>
-                <TvGrid items={tab === "all" ? results.tv.slice(0, 8) : results.tv} query={debounced} />
-                {tab === "all" && results.tv.length > 8 && (
-                  <ShowMore label={`Show all ${results.tv.length} TV results`} onClick={() => setTab("tv")} />
-                )}
-              </Section>
-            )}
-            {(tab === "all" || tab === "people") && results.people.length > 0 && (
-              <Section title={tab === "all" ? "People" : null}>
-                <PeopleGrid people={tab === "all" ? results.people.slice(0, 8) : results.people} query={debounced} />
-                {tab === "all" && results.people.length > 8 && (
-                  <ShowMore label={`Show all ${results.people.length} people`} onClick={() => setTab("people")} />
-                )}
-              </Section>
+
+            {tab === "people" && (
+              results.people.length > 0 ? (
+                <Section title={null}>
+                  <PeopleGrid people={results.people} query={debounced} />
+                </Section>
+              ) : (
+                <EmptyState title={`No people for "${debounced}"`} tone="search" />
+              )
             )}
           </div>
         )}

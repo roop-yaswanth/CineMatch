@@ -184,15 +184,6 @@ export default function AppBottomNav() {
                 transition: "color 220ms ease",
                 cursor: "pointer",
               }}
-              onClick={(e) => {
-                // For Watchlist vs Likes tracking the same path, Next.js fast refresh
-                // might not re-render the view if only query param changes and the user
-                // is already on the page without suspense boundary firing.
-                if (window.location.pathname.startsWith('/your-likes') && item.href.startsWith('/your-likes')) {
-                  // We just let Next router handle it, but if it doesn't trigger
-                  // an update we can optionally force refresh
-                }
-              }}
             >
               {/* Sliding active indicator — single element shared between
                   buttons via layoutId, so framer-motion physically tweens

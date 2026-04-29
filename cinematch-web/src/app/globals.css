@@ -335,7 +335,10 @@
   border: var(--hl-medium);
   background: rgba(28, 30, 36, 0.82);
   color: var(--color-text-primary);
-  font-size: 15px;
+  /* iOS Safari auto-zooms any <input> whose computed font-size is below 16px.
+     We pin 16px on mobile and step down on desktop where the zoom doesn't
+     apply, keeping the visual weight consistent. */
+  font-size: 16px;
   font-weight: 400;
   letter-spacing: -0.005em;
   outline: none;
