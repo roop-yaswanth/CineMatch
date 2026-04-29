@@ -61,7 +61,7 @@ function SearchPage() {
   // and avoids paying TMDB latency unless the user asks for it.
   const [showTmdbMovies, setShowTmdbMovies] = useState(false);
   // Collapse on every fresh debounced query so each search starts library-first.
-  useEffect(() => { setShowTmdbMovies(false); }, [debounced]);
+  useEffect(() => { Promise.resolve().then(() => setShowTmdbMovies(false)); }, [debounced]);
   // Holds the most recent successful response. Crucially we keep showing the
   // last results while the user types — only when *new* results land for the
   // current query do we swap them in. No flash of empty state on every keystroke.
@@ -119,7 +119,7 @@ function SearchPage() {
   }, [debounced]);
 
   // Hydrate recents on mount.
-  useEffect(() => { setRecents(getRecentSearches()); }, []);
+  useEffect(() => { Promise.resolve().then(() => setRecents(getRecentSearches())); }, []);
 
   // While the user is typing, show stale results from the previous successful
   // fetch. Loading indicator shows only when there's a true mismatch and we

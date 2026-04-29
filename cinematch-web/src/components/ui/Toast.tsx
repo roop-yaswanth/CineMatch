@@ -76,10 +76,10 @@ export default function ToastHost() {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
+    Promise.resolve().then(() => setMounted(true));
     const l: Listener = (next) => setList(next);
     listeners.add(l);
-    setList(entries);
+    Promise.resolve().then(() => setList(entries));
     return () => { listeners.delete(l); };
   }, []);
 

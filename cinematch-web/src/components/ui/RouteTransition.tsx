@@ -22,14 +22,14 @@ export default function RouteTransition({ children }: { children: React.ReactNod
 
   useEffect(() => {
     // Trigger bar: 0 → 65 → 100 → 0 (reset hidden).
-    setProgress(15);
+    Promise.resolve().then(() => setProgress(15));
     if (tRef.current) clearTimeout(tRef.current);
     const t1 = window.setTimeout(() => setProgress(65), 80);
     const t2 = window.setTimeout(() => setProgress(100), 220);
     const t3 = window.setTimeout(() => setProgress(0), 380);
     tRef.current = t3;
 
-    setFadeKey(pathname || "");
+    Promise.resolve().then(() => setFadeKey(pathname || ""));
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);

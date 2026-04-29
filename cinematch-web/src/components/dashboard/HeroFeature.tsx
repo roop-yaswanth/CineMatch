@@ -37,7 +37,7 @@ export default function HeroFeature({ movies, onOpenDetail, onWatchlist }: Props
 
   // Reset when the movie list itself changes (e.g. new recommendations).
   useEffect(() => {
-    setIndex(0);
+    Promise.resolve().then(() => setIndex(0));
     wasInteractedRef.current = false;
     
     // Fetch live high-quality backdrops from TMDB for the hero items
