@@ -24,12 +24,15 @@ export default function PreferencesPage() {
     [session]
   );
 
-  const handleUpdate = (prefs: RecommendationPreferences) => {
+  const handleUpdate = async (prefs: RecommendationPreferences) => {
     // Store updated preferences in sessionStorage so the dashboard can pick them up
     try {
       sessionStorage.setItem("cinematch_prefs_update", JSON.stringify(prefs));
     } catch { /* ignore */ }
-    router.back();
+    // Add a small delay to ensure the preferences are saved before navigating back
+    setTimeout(() => {
+      router.back();
+    }, 100);
   };
 
   if (isLoading || !session || !preferences) return null;
