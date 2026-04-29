@@ -23,6 +23,7 @@ function YourLikesContent() {
 
   return (
     <YourLikesView
+      key={filter} // Forces remount and refetch when jumping straight from Watchlist to Likes since they are same route
       sessionId={session.session_id}
       onClose={() => router.back()}
       initialFilter={filter}

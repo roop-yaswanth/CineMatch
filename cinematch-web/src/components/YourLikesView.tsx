@@ -129,6 +129,7 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
   useEffect(() => {
     setInteractionFilter(initialFilter);
   }, [initialFilter]);
+  // We don't watch searchParams here since it's passed from parent as initialFilter
 
   useEffect(() => {
     // Standard data-fetch on mount.
