@@ -1140,6 +1140,7 @@ input[type="number"]::-webkit-inner-spin-button {
 
 .carousel-track {
   display: flex;
+  align-items: flex-start;
   gap: 18px;
   overflow-x: scroll;
   scroll-snap-type: x mandatory;

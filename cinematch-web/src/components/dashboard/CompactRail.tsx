@@ -148,6 +148,7 @@ export default function CompactRail({ label, subtitle, movies, onMovieClick, onO
         className="hide-scrollbar"
         style={{
           display: "flex",
+          alignItems: "flex-start",
           gap: 12,
           overflowX: "auto",
           scrollSnapType: "x proximity",
