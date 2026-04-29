@@ -932,38 +932,11 @@ export default function RecommendationsView({
           </header>
 
           {/* Content */}
-          <div className="app-container" style={{ flex: 1, width: "100%", padding: "24px 0 48px" }}>
-            {/* Title bar */}
-            <div
-              style={{
-                padding: "0 20px",
-                marginBottom: "28px",
-                display: "flex",
-                alignItems: "flex-start",
-                justifyContent: "space-between",
-                gap: "14px",
-                flexWrap: "wrap",
-              }}
-            >
-              <div>
-                <h2
-                  style={{
-                    fontSize: "clamp(1.8rem, 4vw, 2.8rem)",
-                    fontWeight: 700,
-                    letterSpacing: "-0.04em",
-                    margin: 0,
-                    color: "var(--color-text-primary)",
-                  }}
-                >
-                  {/* For You */}
-                </h2>
-              </div>
-
-            </div>
+          <div className="app-container" style={{ flex: 1, width: "100%", padding: "0 0 48px" }}>
 
             {/* Loading skeleton */}
             {loading && movies.length === 0 && (
-              <div style={{ display: "grid", gap: "48px", padding: "0 20px" }}>
+              <div style={{ display: "grid", gap: "48px", padding: "24px 20px 0" }}>
                 {[0, 1, 2].map((i) => (
                   <div key={i}>
                     <div

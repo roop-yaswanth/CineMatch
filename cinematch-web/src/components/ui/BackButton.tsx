@@ -40,11 +40,11 @@ export default function BackButton({ href, ariaLabel = "Back", onClick }: Props)
         color: "var(--color-text-primary)",
         padding: 0,
         cursor: "pointer",
-        border: "1px solid rgba(255,255,255,0.10)",
+        border: "1px solid rgba(255,255,255,0.14)",
         borderRadius: "999px",
-        background: "rgba(28, 30, 36, 0.66)",
-        backdropFilter: "blur(20px) saturate(1.4)",
-        WebkitBackdropFilter: "blur(20px) saturate(1.4)",
+        background: "rgba(255, 255, 255, 0.08)",
+        backdropFilter: "blur(24px) saturate(1.4)",
+        WebkitBackdropFilter: "blur(24px) saturate(1.4)",
       }}
     >
       <svg

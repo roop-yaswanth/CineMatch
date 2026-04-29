@@ -328,7 +328,7 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
           background: "rgba(255,255,255,0.12)",
           display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
         }}>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style={{ marginLeft: "2px" }}>
             <polygon points="5 3 19 12 5 21 5 3" />
           </svg>
         </div>

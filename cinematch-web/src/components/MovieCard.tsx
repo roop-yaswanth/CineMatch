@@ -139,50 +139,66 @@ export default function MovieCard({ movie, priority = false, className = "", com
       <div className={compact ? "mt-3 w-full px-1" : "mt-2 w-full text-center px-2"}>
         <h2
           className={compact
-            ? "text-xs font-medium tracking-[-0.01em] text-[var(--color-text-primary)] leading-tight truncate"
+            ? "text-[13px] font-semibold tracking-tight text-white leading-snug line-clamp-2"
             : "text-base font-medium tracking-[-0.01em] text-[var(--color-text-primary)] leading-tight"
           }
         >
           {movie.title}
         </h2>
 
-        {fullDate && (
-          <div className={compact
-            ? "mt-1 text-[10px] text-[var(--color-text-muted)] font-light"
-            : "mt-1.5 text-xs text-[var(--color-text-muted)] font-light"
-          }>
-            {fullDate}
+        {compact ? (
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            {year && (
+              <span className="px-1.5 py-0.5 rounded bg-white/10 text-[10px] font-medium text-white/80">
+                {year}
+              </span>
+            )}
+            {lang && (
+              <span className="px-1.5 py-0.5 rounded bg-white/10 text-[10px] font-medium text-white/80">
+                {lang}
+              </span>
+            )}
+            {imdb ? (
+              <span className="px-1.5 py-0.5 rounded bg-[#fbbf24]/15 text-[10px] font-bold text-[#fbbf24]">
+                IMDb {imdb}
+              </span>
+            ) : tmdbRating ? (
+              <span className="px-1.5 py-0.5 rounded bg-[#fbbf24]/15 text-[10px] font-bold text-[#fbbf24]">
+                ★ {tmdbRating}
+              </span>
+            ) : null}
           </div>
+        ) : (
+          <>
+            {fullDate && (
+              <div className="mt-1.5 text-xs text-[var(--color-text-muted)] font-light">
+                {fullDate}
+              </div>
+            )}
+
+            {/* Metadata line: Year · Language · IMDb */}
+            <div className="mt-2 flex items-center justify-center gap-2 text-xs text-[var(--color-text-muted)] font-light flex-wrap">
+              {year && <span>{year}</span>}
+              {year && lang && <span style={{ opacity: 0.4 }}>·</span>}
+              {lang && <span>{lang}</span>}
+              {(year || lang) && (imdb || tmdbRating) && <span style={{ opacity: 0.4 }}>·</span>}
+              {imdb ? (
+                <span>IMDb {imdb}</span>
+              ) : tmdbRating ? (
+                <span>
+                  <span style={{ color: "var(--color-accent-warm)" }}>★</span> {tmdbRating}
+                </span>
+              ) : null}
+            </div>
+
+            {/* Genre line */}
+            {(primaryGenre || genres.length > 0) && (
+              <div className="mt-1.5 text-xs text-[var(--color-text-muted)] font-light">
+                {primaryGenre || genres.join(", ")}
+              </div>
+            )}
+          </>
         )}
-
-        {/* Metadata line: Year · Language · IMDb */}
-        <div className={compact
-          ? "mt-1 flex items-center gap-1.5 text-[10px] text-[var(--color-text-muted)] font-light flex-wrap"
-          : "mt-2 flex items-center justify-center gap-2 text-xs text-[var(--color-text-muted)] font-light flex-wrap"
-        }>
-          {year && <span>{year}</span>}
-          {year && lang && <span style={{ opacity: 0.4 }}>·</span>}
-          {lang && <span>{lang}</span>}
-          {(year || lang) && (imdb || tmdbRating) && <span style={{ opacity: 0.4 }}>·</span>}
-          {imdb ? (
-            <span>IMDb {imdb}</span>
-          ) : tmdbRating ? (
-            <span>
-              <span style={{ color: "var(--color-accent-warm)" }}>★</span> {tmdbRating}
-            </span>
-          ) : null}
-        </div>
-
-        {/* Genre line */}
-        {(primaryGenre || genres.length > 0) && (
-          <div className={compact
-            ? "mt-1 text-[10px] text-[var(--color-text-muted)] font-light"
-            : "mt-1.5 text-xs text-[var(--color-text-muted)] font-light"
-          }>
-            {primaryGenre || genres.join(", ")}
-          </div>
-        )}
-
       </div>
     </motion.div>
   );

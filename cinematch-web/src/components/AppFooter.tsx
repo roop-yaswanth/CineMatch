@@ -22,6 +22,8 @@ const HIDDEN_ROUTES: Array<(p: string) => boolean> = [
   (p) => p === "/login",
   // Onboarding is a focused funnel; keep chrome minimal.
   (p) => p.startsWith("/onboarding"),
+  // Preferences renders a fixed modal; hide the footer so it doesn't bleed through.
+  (p) => p === "/preferences",
 ];
 
 export default function AppFooter() {
@@ -33,8 +35,8 @@ export default function AppFooter() {
   return (
     <footer
       style={{
-        marginTop: 64,
-        padding: "32px 24px calc(140px + env(safe-area-inset-bottom)) 24px",
+        marginTop: 32,
+        padding: "32px 24px calc(64px + env(safe-area-inset-bottom)) 24px",
         borderTop: "1px solid rgba(255,255,255,0.06)",
         display: "flex",
         flexDirection: "column",
