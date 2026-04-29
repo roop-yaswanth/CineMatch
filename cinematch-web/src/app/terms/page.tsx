@@ -66,7 +66,7 @@ export default function TermsPage() {
 
       <h2>8. Contact</h2>
       <p>
-        Questions? Email <a href="mailto:hello@cinematch.app">hello@cinematch.app</a>.
+        Questions? Email <a href="mailto:class2t24@gmail.com">Cinematch Team</a>.
       </p>
     </LegalShell>
   );

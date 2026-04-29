@@ -34,7 +34,6 @@ const LANG_LABELS: Record<string, string> = {
 };
 
 // TMDB sometimes tags all videos as "en" even for dubbed regional trailers
-// (common for South Indian bilingual films like Salaar, KGF, international releases etc.).
 // Sniff the video title for language keywords and re-bucket accordingly.
 // Covers Indian regional + all major world languages.
 const TITLE_LANG_PATTERNS: Array<{ pattern: RegExp; lang: string }> = [

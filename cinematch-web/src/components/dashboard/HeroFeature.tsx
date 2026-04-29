@@ -33,10 +33,26 @@ export default function HeroFeature({ movies, onOpenDetail, onWatchlist }: Props
   const [paused, setPaused] = useState(false);
   const wasInteractedRef = useRef(false);
 
+  const [liveBackdrops, setLiveBackdrops] = useState<Record<number, string | null>>({});
+
   // Reset when the movie list itself changes (e.g. new recommendations).
   useEffect(() => {
     setIndex(0);
     wasInteractedRef.current = false;
+    
+    // Fetch live high-quality backdrops from TMDB for the hero items
+    items.forEach((m) => {
+      const tmdbId = m.tmdb_id || m.id;
+      if (!tmdbId) return;
+      fetch(`/api/tmdb?id=${tmdbId}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.backdrop_path) {
+            setLiveBackdrops((prev) => ({ ...prev, [m.id]: data.backdrop_path }));
+          }
+        })
+        .catch(() => {});
+    });
   }, [items.length, items[0]?.id]);
 
   // Auto-rotate. Pauses while `paused` is true (user touch/hover).
@@ -55,8 +71,8 @@ export default function HeroFeature({ movies, onOpenDetail, onWatchlist }: Props
 
   if (items.length === 0) return null;
   const movie = items[index];
-  const backdropPath = movie.backdrop_path || movie.poster_path;
-  const backdropUrl = backdropPath ? posterUrl(backdropPath, "w1280") : "/poster_placeholder.svg";
+  const backdropPath = liveBackdrops[movie.id] || movie.backdrop_path;
+  const backdropUrl = backdropPath ? posterUrl(backdropPath, "original") : "/poster_placeholder.svg";
 
   return (
     <section
@@ -94,7 +110,7 @@ export default function HeroFeature({ movies, onOpenDetail, onWatchlist }: Props
             fill
             priority={index === 0}
             sizes="100vw"
-            style={{ objectFit: "cover" }}
+            style={{ objectFit: "cover", objectPosition: "center 15%" }}
           />
           {/* Dual gradient — bottom to anchor text, left for desktop side-text legibility. */}
           <div

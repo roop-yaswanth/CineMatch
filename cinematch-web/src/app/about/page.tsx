@@ -35,7 +35,7 @@ export default function AboutPage() {
       <h2>Get in touch</h2>
       <p>
         Found a bug, got a suggestion, want to say hi?{" "}
-        <a href="mailto:hello@cinematch.app">hello@cinematch.app</a>.
+        <a href="mailto:class2t24@gmail.com">Cinematch Team</a>.
       </p>
     </LegalShell>
   );

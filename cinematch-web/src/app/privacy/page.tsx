@@ -60,7 +60,7 @@ export default function PrivacyPage() {
       <h2>Your rights</h2>
       <p>
         You can request a copy of your stored data, or request its deletion, by emailing
-        <a href="mailto:hello@cinematch.app"> hello@cinematch.app</a>. Deletion typically
+        <a href="mailto:class2t24@gmail.com">CineMatch Team</a>. Deletion typically
         completes within 30 days.
       </p>
 
