@@ -3,10 +3,14 @@
 import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
-import { apiGetHistory, languageLabel, type HistoryItem } from "@/lib/api";
+import dynamic from "next/dynamic";
+import { apiGetHistory, languageLabel, apiRecommendationAction, type HistoryItem } from "@/lib/api";
 import { usePoster } from "@/lib/usePoster";
 import BackButton from "@/components/ui/BackButton";
 import EmptyState from "@/components/ui/EmptyState";
+import type { DetailMovie } from "@/components/modals/MovieDetailModal";
+
+const MovieDetailModal = dynamic(() => import("@/components/modals/MovieDetailModal"), { ssr: false });
 
 interface Props {
   sessionId: string;
@@ -97,24 +101,37 @@ const IconHeart = () => (
   </svg>
 );
 
+function toDetailMovie(item: HistoryListItem): DetailMovie {
+  return {
+    id: item.tmdb_id,
+    tmdb_id: item.tmdb_id,
+    title: item.title,
+    poster_path: item.poster_path, // maybe undefined
+    year: item.year,
+    original_language: item.original_language,
+    primary_genre: item.primary_genre,
+    genres: item.genres,
+  };
+}
+
 export default function YourLikesView({ sessionId, onClose, initialFilter = "all" }: Props) {
   const initialCache = readHistoryCache(sessionId);
   // Always start in loading state when there's no fresh cache data
-  // This prevents the "No movies found" flash before API responds
   const [items, setItems] = useState<HistoryListItem[]>(() => initialCache?.data ?? []);
   const [loading, setLoading] = useState(!initialCache?.isFresh);
-  
+  const [activeMovie, setActiveMovie] = useState<DetailMovie | null>(null);
+
   // Filters
   const [interactionFilter, setInteractionFilter] = useState<InteractionFilter>(initialFilter);
   const [genreFilter, setGenreFilter] = useState<string>("all");
   const [languageFilter, setLanguageFilter] = useState<string>("all");
 
   useEffect(() => {
-    // Standard data-fetch on mount. The synchronous setLoading calls are
-    // intentional — they reflect the initial fetch state. The set-state-in-effect
-    // rule flags this pattern but the alternative (tag-by-input pattern) is
-    // overkill for a single mount-time fetch keyed by sessionId.
-    /* eslint-disable react-hooks/set-state-in-effect */
+    setInteractionFilter(initialFilter);
+  }, [initialFilter]);
+
+  useEffect(() => {
+    // Standard data-fetch on mount.
     if (initialCache?.isFresh) {
       setLoading(false);
       return;
@@ -129,7 +146,6 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-    /* eslint-enable react-hooks/set-state-in-effect */
   }, [sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Extract unique genres and languages from items
@@ -240,9 +256,9 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
             alignItems: "center",
           }}
         >
-          {/* Interaction filter — pill tabs (more discoverable than the
-              previous dropdown). Stays inline-scrollable on narrow screens. */}
+          {/* Interaction filter — dropdown on mobile, pills on desktop */}
           <div
+            className="interaction-pills"
             role="tablist"
             aria-label="Filter by interaction"
             style={{
@@ -279,6 +295,20 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
                 </button>
               );
             })}
+          </div>
+
+          <div className="interaction-select-mobile" style={{ display: "none" }}>
+            <select
+              value={interactionFilter}
+              onChange={(e) => setInteractionFilter(e.target.value as InteractionFilter)}
+              className="filter-select"
+            >
+              {INTERACTION_FILTERS.map((f) => (
+                <option key={f.value} value={f.value}>
+                  {f.label}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="likes-filter-sep" style={{ width: "1px", height: "24px", background: "var(--color-border-subtle)" }} />
@@ -384,13 +414,43 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
                 }}
               >
                 {filteredItems.map((item, idx) => (
-                  <MovieCard key={`${item.tmdb_id}-${idx}`} item={item} idx={idx} />
+                  <MovieCard 
+                    key={`${item.tmdb_id}-${idx}`} 
+                    item={item} 
+                    idx={idx} 
+                    onClick={() => setActiveMovie(toDetailMovie(item))} 
+                  />
                 ))}
               </div>
             </AnimatePresence>
           )}
         </div>
       </div>
+      
+      {activeMovie && (
+        <MovieDetailModal
+          isOpen={activeMovie !== null}
+          onClose={() => setActiveMovie(null)}
+          movie={activeMovie}
+          sessionId={sessionId}
+          onAction={async (mov, action) => {
+            // Update immediately via API
+            try {
+              await apiRecommendationAction(sessionId, mov.id || mov.tmdb_id!, action);
+              // Refetch list in background to not flash UI
+              const data = await apiGetHistory(sessionId);
+              setItems(data);
+              localStorage.setItem(`history_cache_${sessionId}`, JSON.stringify({ data, ts: Date.now() }));
+              if (action !== "watchlist") {
+                  setActiveMovie(null); // maybe close on rating
+              }
+            } catch (e) {
+              console.error(e);
+            }
+          }}
+          onMovieSelect={(mov) => setActiveMovie(mov)}
+        />
+      )}
 
       <style>{`
         .filter-select {
@@ -447,6 +507,12 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
             padding: 6px 10px;
             font-size: 12px;
           }
+          .interaction-pills {
+            display: none !important;
+          }
+          .interaction-select-mobile {
+            display: block !important;
+          }
         }
       `}</style>
     </>
@@ -455,7 +521,7 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
 
 /* ─── Movie Card Component ─── */
 
-function MovieCard({ item, idx }: { item: HistoryItem; idx: number }) {
+function MovieCard({ item, idx, onClick }: { item: HistoryItem; idx: number; onClick: () => void }) {
   const poster = usePoster(item.poster_path, item.tmdb_id, "w342");
   const config = RATING_CONFIG[item.rating] || {
     label: item.rating,
@@ -470,10 +536,11 @@ function MovieCard({ item, idx }: { item: HistoryItem; idx: number }) {
       exit={{ opacity: 0, scale: 0.9 }}
       transition={{ delay: idx * 0.02, duration: 0.3 }}
       className="glass-card"
+      onClick={onClick}
       style={{
         borderRadius: "16px",
         overflow: "hidden",
-        cursor: "default",
+        cursor: "pointer",
       }}
     >
       {/* Poster */}
