@@ -96,14 +96,25 @@ export default function PreferencesModal({ preferences, onUpdate, onClose, mode 
           inset: 0,
           display: "flex", alignItems: "center", justifyContent: "center",
           pointerEvents: "none",
+          // Respect iOS PWA safe areas so the modal can't drift under the
+          // status bar / home indicator when content is taller than the
+          // visible viewport.
+          paddingTop: "env(safe-area-inset-top)",
+          paddingBottom: "env(safe-area-inset-bottom)",
         }}
       >
         <div
           className="glass-modal"
           style={{
-            width: "90%", maxWidth: "520px", maxHeight: "85vh",
+            width: "90%", maxWidth: "520px", maxHeight: "85dvh",
             overflowY: "auto", boxSizing: "border-box",
             padding: "24px", pointerEvents: "auto",
+            // Contain scroll-chain so a swipe inside the modal never bubbles
+            // up to the page (which on iOS PWA would expose the status-bar
+            // area as overscroll). `touch-action: pan-y` makes the contain
+            // effective on Safari which otherwise ignores it for body bounce.
+            overscrollBehavior: "contain",
+            touchAction: "pan-y",
           }}
         >
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "24px" }}>

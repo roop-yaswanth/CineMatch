@@ -174,7 +174,11 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
 
   // Apply filters
   const filteredItems = useMemo(() => {
-    let filtered = items;
+    // The backend returns history in chronological insertion order
+    // (onboarding rates, then recommendation rates). Reverse so the most
+    // recently rated movie shows first — matches user expectation that
+    // "what I just rated" lands at the top of the grid.
+    let filtered = items.slice().reverse();
 
     // Interaction filter
     if (interactionFilter !== "all") {
@@ -221,29 +225,47 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
             position: "sticky",
             top: 0,
             zIndex: 10,
-            padding: "20px 24px",
+            padding: "12px 20px 10px",
             borderBottom: "1px solid var(--color-border-subtle)",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
+            gap: "10px",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <BackButton onClick={onClose} ariaLabel="Go back" />
-            <span style={{ color: "var(--color-like)", display: "flex" }}>
+          {/* Left: back button (matches Explore / Search / Person headers). */}
+          <BackButton onClick={onClose} ariaLabel="Go back" />
+
+          {/* Center: title — same pattern as Explore (`flex:1; text-align:center`)
+              so the heading is optically centered between the back button on
+              the left and the spacer on the right. Previously the title was
+              packed inside the left flex group, which placed it left-of-center
+              on wide screens and made it look right-of-the-back-button rather
+              than centered like every other page. */}
+          <h2
+            className="h-page"
+            style={{
+              flex: 1,
+              textAlign: "center",
+              fontSize: "18px",
+              fontWeight: 600,
+              letterSpacing: "-0.02em",
+              margin: 0,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "8px",
+            }}
+          >
+            <span style={{ color: "var(--color-like)", display: "inline-flex" }}>
               <IconHeart />
             </span>
-            <h2
-              style={{
-                fontSize: "18px",
-                fontWeight: 600,
-                letterSpacing: "-0.02em",
-                margin: 0,
-              }}
-            >
-              Your Collection
-            </h2>
-          </div>
+            Your Collection
+          </h2>
+
+          {/* Right: invisible spacer of the same width as the back button so
+              the title is balanced. Matches Explore's right-side menu slot. */}
+          <div style={{ width: "44px", flexShrink: 0 }} aria-hidden />
         </div>
 
         {/* Filters */}
