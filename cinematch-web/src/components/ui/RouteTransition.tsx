@@ -17,8 +17,8 @@ import { useEffect, useRef, useState } from "react";
 export default function RouteTransition({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [progress, setProgress] = useState<number>(0);
-  const [fadeKey, setFadeKey] = useState<string>(pathname || "");
   const tRef = useRef<number | null>(null);
+  const fadeRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     // Trigger bar: 0 → 65 → 100 → 0 (reset hidden).
@@ -29,7 +29,18 @@ export default function RouteTransition({ children }: { children: React.ReactNod
     const t3 = window.setTimeout(() => setProgress(0), 380);
     tRef.current = t3;
 
-    Promise.resolve().then(() => setFadeKey(pathname || ""));
+    // Re-trigger the fade-in animation on pathname change WITHOUT remounting
+    // the children. Toggling the class off+on in successive frames forces
+    // the browser to restart the keyframes; React's tree stays untouched
+    // so the dashboard / your-likes / etc. keep all their in-memory state.
+    const el = fadeRef.current;
+    if (el) {
+      el.classList.remove("route-fade");
+      // Force a reflow so the next add() restarts the animation.
+      void el.offsetWidth;
+      el.classList.add("route-fade");
+    }
+
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
@@ -67,8 +78,23 @@ export default function RouteTransition({ children }: { children: React.ReactNod
         />
       </div>
 
-      {/* Fade-in wrapper keyed by route so the children animate per navigation. */}
-      <div key={fadeKey} className="route-fade">
+      {/*
+        Fade-in wrapper. We DELIBERATELY do NOT key this <div> by pathname.
+        Doing so (`<div key={fadeKey}>...`) forces React to unmount the
+        entire route subtree and remount a fresh one on every navigation —
+        meaning the dashboard's in-memory `stacks`, `bucketCacheRef`,
+        `displayedIdsRef`, etc. are all blown away just because the user
+        tapped Likes and tapped back. That presented as "the dashboard
+        re-fetches/re-renders for no reason every time I leave and come
+        back." Next.js App Router already manages mount/unmount for us
+        based on which route segment is active; remounting on top of that
+        is purely destructive.
+
+        The CSS animation below now triggers via a class swap on every
+        pathname change without unmounting children, so we still get the
+        soft hand-off without losing any client state.
+      */}
+      <div ref={fadeRef} className="route-fade">
         {children}
       </div>
 

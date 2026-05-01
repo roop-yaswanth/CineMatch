@@ -116,9 +116,14 @@ function toDetailMovie(item: HistoryListItem): DetailMovie {
 
 export default function YourLikesView({ sessionId, onClose, initialFilter = "all" }: Props) {
   const initialCache = readHistoryCache(sessionId);
-  // Always start in loading state when there's no fresh cache data
+  // Stale-while-revalidate: if we have ANY cached items at all (fresh OR
+  // stale), paint them immediately and skip the skeleton state. The
+  // background refetch below will reconcile silently. Only show skeletons
+  // when the user is genuinely cold (no cache) — that's the "slow first
+  // time" case we can't avoid without a server-side prefetch.
+  const hasAnyCachedItems = !!initialCache?.data?.length;
   const [items, setItems] = useState<HistoryListItem[]>(() => initialCache?.data ?? []);
-  const [loading, setLoading] = useState(!initialCache?.isFresh);
+  const [loading, setLoading] = useState(!hasAnyCachedItems);
   const [activeMovie, setActiveMovie] = useState<DetailMovie | null>(null);
 
   // Filters
@@ -132,12 +137,14 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
   // We don't watch searchParams here since it's passed from parent as initialFilter
 
   useEffect(() => {
-    // Standard data-fetch on mount.
+    // Always refetch on mount to reconcile against the server, but only
+    // *show* the loading skeleton when we have nothing to display. With
+    // stale items already painted from cache, the refetch is invisible.
     if (initialCache?.isFresh) {
       setLoading(false);
       return;
     }
-    setLoading(true);
+    if (!hasAnyCachedItems) setLoading(true);
     apiGetHistory(sessionId)
       .then((data) => {
         setItems(data);

@@ -1037,13 +1037,30 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                             key={c.id}
                             onClick={() => setActivePersonId(c.id)}
                             style={{
-                              width: "92px", flexShrink: 0, textAlign: "center", textDecoration: "none", color: "inherit",
+                              // Hard-pin the column width so the avatar circle
+                              // can't get stretched or squeezed by flex layout
+                              // pressure / different label lengths below it.
+                              width: "92px",
+                              minWidth: "92px",
+                              maxWidth: "92px",
+                              flexShrink: 0,
+                              flexGrow: 0,
+                              textAlign: "center", textDecoration: "none", color: "inherit",
                               background: "none", border: "none", padding: 0, cursor: "pointer", outline: "none", fontFamily: "inherit"
                             }}
                           >
                             <div style={{
+                              // Explicit width + aspectRatio guarantees a
+                              // perfect circle even when the underlying
+                              // <Image> hasn't loaded or the fallback initial
+                              // is rendered. `flexShrink: 0` belt-and-braces
+                              // for any nested flex contexts above.
                               width: "92px",
                               height: "92px",
+                              minWidth: "92px",
+                              minHeight: "92px",
+                              aspectRatio: "1 / 1",
+                              flexShrink: 0,
                               borderRadius: "50%",
                               overflow: "hidden",
                               background: "var(--color-surface)",
