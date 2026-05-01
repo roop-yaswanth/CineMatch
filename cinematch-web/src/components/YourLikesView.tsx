@@ -457,16 +457,37 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
           movie={activeMovie}
           sessionId={sessionId}
           onAction={async (action) => {
-            // Update immediately via API
+            const targetId = activeMovie.id || activeMovie.tmdb_id!;
+            // Optimistic local update so the grid reflects the new rating
+            // *before* the server round-trip and refetch return. Without
+            // this, on slow connections (or whenever the SW serves the
+            // /api/history response from its 5-min cache) the rated movie
+            // visibly stays in the previous filter bucket until the next
+            // full page refresh — which is exactly the "I have to refresh
+            // to see it disappear" symptom.
+            setItems((prev) => {
+              const next = prev.map((it) =>
+                it.tmdb_id === targetId ? { ...it, rating: action } : it
+              );
+              try {
+                localStorage.setItem(
+                  `history_cache_${sessionId}`,
+                  JSON.stringify({ data: next, ts: Date.now() })
+                );
+              } catch { /* storage full */ }
+              return next;
+            });
+            if (action !== "watchlist") setActiveMovie(null);
+
+            // Persist + reconcile against the server in the background.
             try {
-              await apiRecommendationAction(sessionId, activeMovie.id || activeMovie.tmdb_id!, action);
-              // Refetch list in background to not flash UI
+              await apiRecommendationAction(sessionId, targetId, action);
               const data = await apiGetHistory(sessionId);
               setItems(data);
-              localStorage.setItem(`history_cache_${sessionId}`, JSON.stringify({ data, ts: Date.now() }));
-              if (action !== "watchlist") {
-                  setActiveMovie(null); // maybe close on rating
-              }
+              localStorage.setItem(
+                `history_cache_${sessionId}`,
+                JSON.stringify({ data, ts: Date.now() })
+              );
             } catch (e) {
               console.error(e);
             }
@@ -554,16 +575,24 @@ function MovieCard({ item, idx, onClick }: { item: HistoryItem; idx: number; onC
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.9 }}
-      transition={{ delay: idx * 0.02, duration: 0.3 }}
-      className="glass-card"
+      exit={{ opacity: 0, scale: 0.94 }}
+      // Tightened: was `delay: idx * 0.02, duration: 0.3`. With 24+ cards
+      // the last card was waiting almost 0.8s before settling, which
+      // looks "slow" on a fast device. Cap the stagger and shorten the
+      // duration so the whole grid lands in well under 250 ms.
+      transition={{ delay: Math.min(idx, 12) * 0.012, duration: 0.18, ease: "easeOut" }}
+      className="glass-card likes-card"
       onClick={onClick}
       style={{
         borderRadius: "16px",
         overflow: "hidden",
         cursor: "pointer",
+        // Off-screen cards skip layout/paint work until they scroll near
+        // the viewport — big win on long collections.
+        contentVisibility: "auto",
+        containIntrinsicSize: "240px",
       }}
     >
       {/* Poster */}

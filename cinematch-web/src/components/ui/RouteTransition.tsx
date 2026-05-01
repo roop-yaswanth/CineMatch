@@ -74,10 +74,14 @@ export default function RouteTransition({ children }: { children: React.ReactNod
 
       <style>{`
         @keyframes routeFade {
-          from { opacity: 0; transform: translateY(4px); }
-          to   { opacity: 1; transform: translateY(0); }
+          from { opacity: 0; transform: translate3d(0, 3px, 0); }
+          to   { opacity: 1; transform: translate3d(0, 0, 0); }
         }
-        .route-fade { animation: routeFade 180ms cubic-bezier(0.4, 0, 0.2, 1); }
+        /* 130 ms is below the perceptual "delay" threshold for navigation
+           on fast devices but still gives a soft visual hand-off. translate3d
+           promotes the layer to the GPU so it doesn't re-paint the whole
+           subtree on every frame. */
+        .route-fade { animation: routeFade 130ms cubic-bezier(0.22, 0.61, 0.36, 1); }
         @media (prefers-reduced-motion: reduce) {
           .route-fade { animation: none; }
         }

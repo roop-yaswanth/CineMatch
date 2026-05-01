@@ -97,7 +97,7 @@ export default function AppFooter() {
         <Sep />
         <FooterLink href="/about">About</FooterLink>
         <Sep />
-        <FooterLink href="mailto:hello@cinematch.app">Contact</FooterLink>
+        <FooterLink href="mailto:class2t24@gmail.com">Contact</FooterLink>
       </nav>
 
       <div style={{ fontSize: 11, color: "var(--color-text-faint, #55555c)" }}>

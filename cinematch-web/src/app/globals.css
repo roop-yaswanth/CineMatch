@@ -1411,6 +1411,44 @@ body:has(.onboarding-rating-layout) {
 }
 
 /* ═══════════════════════════════════════════════════════════
+   Smoothness — global perf hints applied app-wide.
+
+   • `-webkit-tap-highlight-color: transparent` removes the iOS gray flash
+     on every tap, which always reads as "laggy" no matter how fast the app
+     actually responds.
+
+   • `touch-action: manipulation` on interactive elements skips the 300 ms
+     double-tap zoom delay that mobile browsers add by default.
+
+   • `text-rendering: optimizeLegibility` is *not* set — it's slower than
+     `optimizeSpeed` for short labels and Apple/Google have moved away from
+     it. Default kicks in.
+
+   • `contain: layout paint` on full-screen overlays means a re-render
+     inside them can never invalidate the outer page layout — keeps the
+     bottom-nav and footer at 60 fps even when a modal is animating.
+   ═══════════════════════════════════════════════════════════ */
+
+html, body {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button,
+a,
+[role="button"],
+[role="tab"],
+[role="link"] {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.glass-modal,
+.likes-modal-container,
+.app-bottom-nav {
+  contain: layout paint;
+}
+
+/* ═══════════════════════════════════════════════════════════
    Search header — responsive (Netflix-style)
    Mobile : icon only  →  tap → full-page overlay
    Desktop: mini search box + icon (box visible, icon hidden)

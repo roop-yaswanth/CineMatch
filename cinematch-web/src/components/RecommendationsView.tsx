@@ -266,6 +266,9 @@ export default function RecommendationsView({
 
   // Action counter for auto-rerun
   const actionCountRef = useRef({ positive: 0, negative: 0, total: 0 });
+  // tmdb_ids that already contributed to actionCountRef this window —
+  // re-rating the same movie shouldn't bump the auto-rerun counters again.
+  const countedActionsRef = useRef<Set<number>>(new Set());
 
   // Every movie ID the user has acted on — prevents re-showing after refresh
   const seenIdsRef = useRef<Set<number>>(
@@ -422,7 +425,7 @@ export default function RecommendationsView({
       );
       if (!hasUnseen && totalMovies.length > 0) {
         seenIdsRef.current = new Set();
-        actionCountRef.current = { positive: 0, negative: 0, total: 0 };
+        actionCountRef.current = { positive: 0, negative: 0, total: 0 }; countedActionsRef.current = new Set();
       }
 
       await prefetchPosters(totalMovies);
@@ -450,7 +453,7 @@ export default function RecommendationsView({
         bucketCacheRef.current = EMPTY_CACHE();
         seenIdsRef.current = new Set();
         displayedIdsRef.current = new Set();
-        actionCountRef.current = { positive: 0, negative: 0, total: 0 };
+        actionCountRef.current = { positive: 0, negative: 0, total: 0 }; countedActionsRef.current = new Set();
       }
       try {
         const excludeIds = autoRerun
@@ -473,15 +476,59 @@ export default function RecommendationsView({
           ...(resp.buckets.global || []),
         ];
         await prefetchPosters(allMovies);
-        // On auto-rerun: clear stacks now that new data is ready, then apply
+
         if (autoRerun) {
-          bucketCacheRef.current = EMPTY_CACHE();
-          seenIdsRef.current = new Set();
-          displayedIdsRef.current = new Set();
-          actionCountRef.current = { positive: 0, negative: 0, total: 0 };
+          // Append-mode rerun. Don't blow away the user's current view —
+          // they may be holding movies they haven't acted on yet (rating
+          // is a deliberate choice, "kept on screen" is the default state).
+          // The previous behavior was to clear all stacks and call
+          // applyBucketResponse, which dropped any unrated card from view
+          // and felt like the app was "starting over" mid-session.
+          //
+          // Instead: keep current stacks/cache as-is, and merge the new
+          // batch into bucketCacheRef so subsequent swipes refill from
+          // the fresh supply. seenIds/displayedIds stay populated so we
+          // don't re-show movies the user already passed on.
+          const filterFresh = (arr: Recommendation[]) =>
+            applyFilters(
+              arr.filter((m) => !seenIdsRef.current.has(recommendationId(m))),
+              nextPreferences
+            );
+
+          const newEn = filterFresh(resp.buckets.english || []);
+          const newGlob = filterFresh(resp.buckets.global || []);
+          const regionalEntries = Object.entries(resp.buckets.regional || {});
+          const regionalMerged: Recommendation[] = [];
+          if (regionalEntries.length > 0) {
+            const buckets = regionalEntries.map(([, arr]) => [...(arr || [])]);
+            const cursors = buckets.map(() => 0);
+            let added = true;
+            while (added) {
+              added = false;
+              for (let i = 0; i < buckets.length; i++) {
+                if (cursors[i] < buckets[i].length) {
+                  regionalMerged.push(buckets[i][cursors[i]++]);
+                  added = true;
+                }
+              }
+            }
+          }
+          const newReg = filterFresh(regionalMerged);
+
+          // Append fresh recs to whatever's already in the cache. Subsequent
+          // swipes naturally drain the cache and the new supply lands at
+          // the END — so existing cards stay first.
+          bucketCacheRef.current = {
+            hollywood: [...(bucketCacheRef.current.hollywood || []), ...newEn],
+            matched:   [...(bucketCacheRef.current.matched   || []), ...newReg],
+            other:     [...(bucketCacheRef.current.other     || []), ...newGlob],
+          };
+
+          if (resp.session) onSessionUpdate(resp.session);
+        } else {
+          applyBucketResponse(resp, nextPreferences);
+          if (resp.session) onSessionUpdate(resp.session);
         }
-        applyBucketResponse(resp, nextPreferences);
-        if (resp.session) onSessionUpdate(resp.session);
       } catch (err) {
         console.error(err);
       } finally {
@@ -534,16 +581,28 @@ export default function RecommendationsView({
         })
       );
 
-      actionCountRef.current.total++;
-      if (action === "like" || action === "okay") actionCountRef.current.positive++;
-      if (action === "dislike") actionCountRef.current.negative++;
-      if (action === "remove" || action === "skip") actionCountRef.current.negative += 0.5;
+      // Per-movie dedup of the rerun counters. Re-rating the same movie
+      // (like → dislike → like) used to bump `total` three times even
+      // though it represents one piece of feedback. Track the set of
+      // tmdb_ids already counted in this refresh window — only the first
+      // action per movie contributes.
+      const counted = countedActionsRef.current;
+      const isFirstForMovie = !counted.has(tmdbId);
+      if (isFirstForMovie) {
+        counted.add(tmdbId);
+        actionCountRef.current.total++;
+        if (action === "like" || action === "okay") actionCountRef.current.positive++;
+        if (action === "dislike") actionCountRef.current.negative++;
+        if (action === "remove" || action === "skip") actionCountRef.current.negative += 0.5;
+      }
 
       const { positive, negative, total } = actionCountRef.current;
-      const shouldAutoRerun = negative >= 10 || total >= 10 || positive >= 10;
+      // Match the backend thresholds (all 30). Was 10/10/10, which fired
+      // the profile rebuild after a third of the documented count.
+      const shouldAutoRerun = negative >= 30 || total >= 30 || positive >= 30;
 
       if (shouldAutoRerun) {
-        actionCountRef.current = { positive: 0, negative: 0, total: 0 };
+        actionCountRef.current = { positive: 0, negative: 0, total: 0 }; countedActionsRef.current = new Set();
         setIsUpdating(true);
         try {
           await apiRecommendationAction(session.session_id, tmdbId, action);
@@ -1090,62 +1149,60 @@ export default function RecommendationsView({
         </AnimatePresence>
 
 
+        {/* Updating-taste-profile indicator. Used to be a full-screen
+            blackout with a giant popcorn — that blocked the user from
+            doing anything (swipe, tap, watchlist) while a 1–3 second
+            rebuild was running. Now it's a small glass pill in the
+            bottom-left corner; the rest of the dashboard stays
+            interactive throughout the rerun. */}
         {typeof document !== 'undefined' && createPortal(
           <AnimatePresence>
             {(showUpdateToast || isUpdating) && (
               <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.3 }}
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 16 }}
+                transition={{ duration: 0.22, ease: "easeOut" }}
+                role="status"
+                aria-live="polite"
                 style={{
                   position: "fixed",
-                  inset: 0,
-                  zIndex: 10000000,
-                  display: "flex",
-                  flexDirection: "column",
+                  // Sit in the bottom-left, well clear of the bottom-nav
+                  // pill on the right and the iOS home indicator below.
+                  left: "calc(16px + env(safe-area-inset-left))",
+                  bottom: "calc(96px + env(safe-area-inset-bottom))",
+                  zIndex: 90,
+                  display: "inline-flex",
                   alignItems: "center",
-                  justifyContent: "center",
-                  background: "rgba(0, 0, 0, 0.6)",
-                  backdropFilter: "blur(16px)",
-                  WebkitBackdropFilter: "blur(16px)",
+                  gap: "10px",
+                  padding: "10px 14px 10px 12px",
+                  borderRadius: "999px",
+                  background: "rgba(20, 22, 28, 0.78)",
+                  backdropFilter: "blur(28px) saturate(1.6)",
+                  WebkitBackdropFilter: "blur(28px) saturate(1.6)",
+                  border: "1px solid rgba(255,255,255,0.10)",
+                  boxShadow: "0 12px 36px rgba(0,0,0,0.45), 0 1px 0 rgba(255,255,255,0.10) inset",
+                  pointerEvents: "none",  // explicitly never block interaction
                 }}
               >
-                <motion.div
-                  animate={{ y: [0, -18, 0] }}
-                  transition={{ repeat: Infinity, duration: 0.7, ease: "easeInOut" }}
-                  style={{ fontSize: "72px" }}
+                <motion.span
+                  animate={{ y: [0, -3, 0] }}
+                  transition={{ repeat: Infinity, duration: 0.9, ease: "easeInOut" }}
+                  style={{ fontSize: "18px", display: "inline-flex" }}
                 >
                   🍿
-                </motion.div>
-                <motion.p
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.3, type: "spring", stiffness: 200, damping: 20 }}
+                </motion.span>
+                <span
                   style={{
-                    marginTop: "20px",
-                    color: "white",
-                    fontSize: "18px",
-                    fontWeight: 600,
-                    letterSpacing: "-0.02em",
-                    textShadow: "0 2px 12px rgba(0,0,0,0.5)",
-                  }}
-                >
-                  Updating Taste Profile...
-                </motion.p>
-                <motion.p
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 0.6 }}
-                  transition={{ delay: 0.6 }}
-                  style={{
-                    marginTop: "8px",
                     color: "white",
                     fontSize: "13px",
-                    fontWeight: 400,
+                    fontWeight: 500,
+                    letterSpacing: "-0.01em",
+                    whiteSpace: "nowrap",
                   }}
                 >
-                  Rebuilding recommendations from your feedback
-                </motion.p>
+                  Updating taste profile…
+                </span>
               </motion.div>
             )}
           </AnimatePresence>,
