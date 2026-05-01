@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import RecommendationsView from "@/components/RecommendationsView";
 import { useSession } from "@/context/SessionContext";
@@ -9,12 +9,26 @@ export default function DashboardPage() {
   const router = useRouter();
   const { session, isLoading, logout, updateSession } = useSession();
 
-  // Route protection
+  // Route protection — one-shot. We only check `onboarding_complete` on the
+  // initial gate. Once the user is on the dashboard, we DO NOT bounce them
+  // back to /onboarding for any subsequent session update — even if the
+  // backend's flag transiently flips false (which used to happen after
+  // re-rating a movie because the dedup logic shrank onboarding_feedback
+  // below threshold). The "you must finish onboarding" check belongs at
+  // the entrance, not on every state change. Logout still bounces to
+  // /login since that requires the user to be unauthenticated entirely.
+  const onboardingGateChecked = useRef(false);
   useEffect(() => {
-    if (!isLoading && !session) {
+    if (isLoading) return;
+    if (!session) {
       router.replace("/login");
-    } else if (!isLoading && session && !session.onboarding_complete) {
-      router.replace("/onboarding");
+      return;
+    }
+    if (!onboardingGateChecked.current) {
+      onboardingGateChecked.current = true;
+      if (!session.onboarding_complete) {
+        router.replace("/onboarding");
+      }
     }
   }, [session, isLoading, router]);
 

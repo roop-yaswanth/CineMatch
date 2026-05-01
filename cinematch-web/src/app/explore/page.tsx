@@ -180,7 +180,10 @@ function ExplorePageInner() {
       {/* Header */}
       <header className="glass" style={{ position: "sticky", top: 0, zIndex: 40 }}>
         <div style={{ width: "100%", padding: "12px 20px 10px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <BackButton href="/dashboard" />
+          {/* Standard back: pop the browser history. Dropped the hardcoded
+              `href="/dashboard"` — if the user arrived from /search, a deep
+              link, or anywhere else, back should return them there. */}
+          <BackButton />
 
           <h1
             className="h-page h-page--brand"
