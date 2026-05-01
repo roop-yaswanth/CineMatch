@@ -9,7 +9,7 @@
  * No inactivity logout — session is managed by the app itself.
  */
 
-const CACHE_VERSION = "v5.2";
+const CACHE_VERSION = "v5.3";
 const SHELL_CACHE = `cinematch-shell-${CACHE_VERSION}`;
 const IMAGE_CACHE = `cinematch-images-${CACHE_VERSION}`;
 const API_CACHE = `cinematch-api-${CACHE_VERSION}`;

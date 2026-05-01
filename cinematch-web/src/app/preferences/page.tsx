@@ -25,14 +25,15 @@ export default function PreferencesPage() {
   );
 
   const handleUpdate = async (prefs: RecommendationPreferences) => {
-    // Store updated preferences in sessionStorage so the dashboard can pick them up
+    // Stash for the dashboard to pick up on mount/visibility — DO NOT navigate
+    // here. PreferencesModal calls onClose() right after onUpdate(), which
+    // already triggers router.back(). If we also navigate here we end up
+    // calling router.back() twice and the user is bounced past /dashboard
+    // (back to the previous route) while sessionStorage is still pending,
+    // which looks like "Apply did nothing".
     try {
       sessionStorage.setItem("cinematch_prefs_update", JSON.stringify(prefs));
     } catch { /* ignore */ }
-    // Add a small delay to ensure the preferences are saved before navigating back
-    setTimeout(() => {
-      router.back();
-    }, 100);
   };
 
   if (isLoading || !session || !preferences) return null;

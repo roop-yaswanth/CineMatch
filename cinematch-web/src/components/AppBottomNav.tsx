@@ -195,10 +195,11 @@ export default function AppBottomNav() {
         justifyContent: "center",
         alignItems: "center",
         gap: "10px",
-        // Bumped the static bottom from 14px → 22px so the nav clears the
-        // iOS home indicator (the safe-area inset alone left the pill flush
-        // against the indicator on the swipe-up zone).
-        padding: "0 16px calc(22px + env(safe-area-inset-bottom))",
+        // Lift the bar well above the iOS home indicator. The safe-area
+        // inset alone (~34px on iPhones with rounded corners) puts the pill
+        // flush against the swipe-up zone, where edge taps are eaten by the
+        // OS gesture. 36px static + safe-area moves the pill clear of both.
+        padding: "0 16px calc(36px + env(safe-area-inset-bottom))",
         pointerEvents: hidden ? "none" : "auto",
         transform: hidden ? "translateY(140%)" : "translateY(0)",
         transition: "transform 280ms cubic-bezier(0.4, 0, 0.2, 1)",
