@@ -228,7 +228,10 @@ function ExplorePageInner() {
       </header>
 
       {/* Content */}
-      <div className="app-container" style={{ flex: 1, width: "100%", padding: "20px 0 80px" }}>
+      {/* Bottom padding clears the floating bottom-nav (pill ≈ 72px + 28px
+          static lift + safe-area). 80px wasn't enough — the last row's
+          titles ended up under the nav on phones with home indicators. */}
+      <div className="app-container" style={{ flex: 1, width: "100%", padding: "20px 0 calc(120px + env(safe-area-inset-bottom))" }}>
         {tab === "all" ? (
           <div style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
             {CATEGORIES.map((cat) => (

@@ -1448,6 +1448,34 @@ a,
   contain: layout paint;
 }
 
+/* ─── Tactile press feedback ──────────────────────────────────
+   Native iOS / Material both give a subtle "press-in" on every
+   tap. Without it, our buttons feel more like flat decorations
+   than interactive surfaces. The transform is GPU-cheap and the
+   100 ms duration is below perceptual delay. Skipped for inputs
+   (would interfere with text-cursor placement) and for elements
+   that opt out via `data-press="off"`. */
+button:not([data-press="off"]):active,
+a[role="button"]:active,
+[role="button"]:not([data-press="off"]):active,
+.glass-button:active,
+.glass-pill:active,
+.menu-btn:active {
+  transform: scale(0.97);
+  transition: transform 100ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button:active,
+  a[role="button"]:active,
+  [role="button"]:active,
+  .glass-button:active,
+  .glass-pill:active,
+  .menu-btn:active {
+    transform: none;
+  }
+}
+
 /* ═══════════════════════════════════════════════════════════
    Search header — responsive (Netflix-style)
    Mobile : icon only  →  tap → full-page overlay

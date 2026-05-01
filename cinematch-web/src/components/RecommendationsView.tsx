@@ -518,11 +518,29 @@ export default function RecommendationsView({
           // Append fresh recs to whatever's already in the cache. Subsequent
           // swipes naturally drain the cache and the new supply lands at
           // the END — so existing cards stay first.
+          //
+          // Cap each bucket so repeated reruns don't grow the cache
+          // unboundedly. 80 per bucket × 3 buckets ≈ 240 candidates is
+          // plenty of runway between reruns.
+          const CAP = 80;
           bucketCacheRef.current = {
-            hollywood: [...(bucketCacheRef.current.hollywood || []), ...newEn],
-            matched:   [...(bucketCacheRef.current.matched   || []), ...newReg],
-            other:     [...(bucketCacheRef.current.other     || []), ...newGlob],
+            hollywood: [...(bucketCacheRef.current.hollywood || []), ...newEn].slice(-CAP),
+            matched:   [...(bucketCacheRef.current.matched   || []), ...newReg].slice(-CAP),
+            other:     [...(bucketCacheRef.current.other     || []), ...newGlob].slice(-CAP),
           };
+
+          // Persist the new bucketCache to localStorage. The write effect
+          // below only fires on stacks/movies changes — autoRerun mutates
+          // the cache without touching either, so without this explicit
+          // write the freshly-fetched recs would only live in memory and
+          // be lost on the next dashboard mount.
+          writeRecsCache(session.session_id, {
+            stacks,
+            movies,
+            bucketCache: bucketCacheRef.current,
+            seenIds: Array.from(seenIdsRef.current),
+            displayedIds: Array.from(displayedIdsRef.current),
+          });
 
           if (resp.session) onSessionUpdate(resp.session);
         } else {
@@ -1105,7 +1123,18 @@ export default function RecommendationsView({
                 - "hollywood" / "other" become compact rails so users can
                   passively browse without committing to ratings on every card. */}
             {!loading && (
-              <div style={{ display: "grid", gap: "40px" }}>
+              <div
+                style={{
+                  display: "grid",
+                  gap: "40px",
+                  // Reserve space at the bottom of the scroll content so the
+                  // last rail's titles aren't covered by the floating bottom
+                  // nav (pill ≈ 72 px + 28 px static lift + safe-area inset).
+                  // Without this, "Tabu / Oslo / Doctor" titles in the Global
+                  // Cinema row got clipped by the nav.
+                  paddingBottom: "calc(120px + env(safe-area-inset-bottom))",
+                }}
+              >
                 {stacks.map((stack) =>
                   stack.id === "matched" ? (
                     <StackRow

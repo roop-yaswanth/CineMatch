@@ -597,11 +597,14 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                     aria-label={showWatchProviders ? "Close streaming info" : "Close"}
                     style={{
                       position: "absolute",
-                      top: isMobile ? "calc(env(safe-area-inset-top) + 10px)" : "10px",
-                      right: "10px",
+                      top: isMobile ? "calc(env(safe-area-inset-top) + 12px)" : "12px",
+                      right: "12px",
                       zIndex: 25,
-                      width: "32px",
-                      height: "32px",
+                      // 40px touch target — was 32px which falls below the
+                      // iOS / Material 44px guideline and felt fiddly to
+                      // hit one-handed.
+                      width: "40px",
+                      height: "40px",
                       borderRadius: "50%",
                       background: "rgba(0,0,0,0.55)",
                       border: "1px solid rgba(255,255,255,0.18)",
@@ -612,10 +615,13 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                       justifyContent: "center",
                       color: "#fff",
                       cursor: "pointer",
-                      transition: "background 0.2s",
+                      transition: "background 160ms ease, transform 120ms ease",
                     }}
+                    onPointerDown={(e) => { (e.currentTarget as HTMLElement).style.transform = "scale(0.92)"; }}
+                    onPointerUp={(e) => { (e.currentTarget as HTMLElement).style.transform = ""; }}
+                    onPointerLeave={(e) => { (e.currentTarget as HTMLElement).style.transform = ""; }}
                   >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                       <line x1="18" y1="6" x2="6" y2="18" />
                       <line x1="6" y1="6" x2="18" y2="18" />
                     </svg>

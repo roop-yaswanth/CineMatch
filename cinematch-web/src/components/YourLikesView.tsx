@@ -377,7 +377,18 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
         </div>
 
         {/* Content */}
-        <div className="likes-content" style={{ flex: 1, padding: "24px", overflowY: "auto" }}>
+        <div
+          className="likes-content"
+          style={{
+            flex: 1,
+            // Reserve room at the bottom so the last grid row clears the
+            // floating bottom nav (pill ≈ 72 px + 28 px static lift +
+            // safe-area). Without this, the bottom-most cards' titles are
+            // hidden behind the nav.
+            padding: "24px 24px calc(120px + env(safe-area-inset-bottom))",
+            overflowY: "auto",
+          }}
+        >
           {loading && (
             <div className="likes-grid"
               style={{
