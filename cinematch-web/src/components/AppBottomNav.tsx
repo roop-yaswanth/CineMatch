@@ -96,6 +96,16 @@ export default function AppBottomNav() {
   const { session } = useSession();
   const [hidden, setHidden] = useState(false);
 
+  // Render nothing until after the first client commit. The server render
+  // (and the SW-cached HTML) has no session, so the nav is omitted there;
+  // on the client `useSession` may have already rehydrated from
+  // localStorage by the time React hydrates, leading to a "client added a
+  // <div> the server didn't render" mismatch on /dashboard. Gating on a
+  // mounted flag forces both renders to agree (null, then the real nav
+  // appears on the next client render).
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
   // Displayed active id is used to sequence the shared layout element
   // across intermediate items for multi-step jumps (1 -> 3 becomes
   // 1 -> 2 -> 3) so the motion feels like a flowing bubble.
@@ -178,7 +188,7 @@ export default function AppBottomNav() {
     };
   }, [activeId, displayedActiveId]);
 
-  if (!session) return null;
+  if (!mounted || !session) return null;
   if (HIDDEN_ROUTES.some((m) => m(pathname))) return null;
 
   return (

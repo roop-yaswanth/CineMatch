@@ -584,10 +584,20 @@ export default function RecommendationsView({
     [generate]
   );
 
-  // Pick up preference updates from /preferences page via sessionStorage
+  // Pick up preference updates from /preferences page.
+  //
+  // Three delivery channels because the App Router caches /dashboard:
+  // back-navigation from /preferences DOES NOT remount this component, so
+  // a mount-only check is dead code on the common path.
+  //
+  //  (a) Custom window event — fires inline while we're still mounted, so
+  //      router.back() from /preferences delivers immediately. This is the
+  //      primary path.
+  //  (b) Mount-time sessionStorage check — covers cold reloads / hard
+  //      navigation where (a) was missed.
+  //  (c) visibilitychange — covers backgrounding the PWA and returning.
   useEffect(() => {
-    const handleVisibility = () => {
-      if (document.visibilityState !== "visible") return;
+    const consumeStorage = () => {
       try {
         const raw = sessionStorage.getItem("cinematch_prefs_update");
         if (raw) {
@@ -598,24 +608,38 @@ export default function RecommendationsView({
       } catch { /* ignore */ }
     };
 
-    // Also check immediately on mount (covers back-navigation)
-    try {
-      const raw = sessionStorage.getItem("cinematch_prefs_update");
-      if (raw) {
-        sessionStorage.removeItem("cinematch_prefs_update");
-        const nextPrefs = JSON.parse(raw) as RecommendationPreferences;
-        handlePreferenceUpdate(nextPrefs);
-      }
-    } catch { /* ignore */ }
+    const handleEvent = (e: Event) => {
+      const detail = (e as CustomEvent<RecommendationPreferences>).detail;
+      // Clear any stashed copy so the mount-time path doesn't double-apply.
+      try { sessionStorage.removeItem("cinematch_prefs_update"); } catch { /* ignore */ }
+      if (detail) handlePreferenceUpdate(detail);
+      else consumeStorage();
+    };
 
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") consumeStorage();
+    };
+
+    // Run once on mount in case we got here via a hard reload.
+    consumeStorage();
+
+    window.addEventListener("cinematch:prefs-update", handleEvent as EventListener);
     document.addEventListener("visibilitychange", handleVisibility);
-    return () => document.removeEventListener("visibilitychange", handleVisibility);
+    return () => {
+      window.removeEventListener("cinematch:prefs-update", handleEvent as EventListener);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
   }, [handlePreferenceUpdate]);
 
   return (
     <div
       style={{
-        minHeight: "100dvh",
+        // Fill the viewport exactly and own scroll inside this container.
+        // Body scroll is locked at the dashboard page level (so the global
+        // footer can't slide up *behind* the fixed swipe cards), so all
+        // vertical scrolling for rails / extra content has to happen in
+        // here instead.
+        height: "100dvh",
         display: "flex",
         flexDirection: "column",
         fontFamily: "var(--font-sans)",
@@ -625,7 +649,10 @@ export default function RecommendationsView({
         // width: 100% inherits correctly from the zoomed html element.
         maxWidth: "100%",
         overflowX: "hidden",
+        overflowY: "auto",
+        WebkitOverflowScrolling: "touch",
         position: "relative",
+        background: "var(--color-bg)",
       }}
     >
       <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", minHeight: "100dvh" }}>

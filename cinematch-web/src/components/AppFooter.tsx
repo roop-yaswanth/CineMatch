@@ -24,17 +24,9 @@ const HIDDEN_ROUTES: Array<(p: string) => boolean> = [
   (p) => p.startsWith("/onboarding"),
   // Preferences renders a fixed modal; hide the footer so it doesn't bleed through.
   (p) => p === "/preferences",
-  // Dashboard is a fixed-viewport swipe stack; the footer would render
-  // *behind* it (children + footer are siblings in the body flow but the
-  // stack uses fixed/100dvh layers), so hide it entirely on /dashboard.
-  // Match with startsWith so a trailing slash (`/dashboard/`) still hides.
-  (p) => p === "/" || p.startsWith("/dashboard"),
-  // Your-likes / search / explore are app-shell pages where the bottom nav
-  // already anchors the bottom of the screen; the footer would clash.
-  (p) => p.startsWith("/your-likes"),
-  (p) => p.startsWith("/search"),
-  (p) => p.startsWith("/explore"),
-  (p) => p.startsWith("/person"),
+  // Footer renders on every other route. On the dashboard the stack uses
+  // `position: fixed` cards, which used to expose the footer through body
+  // scroll — fixed in dashboard/page.tsx by locking body overflow there.
 ];
 
 export default function AppFooter() {
