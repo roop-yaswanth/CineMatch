@@ -17,7 +17,7 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 
 import { useSession } from "@/context/SessionContext";
@@ -106,13 +106,18 @@ export default function AppBottomNav() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
 
-  // Displayed active id is used to sequence the shared layout element
-  // across intermediate items for multi-step jumps (1 -> 3 becomes
-  // 1 -> 2 -> 3) so the motion feels like a flowing bubble.
-  const [displayedActiveId, setDisplayedActiveId] = useState<NavItem["id"] | null>(activeIdFor(pathname, filterParam));
-  const seqTimeout = useRef<number | null>(null);
-
+  // The bottom nav previously sequenced the active pill through every
+  // intermediate item on multi-step jumps ("flowing bubble" effect). It
+  // depended on `displayedActiveId` for both reading and writing inside
+  // the same effect, which caused the effect to re-run on every render
+  // and (on /your-likes ↔ ?filter=watchlist switches in particular) made
+  // the pill visibly lag — sometimes the tap looked unresponsive.
+  //
+  // The framer-motion `layoutId` already animates magic-moves between
+  // any two positions perfectly. Drop the manual sequencing and just
+  // mirror the real activeId.
   const activeId = activeIdFor(pathname, filterParam);
+  const displayedActiveId = activeId;
   const searchActive = pathname.startsWith("/search");
 
   useEffect(() => {
@@ -136,57 +141,6 @@ export default function AppBottomNav() {
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
-
-  useEffect(() => {
-    // Sequence the displayed active pill when the real activeId jumps
-    // more than one position. For single-step moves we just mirror
-    // the activeId so framer-motion's layout tween handles it.
-    if (seqTimeout.current) {
-      window.clearTimeout(seqTimeout.current);
-      seqTimeout.current = null;
-    }
-    if (!activeId) {
-      Promise.resolve().then(() => setDisplayedActiveId(null));
-      return;
-    }
-    const currentIndex = NAV_ITEMS.findIndex((n) => n.id === displayedActiveId);
-    const targetIndex = NAV_ITEMS.findIndex((n) => n.id === activeId);
-    if (currentIndex === -1) {
-      Promise.resolve().then(() => setDisplayedActiveId(activeId));
-      return;
-    }
-    const diff = targetIndex - currentIndex;
-    const step = diff > 0 ? 1 : -1;
-    if (Math.abs(diff) <= 1) {
-      Promise.resolve().then(() => setDisplayedActiveId(activeId));
-      return;
-    }
-
-    // Build sequence of intermediate ids and step through them with short delays.
-    const ids: Array<NavItem["id"]> = [];
-    for (let i = currentIndex + step; step > 0 ? i <= targetIndex : i >= targetIndex; i += step) {
-      ids.push(NAV_ITEMS[i].id);
-    }
-
-    // Animate through each id in order. Use a small timeout so layoutId
-    // tweens are visible and feel like a flowing bubble.
-    let idx = 0;
-    const tick = () => {
-      setDisplayedActiveId(ids[idx]);
-      idx += 1;
-      if (idx < ids.length) {
-        seqTimeout.current = window.setTimeout(tick, 120);
-      }
-    };
-    // start the sequence after a tiny delay to allow the first layout frame
-    seqTimeout.current = window.setTimeout(tick, 40);
-    return () => {
-      if (seqTimeout.current) {
-        window.clearTimeout(seqTimeout.current);
-        seqTimeout.current = null;
-      }
-    };
-  }, [activeId, displayedActiveId]);
 
   if (!mounted || !session) return null;
   if (HIDDEN_ROUTES.some((m) => m(pathname))) return null;

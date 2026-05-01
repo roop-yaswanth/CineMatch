@@ -1218,7 +1218,17 @@ function StackDetailView({
         position: "fixed",
         inset: 0,
         zIndex: 50,
-        background: "transparent",
+        // Solid bg, NOT transparent. Two reasons:
+        //  (1) RouteTransition wraps children with a 180ms `transform`
+        //      animation. While that transform is active, `position:fixed`
+        //      descendants are re-anchored to the transformed ancestor
+        //      instead of the viewport — which briefly exposed the global
+        //      footer through the transparent grid gaps on this overlay.
+        //  (2) Even without that quirk, a transparent full-screen overlay
+        //      is fragile: anything painted in the body below (footer,
+        //      extra route content) bleeds through whenever the stacking
+        //      context changes. Solid bg = bug surface area = 0.
+        background: "var(--color-bg)",
         overflowY: "auto",
         overflowX: "hidden",
         overscrollBehavior: "none",   // prevent iOS rubber-band bounce to top pill
