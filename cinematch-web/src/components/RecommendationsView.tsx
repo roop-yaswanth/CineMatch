@@ -401,9 +401,17 @@ export default function RecommendationsView({
   );
 
   const silentRefreshInFlight = useRef(false);
+  // Monotonically increasing token stamped on every silentRefresh call.
+  // The handler discards a response whose token is older than the current
+  // value — without this guard, a slow batch landing after the user has
+  // already kept tapping (which advances stacks state) silently overwrites
+  // the fresher state with stale data.
+  const silentRefreshToken = useRef(0);
   const silentRefresh = useCallback(async (prefs: RecommendationPreferences) => {
     if (silentRefreshInFlight.current) return;
     silentRefreshInFlight.current = true;
+    silentRefreshToken.current += 1;
+    const myToken = silentRefreshToken.current;
     try {
       const resp = await apiMultiRecommendations(session.session_id, {
         languages: prefs.languages,
@@ -414,6 +422,11 @@ export default function RecommendationsView({
         semantic_index: prefs.semantic_index,
         per_bucket_k: BUCKET_FETCH,
       });
+
+      // Drop the response if a newer silentRefresh has been kicked off
+      // while we were waiting on the network — the newer one will deliver
+      // fresher data.
+      if (myToken !== silentRefreshToken.current) return;
 
       const totalMovies = [
         ...(resp.buckets.english || []),
@@ -429,6 +442,9 @@ export default function RecommendationsView({
       }
 
       await prefetchPosters(totalMovies);
+      // Re-check the token after the await — prefetchPosters can be slow
+      // on cold caches and another refresh may have started in the meantime.
+      if (myToken !== silentRefreshToken.current) return;
       applyBucketResponse(resp, prefs);
       if (resp.session) onSessionUpdate(resp.session);
     } catch (err) {

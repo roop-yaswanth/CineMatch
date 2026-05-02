@@ -1035,7 +1035,31 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                       )}
                     </div>
                     {creditsLoading && cast.length === 0 ? (
-                      <div style={{ color: "var(--color-text-muted)", fontSize: "13px", padding: "8px 0" }}>Loading…</div>
+                      // Skeleton placeholders that match the real cast row
+                      // dimensions (92×92 circles + two title lines). Was a
+                      // bare "Loading…" string which read as a bug on slow
+                      // networks where the wait can stretch 1–2 seconds.
+                      <div style={{ display: "flex", gap: "12px", overflowX: "hidden", paddingBottom: "0" }}>
+                        {Array.from({ length: 6 }).map((_, i) => (
+                          <div key={i} style={{ width: "92px", flexShrink: 0 }}>
+                            <div
+                              className="skeleton-shimmer"
+                              style={{
+                                width: "92px", height: "92px",
+                                borderRadius: "50%", marginBottom: "8px",
+                              }}
+                            />
+                            <div
+                              className="skeleton-shimmer"
+                              style={{ height: "12px", width: "78%", borderRadius: "999px", marginBottom: "4px" }}
+                            />
+                            <div
+                              className="skeleton-shimmer"
+                              style={{ height: "11px", width: "55%", borderRadius: "999px" }}
+                            />
+                          </div>
+                        ))}
+                      </div>
                     ) : (
                       <div ref={castRowRef} style={{ display: "flex", gap: "12px", overflowX: "auto", paddingBottom: "0", scrollbarWidth: "none", msOverflowStyle: "none" }}>
                         {cast.map((c) => (

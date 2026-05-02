@@ -214,7 +214,27 @@ function SearchPage() {
             <button
               onClick={() => setQuery("")}
               aria-label="Clear"
-              style={{ position: "absolute", right: "32px", top: "12px", background: "none", border: "none", cursor: "pointer", color: "var(--color-text-muted)", padding: "4px" }}
+              // 40 px touch target — was `padding: 4px` which gave a
+              // ~16×16 hit area, well below the iOS 44 px guideline. The
+              // visual icon stays 16×16; the surrounding box just becomes
+              // easier to tap.
+              style={{
+                position: "absolute",
+                right: "24px",
+                top: "50%",
+                transform: "translateY(-50%)",
+                width: "40px",
+                height: "40px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: "none",
+                border: "none",
+                borderRadius: "999px",
+                cursor: "pointer",
+                color: "var(--color-text-muted)",
+                padding: 0,
+              }}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
