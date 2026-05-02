@@ -8,7 +8,7 @@ import { motion } from "framer-motion";
 
 import dynamic from "next/dynamic";
 import MobileMenu from "@/components/MobileMenu";
-import BackButton from "@/components/ui/BackButton";
+import PageHeader from "@/components/ui/PageHeader";
 import type { DetailMovie } from "@/components/modals/MovieDetailModal";
 import { useSession } from "@/context/SessionContext";
 
@@ -160,25 +160,15 @@ function SearchPage() {
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--color-bg)", display: "flex", flexDirection: "column" }}>
-      {/* Header */}
-      <header className="glass" style={{ position: "sticky", top: 0, zIndex: 40 }}>
-        <div style={{ width: "100%", padding: "12px 20px 10px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <BackButton />
-
-          <h1
-            className="h-page h-page--brand"
-            style={{ flex: 1, textAlign: "center" }}
-          >
-            Search
-          </h1>
-
-          <div style={{ width: "40px", flexShrink: 0, display: "flex", justifyContent: "flex-end" }}>
-            {session && <MobileMenu onLogout={() => { logout(); router.replace("/login"); }} />}
-          </div>
-        </div>
-
+      {/* Header — shared <PageHeader> for layout consistency. */}
+      <PageHeader
+        title="Search"
+        rightSlot={
+          session ? <MobileMenu onLogout={() => { logout(); router.replace("/login"); }} /> : null
+        }
+      >
         {/* Search input */}
-        <div style={{ padding: "0 20px 12px", position: "relative" }}>
+        <div style={{ padding: "0 var(--s-header-x) var(--s-3)", position: "relative" }}>
           <input
             ref={inputRef}
             type="text"
@@ -277,10 +267,10 @@ function SearchPage() {
             );
           })}
         </div>
-      </header>
+      </PageHeader>
 
       {/* Body */}
-      <div className="app-container" style={{ flex: 1, width: "100%", padding: "20px 20px 120px" }}>
+      <div className="app-container" style={{ flex: 1, width: "100%", padding: "var(--s-5) var(--s-header-x) var(--s-bottom-clearance)" }}>
         {!debounced ? (
           <RecentSearchesPanel
             recents={recents}

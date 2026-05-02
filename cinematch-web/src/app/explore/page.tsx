@@ -8,7 +8,7 @@ import dynamic from "next/dynamic";
 import MovieCard from "@/components/MovieCard";
 import type { DetailMovie } from "@/components/modals/MovieDetailModal";
 import MobileMenu from "@/components/MobileMenu";
-import BackButton from "@/components/ui/BackButton";
+import PageHeader from "@/components/ui/PageHeader";
 import EmptyState from "@/components/ui/EmptyState";
 import { SkeletonGrid, SkeletonRail } from "@/components/ui/Skeleton";
 
@@ -177,30 +177,18 @@ function ExplorePageInner() {
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--color-bg)", display: "flex", flexDirection: "column" }}>
-      {/* Header */}
-      <header className="glass" style={{ position: "sticky", top: 0, zIndex: 40 }}>
-        <div style={{ width: "100%", padding: "12px 20px 10px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          {/* Standard back: pop the browser history. Dropped the hardcoded
-              `href="/dashboard"` — if the user arrived from /search, a deep
-              link, or anywhere else, back should return them there. */}
-          <BackButton />
-
-          <h1
-            className="h-page h-page--brand"
-            style={{ flex: 1, textAlign: "center" }}
-          >
-            Explore
-          </h1>
-
-          <div style={{ width: "40px", flexShrink: 0, display: "flex", justifyContent: "flex-end" }}>
-            {session && (
-              <MobileMenu onLogout={() => { logout(); router.replace("/login"); }} />
-            )}
-          </div>
-        </div>
-
-        {/* Category tabs */}
-        <div style={{ padding: "0 20px 12px", display: "flex", gap: "8px", overflowX: "auto", scrollbarWidth: "none" }}>
+      {/* Header — uses the shared <PageHeader> so back-button placement,
+          title centering and right-slot spacing match every other page. */}
+      <PageHeader
+        title="Explore"
+        rightSlot={
+          session ? (
+            <MobileMenu onLogout={() => { logout(); router.replace("/login"); }} />
+          ) : null
+        }
+      >
+        {/* Category tabs scroll horizontally below the header row. */}
+        <div style={{ padding: "0 var(--s-header-x) var(--s-3)", display: "flex", gap: "var(--s-2)", overflowX: "auto", scrollbarWidth: "none" }}>
           {TAB_OPTIONS.map((t) => {
             const active = tab === t.id;
             return (
@@ -225,13 +213,11 @@ function ExplorePageInner() {
             );
           })}
         </div>
-      </header>
+      </PageHeader>
 
-      {/* Content */}
-      {/* Bottom padding clears the floating bottom-nav (pill ≈ 72px + 28px
-          static lift + safe-area). 80px wasn't enough — the last row's
-          titles ended up under the nav on phones with home indicators. */}
-      <div className="app-container" style={{ flex: 1, width: "100%", padding: "20px 0 calc(120px + env(safe-area-inset-bottom))" }}>
+      {/* Content. Bottom padding (`--s-bottom-clearance`) reserves space
+          for the floating bottom-nav so the last row isn't hidden. */}
+      <div className="app-container" style={{ flex: 1, width: "100%", padding: "var(--s-5) 0 var(--s-bottom-clearance)" }}>
         {tab === "all" ? (
           <div style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
             {CATEGORIES.map((cat) => (

@@ -8,7 +8,7 @@ import { motion } from "framer-motion";
 import dynamic from "next/dynamic";
 import { PersonContent } from "@/components/PersonProfileContent";
 import MobileMenu from "@/components/MobileMenu";
-import BackButton from "@/components/ui/BackButton";
+import PageHeader from "@/components/ui/PageHeader";
 import EmptyState from "@/components/ui/EmptyState";
 import type { DetailMovie } from "@/components/modals/MovieDetailModal";
 
@@ -82,35 +82,28 @@ export default function PersonPage() {
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--color-bg)", display: "flex", flexDirection: "column" }}>
-      {/* Header */}
-      <header className="glass" style={{ position: "sticky", top: 0, zIndex: 40 }}>
-        <div style={{ width: "100%", padding: "12px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <BackButton />
-          <h1
-            className="heading-display"
+      {/* Header — shared <PageHeader>. Title truncates with ellipsis when
+          a person's name is too long for the centered slot. */}
+      <PageHeader
+        title={
+          <span
             style={{
-              flex: 1,
-              fontSize: "18px",
-              fontWeight: 600,
-              letterSpacing: "-0.02em",
-              color: "var(--color-text-primary)",
-              margin: 0,
-              textAlign: "center",
+              display: "inline-block",
+              maxWidth: "100%",
               overflow: "hidden",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
-              padding: "0 12px",
             }}
           >
             {data?.name || "Person"}
-          </h1>
-          <div style={{ width: "40px", flexShrink: 0, display: "flex", justifyContent: "flex-end" }}>
-            {session && <MobileMenu onLogout={() => { logout(); router.replace("/login"); }} />}
-          </div>
-        </div>
-      </header>
+          </span>
+        }
+        rightSlot={
+          session ? <MobileMenu onLogout={() => { logout(); router.replace("/login"); }} /> : null
+        }
+      />
 
-      <div className="app-container" style={{ flex: 1, width: "100%", padding: "24px 20px 80px", maxWidth: "1100px", margin: "0 auto" }}>
+      <div className="app-container" style={{ flex: 1, width: "100%", padding: "var(--s-5) var(--s-header-x) var(--s-bottom-clearance)", maxWidth: "1100px", margin: "0 auto" }}>
         {loading ? (
           <PersonSkeleton />
         ) : !data ? (

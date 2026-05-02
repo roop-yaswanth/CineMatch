@@ -6,7 +6,7 @@ import Image from "next/image";
 import dynamic from "next/dynamic";
 import { apiGetHistory, languageLabel, apiRecommendationAction, type HistoryItem } from "@/lib/api";
 import { usePoster } from "@/lib/usePoster";
-import BackButton from "@/components/ui/BackButton";
+import PageHeader from "@/components/ui/PageHeader";
 import EmptyState from "@/components/ui/EmptyState";
 import type { DetailMovie } from "@/components/modals/MovieDetailModal";
 
@@ -225,55 +225,20 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
           background: "var(--color-bg)",
         }}
       >
-        {/* Header */}
-        <div
-          className="glass likes-header"
-          style={{
-            position: "sticky",
-            top: 0,
-            zIndex: 10,
-            padding: "12px 20px 10px",
-            borderBottom: "1px solid var(--color-border-subtle)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: "10px",
-          }}
-        >
-          {/* Left: back button (matches Explore / Search / Person headers). */}
-          <BackButton onClick={onClose} ariaLabel="Go back" />
-
-          {/* Center: title — same pattern as Explore (`flex:1; text-align:center`)
-              so the heading is optically centered between the back button on
-              the left and the spacer on the right. Previously the title was
-              packed inside the left flex group, which placed it left-of-center
-              on wide screens and made it look right-of-the-back-button rather
-              than centered like every other page. */}
-          <h2
-            className="h-page"
-            style={{
-              flex: 1,
-              textAlign: "center",
-              fontSize: "18px",
-              fontWeight: 600,
-              letterSpacing: "-0.02em",
-              margin: 0,
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "8px",
-            }}
-          >
-            <span style={{ color: "var(--color-like)", display: "inline-flex" }}>
-              <IconHeart />
+        {/* Header — shared <PageHeader> component. The heart-shaped icon
+            sits inline with the title text inside the centered slot. */}
+        <PageHeader
+          onBack={onClose}
+          backAriaLabel="Go back"
+          title={
+            <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "var(--s-2)" }}>
+              <span style={{ color: "var(--color-like)", display: "inline-flex" }}>
+                <IconHeart />
+              </span>
+              Your Collection
             </span>
-            Your Collection
-          </h2>
-
-          {/* Right: invisible spacer of the same width as the back button so
-              the title is balanced. Matches Explore's right-side menu slot. */}
-          <div style={{ width: "44px", flexShrink: 0 }} aria-hidden />
-        </div>
+          }
+        />
 
         {/* Filters */}
         <div className="likes-filters"

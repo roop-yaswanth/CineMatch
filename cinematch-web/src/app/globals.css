@@ -76,6 +76,29 @@
   --rgb-dislike: 255, 69, 58;
   --rgb-skip: 142, 142, 147;
 
+  /* ─── Spacing Scale ──────────────────────────────────────────
+     Use these variables instead of hardcoded pixel values for
+     padding/margin/gap. The scale is geometric (4 → 8 → 12 → 16 → 24
+     → 32 → 48 → 64) which keeps a consistent visual rhythm without
+     forcing rigid 4-or-8-only adherence. The named aliases on the
+     right map to common UI roles so a header can ask for `--s-header`
+     instead of memorizing whether that's `--s-3` or `--s-4`. */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --s-7: 48px;
+  --s-8: 64px;
+
+  /* Role aliases — change once here to retune the whole app. */
+  --s-header-y: 12px;     /* sticky header vertical padding */
+  --s-header-x: 20px;     /* sticky header horizontal padding */
+  --s-section-gap: 32px;  /* gap between rails on dashboard / explore */
+  --s-card-gap: 16px;     /* gap inside a row of cards */
+  --s-bottom-clearance: calc(120px + env(safe-area-inset-bottom));
+
   /* ─── Radius Scale (Apple uses continuous curvature) ─── */
   --radius-xs: 6px;
   --radius-sm: 10px;

@@ -6,7 +6,7 @@
  * rebuilding the same scaffold.
  */
 
-import BackButton from "@/components/ui/BackButton";
+import PageHeader from "@/components/ui/PageHeader";
 
 interface Props {
   title: string;
@@ -26,23 +26,10 @@ export default function LegalShell({ title, updated, children }: Props) {
 
   return (
     <div style={{ minHeight: "100dvh", background: "var(--color-bg)", display: "flex", flexDirection: "column" }}>
-      <header className="glass" style={{ position: "sticky", top: 0, zIndex: 40 }}>
-        <div
-          style={{
-            width: "100%",
-            padding: "12px 20px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
-        >
-          <BackButton />
-          <h1 className="h-page" style={{ flex: 1, textAlign: "center", fontSize: 18 }}>
-            {title}
-          </h1>
-          <div style={{ width: 44 }} />
-        </div>
-      </header>
+      {/* Shared header — same component used by Explore / Search / Person /
+          Your Likes so the legal pages don't drift visually from the rest
+          of the app. */}
+      <PageHeader title={title} />
 
       <div
         className="legal-prose"
@@ -50,7 +37,7 @@ export default function LegalShell({ title, updated, children }: Props) {
           width: "100%",
           maxWidth: 720,
           margin: "0 auto",
-          padding: "32px 24px 80px",
+          padding: "var(--s-6) var(--s-5) var(--s-bottom-clearance)",
         }}
       >
         {updatedHuman && (

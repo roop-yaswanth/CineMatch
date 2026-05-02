@@ -118,7 +118,7 @@ export default function PreferencesModal({ preferences, onUpdate, onClose, mode 
           }}
         >
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "24px" }}>
-            <h2 style={{ fontSize: "18px", fontWeight: 600, letterSpacing: "-0.02em", margin: 0 }}>
+            <h2 className="h-section" style={{ margin: 0 }}>
               Preferences
             </h2>
             <button
