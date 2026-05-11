@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import Image from "next/image";
+
 import type { CountryProviders, WatchProvider, WatchProvidersResponse } from "@/app/api/tmdb-watch-providers/route";
 
 interface Props {
@@ -230,7 +230,7 @@ function ProviderRow({ title, providers, link }: { title: string; providers?: Wa
               onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.transform = "scale(1)"; }}
             >
               {logoUrl ? (
-                <Image src={logoUrl} alt={p.provider_name} fill sizes="44px" style={{ objectFit: "cover" }} />
+                <img src={logoUrl} alt={p.provider_name} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
               ) : (
                 <span style={{ fontSize: "9px", color: "rgba(255,255,255,0.7)", padding: "2px", textAlign: "center", lineHeight: 1.1 }}>{p.provider_name}</span>
               )}

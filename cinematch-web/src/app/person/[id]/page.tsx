@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import Image from "next/image";
 import { motion } from "framer-motion";
 
 import dynamic from "next/dynamic";

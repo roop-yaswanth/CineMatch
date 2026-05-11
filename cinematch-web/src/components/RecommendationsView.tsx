@@ -11,7 +11,7 @@ import { useRouter } from "next/navigation";
 
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import Image from "next/image";
+
 
 
 import dynamic from "next/dynamic";
@@ -895,7 +895,7 @@ export default function RecommendationsView({
                   >
                     <div style={{ width: "52px", height: "78px", borderRadius: "8px", overflow: "hidden", flexShrink: 0, background: "rgba(255,255,255,0.06)" }}>
                       {movie.poster_path && (
-                        <Image src={posterUrl(movie.poster_path, "w92")} alt={movie.title} width={52} height={78} style={{ objectFit: "cover", width: "100%", height: "100%" }} />
+                        <img src={posterUrl(movie.poster_path, "w92")} alt={movie.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                       )}
                     </div>
                     <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", justifyContent: "center" }}>
@@ -1794,7 +1794,7 @@ function PosterCard({
           >
             {/* The Image Header (Poster or Backdrop) */}
             <div style={{ position: "relative", width: "100%", height: expandedImgHeight, flexShrink: 0 }}>
-              <Image src={hasBackdrop ? backdrop : poster} alt={movie.title} fill sizes="400px" style={{ objectFit: "cover", objectPosition: "center 20%" }} />
+              <img src={hasBackdrop ? backdrop : poster} alt={movie.title} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 20%" }} />
               <div style={{ position: "absolute", bottom: -2, left: 0, right: 0, height: "65%", background: "linear-gradient(to top, #18191c 0%, rgba(24,25,28,0.95) 20%, rgba(24,25,28,0.6) 50%, rgba(24,25,28,0) 100%)", pointerEvents: "none" }} />
               {imdb && (
                 <div style={{ position: "absolute", top: "12px", right: "12px", padding: "4px 8px", borderRadius: "8px", background: "rgba(0,0,0,0.7)", fontSize: "11px", fontWeight: 700, color: "#e8c84a", display: "flex", alignItems: "center", gap: "4px", boxShadow: "0 4px 12px rgba(0,0,0,0.4)" }}>
@@ -1872,7 +1872,7 @@ function PosterCard({
           className="poster-container"
           style={{ position: "relative", aspectRatio: "2 / 3", borderRadius: "12px", overflow: "hidden", background: "transparent", cursor: "pointer", border: "1px solid transparent", transition: "border-color 0.22s ease" }}
         >
-          <Image src={poster} alt={movie.title} fill sizes="(max-width: 640px) 48vw, 180px" style={{ objectFit: "cover" }} priority={priority} />
+          <img src={poster} alt={movie.title} loading={priority ? "eager" : "lazy"} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
           {imdb && (
             <div style={{ position: "absolute", top: "8px", right: "8px", padding: "4px 8px", borderRadius: "8px", background: "rgba(0,0,0,0.82)", fontSize: "10px", fontWeight: 700, color: "#e8c84a", display: "flex", alignItems: "center", gap: "3px" }}>
               <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import Image from "next/image";
+
 import dynamic from "next/dynamic";
 import { apiGetHistory, languageLabel, apiRecommendationAction, type HistoryItem } from "@/lib/api";
 import { usePoster } from "@/lib/usePoster";
@@ -588,13 +588,10 @@ function MovieCard({ item, idx, onClick }: { item: HistoryItem; idx: number; onC
           overflow: "hidden",
         }}
       >
-        <Image
+        <img
           src={poster}
           alt={item.title}
-          fill
-          sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 20vw"
-          className="object-cover"
-
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
         />
         
         {/* Rating Badge */}

@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState, useRef } from "react";
-import Image from "next/image";
+
 import { createPortal } from "react-dom";
 import { posterUrl, languageLabel, apiSimilarMovies, apiCredits, type Recommendation, type CastMember, type CrewMember } from "@/lib/api";
 import { PersonDetailOverlay } from "./PersonDetailOverlay";
@@ -427,27 +427,24 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
 
                   {isMobile ? (
                     /* Landscape backdrop — single image, edge-to-edge */
-                    <Image
+                    <img
                       src={mobileHero}
                       alt={movie.title}
-                      fill
-                      sizes="100vw"
+                      loading="eager"
                       style={{
+                        position: "absolute", inset: 0, width: "100%", height: "100%",
                         objectFit: "cover",
                         objectPosition: movie.backdrop_path ? "center center" : "center top",
                         zIndex: 0,
                       }}
-                      priority
                     />
                   ) : (
                     /* Desktop: blurred bg fill */
-                    <Image
+                    <img
                       src={poster}
-                      alt=""
                       aria-hidden
-                      fill
-                      sizes="340px"
                       style={{
+                        position: "absolute", inset: 0, width: "100%", height: "100%",
                         objectFit: "cover",
                         objectPosition: "center center",
                         filter: "blur(20px) saturate(1.1) brightness(0.45)",
@@ -517,12 +514,10 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                           aspectRatio: "2 / 3",
                         }}
                       >
-                        <Image
+                        <img
                           src={poster}
                           alt={movie.title}
-                          fill
-                          sizes="340px"
-                          style={{ objectFit: "cover", objectPosition: "center center" }}
+                          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "center center" }}
                         />
                       </div>
                     </div>
@@ -1098,13 +1093,10 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                               position: "relative",
                             }}>
                               {c.profile_path ? (
-                                <Image
+                                <img
                                   src={posterUrl(c.profile_path, "w185")}
                                   alt={c.name}
-                                  fill
-                                  sizes="92px"
-                                  style={{ objectFit: "cover" }}
-
+                                  style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
                                 />
                               ) : (
                                 <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-text-muted)", fontSize: "24px" }}>
@@ -1401,13 +1393,10 @@ function SimilarCard({ movie, onClick }: { movie: Recommendation; onClick: () =>
         background: "var(--color-surface)",
         position: "relative",
       }}>
-        <Image
+        <img
           src={imgSrc}
           alt={movie.title}
-          fill
-          sizes="90px"
-          style={{ objectFit: "cover" }}
-
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
           onError={() => {
             if (imgSrc !== fallbackSrc) setImgSrc(fallbackSrc);
           }}

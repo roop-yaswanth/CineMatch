@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import Image from "next/image";
+
 import Link from "next/link";
 import { motion } from "framer-motion";
 
@@ -486,7 +486,7 @@ function MovieGrid({ movies, onSelect, query }: { movies: MultiSearchMovie[]; on
         >
           <div style={{ position: "relative", width: "100%", aspectRatio: "2 / 3", borderRadius: "14px", overflow: "hidden", background: "var(--color-surface)" }}>
             {m.poster_path ? (
-              <Image src={posterUrl(m.poster_path, "w342")} alt={m.title} fill sizes="140px" style={{ objectFit: "cover" }} />
+              <img src={posterUrl(m.poster_path, "w342")} alt={m.title} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
             ) : null}
           </div>
           <div style={{ padding: "8px 2px 0" }}>
@@ -517,7 +517,7 @@ function TvGrid({ items, query }: { items: MultiSearchTv[]; query: string }) {
         >
           <div style={{ position: "relative", width: "100%", aspectRatio: "2 / 3", borderRadius: "14px", overflow: "hidden", background: "var(--color-surface)" }}>
             {t.poster_path ? (
-              <Image src={posterUrl(t.poster_path, "w342")} alt={t.name} fill sizes="140px" style={{ objectFit: "cover" }} />
+              <img src={posterUrl(t.poster_path, "w342")} alt={t.name} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
             ) : (
               <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-text-muted)", fontSize: "12px" }}>No poster</div>
             )}
@@ -549,7 +549,7 @@ function PeopleGrid({ people, query }: { people: MultiSearchPerson[]; query: str
         >
           <div style={{ position: "relative", width: "120px", height: "120px", borderRadius: "50%", overflow: "hidden", background: "var(--color-surface)" }}>
             {p.profile_path ? (
-              <Image src={posterUrl(p.profile_path, "w185")} alt={p.name} fill sizes="120px" style={{ objectFit: "cover" }} />
+              <img src={posterUrl(p.profile_path, "w185")} alt={p.name} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
             ) : (
               <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-text-muted)", fontSize: "32px" }}>
                 {p.name?.[0] || "?"}

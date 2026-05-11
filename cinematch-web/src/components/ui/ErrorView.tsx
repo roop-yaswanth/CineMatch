@@ -91,6 +91,7 @@ export default function ErrorView({ code, title, description, action }: Props) {
             sizes="(max-width: 480px) 86vw, 360px"
             style={{ objectFit: "cover" }}
             priority
+            unoptimized
           />
         </div>
 

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import Image from "next/image";
+
 import { apiGetHistory, type HistoryItem } from "@/lib/api";
 import { usePoster } from "@/lib/usePoster";
 
@@ -261,13 +261,10 @@ function HistoryItemCard({
         borderRadius: "10px", overflow: "hidden",
         background: "var(--color-surface)", flexShrink: 0,
       }}>
-        <Image
+        <img
           src={poster}
           alt={item.title}
-          fill
-          sizes="44px"
-          className="object-cover"
-
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
         />
       </div>
 

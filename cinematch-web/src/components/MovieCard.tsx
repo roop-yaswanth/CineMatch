@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import Image from "next/image";
+
 import {
   languageLabel,
   prefetchMovieDetails,
@@ -61,14 +61,11 @@ export default function MovieCard({ movie, priority = false, className = "", com
           className="relative w-full aspect-[2/3] overflow-hidden bg-[var(--color-surface)] group"
           style={{ borderRadius: compact ? "14px" : "var(--radius-poster)" }}
         >
-          <Image
+          <img
             src={poster}
             alt={movie.title}
-            fill
-            priority={priority}
-            sizes={compact ? "(max-width: 640px) 45vw, 20vw" : "(max-width: 640px) 85vw, 360px"}
-            className="object-cover"
-
+            loading={priority ? "eager" : "lazy"}
+            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
           />
           
           {/* Gradient overlay at bottom */}
@@ -124,14 +121,11 @@ export default function MovieCard({ movie, priority = false, className = "", com
         className="relative w-full aspect-[2/3] overflow-hidden bg-[var(--color-surface)]"
         style={{ borderRadius: compact ? "14px" : "var(--radius-poster)" }}
       >
-        <Image
+        <img
           src={poster}
           alt={movie.title}
-          fill
-          priority={priority}
-          sizes={compact ? "(max-width: 640px) 45vw, 20vw" : "(max-width: 640px) 85vw, 360px"}
-          className="object-cover"
-
+          loading={priority ? "eager" : "lazy"}
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
         />
       </div>
 

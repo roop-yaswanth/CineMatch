@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo, useRef, useState } from "react";
-import Image from "next/image";
+
 import { motion } from "framer-motion";
 import { posterUrl, type PersonCredit, type PersonDetail } from "@/lib/api";
 
@@ -52,13 +52,11 @@ export function PersonContent({
         {/* Profile photo */}
         <div style={{ width: "100%", aspectRatio: "2 / 3", borderRadius: "14px", overflow: "hidden", background: "var(--color-surface)", position: "relative" }}>
           {data.profile_path ? (
-            <Image
+            <img
               src={posterUrl(data.profile_path, "w500")}
               alt={data.name}
-              fill
-              sizes="240px"
-              style={{ objectFit: "cover" }}
-              priority
+              loading="eager"
+              style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
             />
           ) : (
             <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-text-muted)", fontSize: "60px" }}>
@@ -240,7 +238,7 @@ function KnownForCard({ credit, onClick }: { credit: PersonCredit; onClick: () =
     >
       <div style={{ position: "relative", width: "100%", aspectRatio: "2 / 3", borderRadius: "10px", overflow: "hidden", background: "var(--color-surface)" }}>
         {credit.poster_path ? (
-          <Image src={posterUrl(credit.poster_path, "w342")} alt={credit.title} fill sizes="110px" style={{ objectFit: "cover" }} />
+          <img src={posterUrl(credit.poster_path, "w342")} alt={credit.title} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
         ) : null}
         {credit.media_type === "tv" && (
           <div style={{ position: "absolute", top: "4px", right: "4px", background: "rgba(0,0,0,0.7)", color: "#fff", fontSize: "9px", padding: "2px 4px", borderRadius: "4px", letterSpacing: "0.04em" }}>TV</div>

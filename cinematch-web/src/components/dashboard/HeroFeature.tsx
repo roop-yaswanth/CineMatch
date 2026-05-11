@@ -13,7 +13,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import Image from "next/image";
+
 import { motion, AnimatePresence } from "framer-motion";
 
 import { posterUrl, type Recommendation } from "@/lib/api";
@@ -104,13 +104,10 @@ export default function HeroFeature({ movies, onOpenDetail, onWatchlist }: Props
           transition={{ duration: 0.6, ease: "easeOut" }}
           style={{ position: "absolute", inset: 0 }}
         >
-          <Image
+          <img
             src={backdropUrl}
             alt=""
-            fill
-            priority={index === 0}
-            sizes="100vw"
-            style={{ objectFit: "cover", objectPosition: "center 15%" }}
+            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 15%" }}
           />
           {/* Dual gradient — bottom to anchor text, left for desktop side-text legibility. */}
           <div
