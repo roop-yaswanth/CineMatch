@@ -1104,7 +1104,7 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                                 </div>
                               )}
                             </div>
-                            <div style={{ fontSize: "12px", color: "var(--color-text-primary)", fontWeight: 500, lineHeight: 1.25, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                            <div style={{ fontSize: "12px", color: "var(--color-text-primary)", fontWeight: 500, lineHeight: 1.25, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", minHeight: "30px" }}>
                               {c.name}
                             </div>
                             {c.character && (
