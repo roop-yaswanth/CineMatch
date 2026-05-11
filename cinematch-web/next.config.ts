@@ -48,7 +48,7 @@ const nextConfig: NextConfig = {
       "img-src 'self' data: blob: https://image.tmdb.org https://www.themoviedb.org https://http.cat",
       "font-src 'self' data:",
       "frame-src 'self' https://www.youtube-nocookie.com https://www.youtube.com",
-      "connect-src 'self' https://vitals.vercel-insights.com https://va.vercel-scripts.com",
+      "connect-src 'self' https://image.tmdb.org https://vitals.vercel-insights.com https://va.vercel-scripts.com",
       "worker-src 'self'",
       "frame-ancestors 'none'",
       "object-src 'none'",
