@@ -67,7 +67,7 @@ export default function DashboardPage() {
   const handleBackToOnboarding = useCallback(async () => {
     if (!session) return;
     try {
-      localStorage.removeItem(`cinematch_recs_cache_${session.session_id}`);
+      localStorage.removeItem(`cinematch_recs_cache_${session.user_id}`);
     } catch { /* non-critical */ }
     updateSession({ ...session, onboarding_complete: false });
     try {

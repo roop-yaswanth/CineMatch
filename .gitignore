@@ -5,6 +5,7 @@ __pycache__/
 .vscode/
 *.pem
 src/log_tensorboard/
+/RecBole-GNN/
 
 # dependencies
 /node_modules

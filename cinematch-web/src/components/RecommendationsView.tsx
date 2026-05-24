@@ -195,10 +195,10 @@ interface RecsCache {
   ts: number;
 }
 
-function readRecsCache(sessionId: string): RecsCache | null {
+function readRecsCache(userId: string): RecsCache | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = localStorage.getItem(`${RECS_CACHE_KEY}_${sessionId}`);
+    const raw = localStorage.getItem(`${RECS_CACHE_KEY}_${userId}`);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as RecsCache;
     if (!parsed || !Array.isArray(parsed.stacks) || Date.now() - parsed.ts > RECS_CACHE_TTL_MS) {
@@ -210,11 +210,11 @@ function readRecsCache(sessionId: string): RecsCache | null {
   }
 }
 
-function writeRecsCache(sessionId: string, data: Omit<RecsCache, "ts">) {
+function writeRecsCache(userId: string, data: Omit<RecsCache, "ts">) {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(
-      `${RECS_CACHE_KEY}_${sessionId}`,
+      `${RECS_CACHE_KEY}_${userId}`,
       JSON.stringify({ ...data, ts: Date.now() })
     );
   } catch { /* localStorage full — non-critical */ }
@@ -229,7 +229,7 @@ export default function RecommendationsView({
   const router = useRouter();
 
   // ── Try to restore from navigation cache on mount ─────────────────────────
-  const cachedRef = useRef(readRecsCache(session.session_id));
+  const cachedRef = useRef(readRecsCache(session.user_id));
   const hadCache = cachedRef.current !== null;
 
   const [stacks, setStacks] = useState<Stack[]>(() => cachedRef.current?.stacks ?? []);
@@ -248,7 +248,6 @@ export default function RecommendationsView({
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
-  const [showSearchOverlay, setShowSearchOverlay] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -550,7 +549,7 @@ export default function RecommendationsView({
           // the cache without touching either, so without this explicit
           // write the freshly-fetched recs would only live in memory and
           // be lost on the next dashboard mount.
-          writeRecsCache(session.session_id, {
+          writeRecsCache(session.user_id, {
             stacks,
             movies,
             bucketCache: bucketCacheRef.current,
@@ -570,7 +569,7 @@ export default function RecommendationsView({
         setIsUpdating(false);
       }
     },
-    [applyBucketResponse, onSessionUpdate, preferences, session.session_id]
+    [applyBucketResponse, onSessionUpdate, preferences, session.user_id]
   );
 
 
@@ -584,14 +583,14 @@ export default function RecommendationsView({
   // Keep navigation cache in sync with optimistic stack updates (actions, etc.)
   useEffect(() => {
     if (stacks.length === 0) return; // Don't cache empty state
-    writeRecsCache(session.session_id, {
+    writeRecsCache(session.user_id, {
       stacks,
       movies,
       bucketCache: bucketCacheRef.current,
       seenIds: Array.from(seenIdsRef.current),
       displayedIds: Array.from(displayedIdsRef.current),
     });
-  }, [stacks, movies, session.session_id]);
+  }, [stacks, movies, session.user_id]);
 
   const handleAction = useCallback(
     async (movie: Recommendation | DetailMovie, action: RecommendationAction) => {
@@ -761,190 +760,7 @@ export default function RecommendationsView({
           }}
         >
 
-          {/* ─── Full-Page Search Overlay ─── */}
-          {showSearchOverlay && (
-            <div
-              style={{
-                position: "fixed",
-                inset: 0,
-                zIndex: 9000,
-                background: "rgba(8, 8, 12, 0.96)",
-                backdropFilter: "blur(32px) saturate(1.2)",
-                WebkitBackdropFilter: "blur(32px) saturate(1.2)",
-                display: "flex",
-                flexDirection: "column",
-                padding: "env(safe-area-inset-top, 0px) 0 0 0",
-              }}
-            >
-              {/* Overlay header with search input */}
-              <div style={{
-                padding: "16px 20px 12px",
-                display: "flex",
-                alignItems: "center",
-                gap: "12px",
-                borderBottom: "1px solid rgba(255,255,255,0.08)",
-              }}>
-                {/* Back / close */}
-                <button
-                  onClick={() => {
-                    setShowSearchOverlay(false);
-                    setSearchQuery("");
-                    setSearchResults([]);
-                    setShowSearch(false);
-                  }}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    color: "var(--color-text-muted)",
-                    display: "flex",
-                    alignItems: "center",
-                    padding: "6px",
-                    flexShrink: 0,
-                  }}
-                  aria-label="Close search"
-                >
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="15 18 9 12 15 6" />
-                  </svg>
-                </button>
 
-                {/* Search input */}
-                <div style={{ flex: 1, position: "relative" }}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}>
-                    <circle cx="11" cy="11" r="8" />
-                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                  </svg>
-                  <input
-                    ref={searchInputRef}
-                    type="text"
-                    placeholder="Search movies, shows, people…"
-                    value={searchQuery}
-                    autoFocus
-                    onChange={(e) => handleSearch(e.target.value)}
-                    style={{
-                      width: "100%",
-                      padding: "13px 44px 13px 44px",
-                      borderRadius: "14px",
-                      border: "1px solid rgba(255,255,255,0.15)",
-                      background: "rgba(255,255,255,0.07)",
-                      color: "var(--color-text-primary)",
-                      fontSize: "16px",
-                      fontWeight: 400,
-                      letterSpacing: "-0.005em",
-                      outline: "none",
-                    }}
-                  />
-                  {searchQuery && (
-                    <button
-                      onClick={() => { setSearchQuery(""); setSearchResults([]); setShowSearch(false); }}
-                      style={{
-                        position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)",
-                        background: "rgba(255,255,255,0.15)", border: "none", cursor: "pointer",
-                        padding: "3px", borderRadius: "50%", color: "rgba(255,255,255,0.7)",
-                        width: "22px", height: "22px", display: "flex", alignItems: "center", justifyContent: "center",
-                      }}
-                    >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                        <line x1="18" y1="6" x2="6" y2="18" />
-                        <line x1="6" y1="6" x2="18" y2="18" />
-                      </svg>
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Results area */}
-              <div style={{ flex: 1, overflowY: "auto", padding: "8px 12px" }}>
-                {/* Query hint */}
-                {searchQuery && !searchLoading && (
-                  <div style={{ padding: "10px 8px 4px", fontSize: "12px", color: "var(--color-text-muted)", fontWeight: 500 }}>
-                    {searchQuery}
-                  </div>
-                )}
-
-                {searchLoading && (
-                  <div style={{ padding: "40px", textAlign: "center", color: "var(--color-text-muted)" }}>Searching…</div>
-                )}
-
-                {!searchLoading && searchQuery && searchResults.length === 0 && (
-                  <div style={{ padding: "40px", textAlign: "center", color: "var(--color-text-muted)" }}>No results for &ldquo;{searchQuery}&rdquo;</div>
-                )}
-
-                {!searchLoading && searchResults.map((movie) => (
-                  <div
-                    key={movie.tmdb_id}
-                    style={{
-                      display: "flex",
-                      gap: "14px",
-                      padding: "12px 12px",
-                      borderRadius: "14px",
-                      background: "transparent",
-                      cursor: "pointer",
-                      borderBottom: "1px solid rgba(255,255,255,0.05)",
-                      transition: "background 0.15s ease",
-                    }}
-                    onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-                    onClick={() => {
-                      setActiveMovie({ ...movie, id: movie.tmdb_id });
-                      setShowSearchOverlay(false);
-                      setSearchQuery("");
-                      setSearchResults([]);
-                    }}
-                  >
-                    <div style={{ width: "52px", height: "78px", borderRadius: "8px", overflow: "hidden", flexShrink: 0, background: "rgba(255,255,255,0.06)" }}>
-                      {movie.poster_path && (
-                        <img src={posterUrl(movie.poster_path, "w92")} alt={movie.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                      )}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", justifyContent: "center" }}>
-                      <div style={{ fontWeight: 600, color: "var(--color-text-primary)", fontSize: "15px", marginBottom: "4px" }}>{movie.title}</div>
-                      <div style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>
-                        {[movie.original_language ? languageLabel(movie.original_language) : null, movie.year].filter(Boolean).join(" · ")}
-                      </div>
-                      {movie.imdb_rating && (
-                        <div style={{ fontSize: "11px", color: "#fbbf24", marginTop: "4px" }}>IMDb {movie.imdb_rating.toFixed(1)}</div>
-                      )}
-                    </div>
-                    {/* Play icon */}
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: "rgba(255,255,255,0.35)" }}>
-                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                        <circle cx="12" cy="12" r="10" />
-                        <polygon points="10 8 16 12 10 16 10 8" fill="currentColor" stroke="none" />
-                      </svg>
-                    </div>
-                  </div>
-                ))}
-
-                {/* Full search link */}
-                {searchQuery.trim().length > 0 && !searchLoading && (
-                  <button
-                    onClick={() => {
-                      router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
-                      setShowSearchOverlay(false);
-                      setSearchQuery("");
-                    }}
-                    style={{
-                      marginTop: "12px",
-                      width: "100%",
-                      textAlign: "center",
-                      padding: "12px",
-                      borderRadius: "12px",
-                      background: "rgba(255,255,255,0.06)",
-                      border: "1px solid rgba(255,255,255,0.10)",
-                      color: "var(--color-text-primary)",
-                      fontSize: "13px",
-                      fontWeight: 500,
-                      cursor: "pointer",
-                    }}
-                  >
-                    Search movies, TV &amp; people for &ldquo;{searchQuery.trim()}&rdquo; →
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
 
           {/* Header */}
           <header
@@ -994,7 +810,7 @@ export default function RecommendationsView({
                 {/* Desktop mini search box — hidden on mobile via CSS */}
                 <button
                   className="header-search-box"
-                  onClick={() => setShowSearchOverlay(true)}
+                  onClick={() => router.push("/search")}
                   style={{
                     display: "flex",
                     alignItems: "center",
@@ -1020,7 +836,7 @@ export default function RecommendationsView({
                 {/* Mobile search icon only */}
                 <button
                   className="header-search-icon"
-                  onClick={() => setShowSearchOverlay(true)}
+                  onClick={() => router.push("/search")}
                   aria-label="Search"
                   style={{
                     background: "none",

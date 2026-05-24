@@ -4,11 +4,11 @@ import { useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import PreferencesModal from "@/components/PreferencesModal";
 import { useSession } from "@/context/SessionContext";
-import { preferencesFromProfile, type RecommendationPreferences } from "@/lib/api";
+import { preferencesFromProfile, apiUpdatePreferences, type RecommendationPreferences } from "@/lib/api";
 
 export default function PreferencesPage() {
   const router = useRouter();
-  const { session, isLoading } = useSession();
+  const { session, isLoading, updateSession } = useSession();
 
   // Route protection
   useEffect(() => {
@@ -25,21 +25,30 @@ export default function PreferencesPage() {
   );
 
   const handleUpdate = async (prefs: RecommendationPreferences) => {
+    // (0) Update preferences on the server database backend.
+    try {
+      const sid = session?.session_id;
+      if (sid) {
+        const freshSession = await apiUpdatePreferences(sid, {
+          languages: prefs.languages,
+          genres: prefs.genres,
+          semantic_index: prefs.semantic_index,
+        });
+        updateSession(freshSession);
+      }
+    } catch (err) {
+      console.error("Failed to update preferences on server:", err);
+    }
+
     // (1) Stash for the dashboard to read on its next mount.
     try {
       sessionStorage.setItem("cinematch_prefs_update", JSON.stringify(prefs));
     } catch { /* ignore */ }
 
-    // (2) Drop the local recs cache for this user. RecommendationsView seeds
-    //     `stacks` from this cache on mount — without clearing it, the
-    //     dashboard would briefly (or permanently, if the regenerate
-    //     misfires) repaint the OLD movies that the previous prefs had
-    //     produced. That's exactly the "other browser sees English-only,
-    //     mine still shows mixed" symptom — the other tab has no cached
-    //     stacks, so it always paints the fresh API response.
+    // (2) Drop the local recs cache for this user (using persistent user_id).
     try {
-      const sid = session?.session_id;
-      if (sid) localStorage.removeItem(`cinematch_recs_cache_${sid}`);
+      const uid = session?.user_id;
+      if (uid) localStorage.removeItem(`cinematch_recs_cache_${uid}`);
     } catch { /* ignore */ }
 
     // (3) Best-effort live event for the case where the dashboard is still

@@ -46,11 +46,12 @@ function init(): void {
 export function pushBackHandler(fn: Handler): () => void {
   init();
   counter += 1;
+  const currentCounter = counter;
   // Hash-only push: Next.js App Router does not re-render on hash changes,
   // so this is invisible to the rest of the app, but iOS PWA Safari treats
   // it as real navigable history and enables the edge-swipe gesture.
-  const url = `${window.location.pathname}${window.location.search}#m${counter}`;
-  window.history.pushState({ __cinematch_bs: stack.length + 1, c: counter }, "", url);
+  const url = `${window.location.pathname}${window.location.search}#m${currentCounter}`;
+  window.history.pushState({ __cinematch_bs: stack.length + 1, c: currentCounter }, "", url);
   stack.push(fn);
 
   let cleaned = false;
@@ -62,8 +63,12 @@ export function pushBackHandler(fn: Handler): () => void {
     if (idx === -1) return; // already fired by back gesture — nothing to do
 
     stack.splice(idx, 1);
-    // Suppress the popstate that history.back() is about to fire
-    skipNextPop = true;
-    window.history.back();
+    // Suppress the popstate that history.back() is about to fire.
+    // Only call history.back() if the current state exactly corresponds to our counter,
+    // which prevents asynchronous overlap/race conditions from corrupting navigation stack.
+    if (window.history.state && window.history.state.c === currentCounter) {
+      skipNextPop = true;
+      window.history.back();
+    }
   };
 }

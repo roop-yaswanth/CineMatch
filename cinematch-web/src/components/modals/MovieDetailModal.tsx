@@ -1070,6 +1070,9 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                               maxWidth: "92px",
                               flexShrink: 0,
                               flexGrow: 0,
+                              display: "flex",
+                              flexDirection: "column",
+                              alignItems: "center",
                               textAlign: "center", textDecoration: "none", color: "inherit",
                               background: "none", border: "none", padding: 0, cursor: "pointer", outline: "none", fontFamily: "inherit"
                             }}

@@ -15,10 +15,10 @@ const SessionContext = createContext<SessionContextType | undefined>(undefined);
 const STORAGE_KEY = "cinematch_email";
 const SESSION_CACHE_KEY = "cinematch_session";
 
-/** Safely read a cached session from localStorage */
+/** Safely read a cached session from sessionStorage */
 function readCachedSession(): UserSession | null {
   try {
-    const raw = localStorage.getItem(SESSION_CACHE_KEY);
+    const raw = sessionStorage.getItem(SESSION_CACHE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     // Basic shape check
@@ -34,15 +34,15 @@ function readCachedSession(): UserSession | null {
 /** Persist the full session object alongside the email identifier */
 function persistSession(s: UserSession) {
   try {
-    localStorage.setItem(STORAGE_KEY, s.identifier);
-    localStorage.setItem(SESSION_CACHE_KEY, JSON.stringify(s));
+    sessionStorage.setItem(STORAGE_KEY, s.identifier);
+    sessionStorage.setItem(SESSION_CACHE_KEY, JSON.stringify(s));
   } catch { /* storage full — non-critical */ }
 }
 
-/** Clear all session data from localStorage */
+/** Clear all session data from sessionStorage */
 function clearStoredSession() {
-  localStorage.removeItem(STORAGE_KEY);
-  localStorage.removeItem(SESSION_CACHE_KEY);
+  sessionStorage.removeItem(STORAGE_KEY);
+  sessionStorage.removeItem(SESSION_CACHE_KEY);
 }
 
 export function SessionProvider({ children }: { children: ReactNode }) {
@@ -57,7 +57,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   // Restore: instant from cache, then silently validate with backend
   const restoreSession = useCallback(async () => {
     const cached = readCachedSession();
-    const savedIdentifier = localStorage.getItem(STORAGE_KEY);
+    const savedIdentifier = sessionStorage.getItem(STORAGE_KEY);
 
     if (!cached && !savedIdentifier) {
       // Never logged in
@@ -133,7 +133,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!session) return; // Only track when logged in
 
-    const INACTIVITY_TIMEOUT = 10 * 60 * 1000; // 10 minutes
+    const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minutes
 
     let activityTimeoutId: ReturnType<typeof setTimeout> | null = null;
     let hiddenTimeoutId: ReturnType<typeof setTimeout> | null = null;

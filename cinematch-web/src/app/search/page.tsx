@@ -13,11 +13,13 @@ import type { DetailMovie } from "@/components/modals/MovieDetailModal";
 import { useSession } from "@/context/SessionContext";
 
 const MovieDetailModal = dynamic(() => import("@/components/modals/MovieDetailModal"), { ssr: false });
+import { toast } from "@/components/ui/Toast";
 import {
   apiSearchMulti,
   languageLabel,
   peekMultiSearchCache,
   posterUrl,
+  apiRecommendationAction,
   type MultiSearchMovie,
   type MultiSearchPerson,
   type MultiSearchResponse,
@@ -137,6 +139,11 @@ function SearchPage() {
 
   useEffect(() => { inputRef.current?.focus(); }, []);
 
+  const dbMovies = results.movies.filter((m) => m.source === "db");
+  const hasDb = dbMovies.length > 0;
+  const hasYear = /\b(18[89]\d|19\d{2}|20\d{2})\b/.test(debounced);
+  const autoShowMovies = showTmdbMovies || !hasDb || hasYear;
+
   const openMovie = useCallback((m: MultiSearchMovie) => {
     setActive({
       id: m.tmdb_id,
@@ -153,6 +160,39 @@ function SearchPage() {
       overview: m.overview,
     });
   }, []);
+
+  const handleAction = useCallback(
+    async (action: "like" | "okay" | "dislike" | "watchlist" | "skip") => {
+      if (!session || !active) return;
+      try {
+        await apiRecommendationAction(session.session_id, active.id, action);
+        if (action === "watchlist") {
+          toast({
+            message: `Added "${active.title}" to your watchlist`,
+            tone: "success",
+          });
+        } else if (action === "like") {
+          toast({
+            message: `Liked "${active.title}"`,
+            tone: "success",
+          });
+        } else if (action === "okay") {
+          toast({
+            message: `Rated "${active.title}" as Okay`,
+            tone: "success",
+          });
+        } else if (action === "dislike") {
+          toast({
+            message: `Disliked "${active.title}"`,
+            tone: "neutral",
+          });
+        }
+      } catch (err) {
+        console.error("Action failed:", err);
+      }
+    },
+    [session, active]
+  );
 
   if (isLoading) return null;
 
@@ -242,7 +282,7 @@ function SearchPage() {
             // "Search TMDB" button below the library results.
             const count =
               t.id === "movies"
-                ? results.movies.filter((m) => m.source === "db").length
+                ? (autoShowMovies ? results.movies.length : dbMovies.length)
                 : t.id === "tv"
                 ? results.tv.length
                 : results.people.length;
@@ -294,9 +334,7 @@ function SearchPage() {
             {tab === "movies" && (() => {
               // Split results by source so the local-library hits feel
               // immediate and TMDB-only matches are opt-in.
-              const dbMovies = results.movies.filter((m) => m.source === "db");
               const tmdbMovies = results.movies.filter((m) => m.source === "tmdb");
-              const hasDb = dbMovies.length > 0;
               const hasTmdb = tmdbMovies.length > 0;
               return (
                 <>
@@ -306,7 +344,7 @@ function SearchPage() {
                     </Section>
                   )}
 
-                  {hasTmdb && !showTmdbMovies && (
+                  {hasTmdb && !autoShowMovies && (
                     <div style={{ display: "flex", justifyContent: "center", padding: "12px 0 4px" }}>
                       <button
                         type="button"
@@ -318,7 +356,7 @@ function SearchPage() {
                     </div>
                   )}
 
-                  {hasTmdb && showTmdbMovies && (
+                  {hasTmdb && autoShowMovies && (
                     <Section title="From TMDB">
                       <MovieGrid movies={tmdbMovies} onSelect={openMovie} query={debounced} />
                     </Section>
@@ -378,6 +416,7 @@ function SearchPage() {
         onClose={() => setActive(null)}
         movie={active}
         onMovieSelect={(m) => setActive(m)}
+        onAction={handleAction}
         sessionId={session?.session_id ?? null}
         userRegion={session?.profile?.region ?? null}
       />
