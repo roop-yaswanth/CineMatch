@@ -1013,14 +1013,26 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                       {!creditsLoading && cast.length > 0 && (
                         <div style={{ display: "flex", gap: "6px" }}>
                           <button
-                            onClick={() => castRowRef.current?.scrollBy({ left: -(window.innerWidth * 0.6), behavior: "smooth" })}
+                            onClick={() => {
+                              const el = castRowRef.current;
+                              if (!el) return;
+                              const cardWithGap = 104; // 92px avatar + 12px gap
+                              const cards = Math.min(3, Math.max(1, Math.floor((el.clientWidth * 0.5) / cardWithGap)));
+                              el.scrollBy({ left: -(cards * cardWithGap), behavior: "smooth" });
+                            }}
                             aria-label="Scroll cast left"
                             style={{ width: "28px", height: "28px", borderRadius: "50%", border: "1px solid var(--color-border-subtle)", background: "rgba(255,255,255,0.06)", color: "var(--color-text-secondary)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
                           >
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
                           </button>
                           <button
-                            onClick={() => castRowRef.current?.scrollBy({ left: (window.innerWidth * 0.6), behavior: "smooth" })}
+                            onClick={() => {
+                              const el = castRowRef.current;
+                              if (!el) return;
+                              const cardWithGap = 104; // 92px avatar + 12px gap
+                              const cards = Math.min(3, Math.max(1, Math.floor((el.clientWidth * 0.5) / cardWithGap)));
+                              el.scrollBy({ left: cards * cardWithGap, behavior: "smooth" });
+                            }}
                             aria-label="Scroll cast right"
                             style={{ width: "28px", height: "28px", borderRadius: "50%", border: "1px solid var(--color-border-subtle)", background: "rgba(255,255,255,0.06)", color: "var(--color-text-secondary)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
                           >
@@ -1145,7 +1157,13 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                   {!similarLoading && similar.length > 0 && (
                     <div style={{ display: "flex", gap: "6px" }}>
                       <button
-                        onClick={() => similarRowRef.current?.scrollBy({ left: -(window.innerWidth * 0.8), behavior: "smooth" })}
+                        onClick={() => {
+                          const el = similarRowRef.current;
+                          if (!el) return;
+                          const cardWithGap = 102; // 90px card width + 12px gap
+                          const cards = Math.min(3, Math.max(1, Math.floor((el.clientWidth * 0.5) / cardWithGap)));
+                          el.scrollBy({ left: -(cards * cardWithGap), behavior: "smooth" });
+                        }}
                         style={{
                           width: "28px", height: "28px", borderRadius: "50%",
                           border: "1px solid var(--color-border-subtle)",
@@ -1159,7 +1177,13 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                         </svg>
                       </button>
                       <button
-                        onClick={() => similarRowRef.current?.scrollBy({ left: (window.innerWidth * 0.8), behavior: "smooth" })}
+                        onClick={() => {
+                          const el = similarRowRef.current;
+                          if (!el) return;
+                          const cardWithGap = 102; // 90px card width + 12px gap
+                          const cards = Math.min(3, Math.max(1, Math.floor((el.clientWidth * 0.5) / cardWithGap)));
+                          el.scrollBy({ left: cards * cardWithGap, behavior: "smooth" });
+                        }}
                         style={{
                           width: "28px", height: "28px", borderRadius: "50%",
                           border: "1px solid var(--color-border-subtle)",

@@ -493,17 +493,10 @@ export default function RecommendationsView({
         await prefetchPosters(allMovies);
 
         if (autoRerun) {
-          // Append-mode rerun. Don't blow away the user's current view —
-          // they may be holding movies they haven't acted on yet (rating
-          // is a deliberate choice, "kept on screen" is the default state).
-          // The previous behavior was to clear all stacks and call
-          // applyBucketResponse, which dropped any unrated card from view
-          // and felt like the app was "starting over" mid-session.
-          //
-          // Instead: keep current stacks/cache as-is, and merge the new
-          // batch into bucketCacheRef so subsequent swipes refill from
-          // the fresh supply. seenIds/displayedIds stay populated so we
-          // don't re-show movies the user already passed on.
+          // Keep current stacks visible — the user may still be browsing
+          // movies they haven't acted on. Replace the cache entirely with
+          // fresh taste-profile-aware results so the NEXT movie pulled in
+          // after a swipe comes from the updated batch.
           const filterFresh = (arr: Recommendation[]) =>
             applyFilters(
               arr.filter((m) => !seenIdsRef.current.has(recommendationId(m))),
@@ -530,25 +523,20 @@ export default function RecommendationsView({
           }
           const newReg = filterFresh(regionalMerged);
 
-          // Append fresh recs to whatever's already in the cache. Subsequent
-          // swipes naturally drain the cache and the new supply lands at
-          // the END — so existing cards stay first.
-          //
-          // Cap each bucket so repeated reruns don't grow the cache
-          // unboundedly. 80 per bucket × 3 buckets ≈ 240 candidates is
-          // plenty of runway between reruns.
-          const CAP = 80;
+          // REPLACE cache with fresh taste-profile-aware results.
+          // Old cache items were ranked by the pre-rerun taste profile
+          // and sat at the front of the queue — new items were stuck at
+          // the back and never reached the user. Now fresh results go
+          // directly to the front.
           bucketCacheRef.current = {
-            hollywood: [...(bucketCacheRef.current.hollywood || []), ...newEn].slice(-CAP),
-            matched:   [...(bucketCacheRef.current.matched   || []), ...newReg].slice(-CAP),
-            other:     [...(bucketCacheRef.current.other     || []), ...newGlob].slice(-CAP),
+            hollywood: newEn,
+            matched:   newReg,
+            other:     newGlob,
           };
 
-          // Persist the new bucketCache to localStorage. The write effect
-          // below only fires on stacks/movies changes — autoRerun mutates
-          // the cache without touching either, so without this explicit
-          // write the freshly-fetched recs would only live in memory and
-          // be lost on the next dashboard mount.
+          // Persist to localStorage so a dashboard remount doesn't lose
+          // the freshly-fetched recs (the write effect only fires on
+          // stacks/movies changes, not cache-only mutations).
           writeRecsCache(session.user_id, {
             stacks,
             movies,
@@ -638,8 +626,14 @@ export default function RecommendationsView({
         actionCountRef.current = { positive: 0, negative: 0, total: 0 }; countedActionsRef.current = new Set();
         setIsUpdating(true);
         try {
-          await apiRecommendationAction(session.session_id, tmdbId, action);
+          // Fire action and rerun in parallel — the action is a write
+          // that also triggers a backend pool rebuild; we don't need its
+          // response before fetching fresh multi-bucket recs. Running
+          // them concurrently halves the wall-clock wait.
+          const actionPromise = apiRecommendationAction(session.session_id, tmdbId, action)
+            .catch((err) => console.error("Action during rerun failed:", err));
           await generate(preferences, { autoRerun: true });
+          await actionPromise;
         } catch (err) {
           console.error("Taste profile update failed:", err);
           try { await generate(preferences, { autoRerun: true }); } catch { setIsUpdating(false); }

@@ -72,10 +72,18 @@ async function proxy(
   }
 
   let upstream: Response;
+  // 55s timeout — HuggingFace free-tier Spaces hibernate after ~15 min of
+  // inactivity and cold-start can take 30-60s. Without a timeout the proxy
+  // hangs indefinitely. 55s is slightly under the client's 60s timeout so
+  // we return a clean 502 rather than an opaque client-side abort.
+  const controller = new AbortController();
+  const upstreamTimeout = setTimeout(() => controller.abort(), 55_000);
   try {
-    upstream = await fetch(url, { method: req.method, headers, body });
+    upstream = await fetch(url, { method: req.method, headers, body, signal: controller.signal });
   } catch {
     return NextResponse.json({ error: "Upstream unavailable" }, { status: 502 });
+  } finally {
+    clearTimeout(upstreamTimeout);
   }
 
   const responseHeaders: Record<string, string> = {};

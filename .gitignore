@@ -5,7 +5,7 @@ __pycache__/
 .vscode/
 *.pem
 src/log_tensorboard/
-/RecBole-GNN/
+Cinematch.code-workspace
 
 # dependencies
 /node_modules

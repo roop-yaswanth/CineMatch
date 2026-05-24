@@ -2,8 +2,10 @@
  * ──────────────────────────────────────────────────────────── */
 
 const API_BASE = "";
-const REQUEST_TIMEOUT_MS = 30_000;
-const MAX_RETRIES = 2;
+// 60s — HuggingFace free-tier Spaces can cold-start in 30-60s
+const REQUEST_TIMEOUT_MS = 60_000;
+// 1 retry (total 2 attempts) — with 60s timeout, 2 retries = 180s worst case
+const MAX_RETRIES = 1;
 
 async function request<T>(
   path: string,
