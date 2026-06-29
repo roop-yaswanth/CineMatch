@@ -243,6 +243,15 @@ export async function apiLogin(email: string): Promise<UserSession> {
   });
 }
 
+/** Best-effort server-side session invalidation on explicit logout. Failures are
+ *  non-fatal — the client clears its local session regardless. */
+export async function apiLogout(sessionId: string): Promise<void> {
+  await request<{ status: string }>("/api/logout", {
+    method: "POST",
+    body: JSON.stringify({ session_id: sessionId }),
+  });
+}
+
 export async function apiBuildSlate(
   sessionId: string,
   preferences: {
@@ -465,6 +474,9 @@ export async function apiUpdatePreferences(
     languages?: string[];
     genres?: string[];
     semantic_index?: string;
+    age_group?: string;
+    region?: string;
+    include_classics?: boolean;
   }
 ): Promise<UserSession> {
   return request<UserSession>("/api/preferences", {

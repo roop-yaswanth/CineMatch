@@ -133,7 +133,10 @@ export default function MovieCard({ movie, priority = false, className = "", com
       <div className={compact ? "mt-3 w-full px-1" : "mt-2 w-full text-center px-2"}>
         <h2
           className={compact
-            ? "text-[13px] font-semibold tracking-tight text-white leading-snug line-clamp-2"
+            // min-h reserves two lines so the metadata row lines up across every
+            // card in the rail whether a title wraps to one line or two (fixes
+            // the ragged look where short titles sat higher).
+            ? "text-[13px] font-semibold tracking-tight text-white leading-snug line-clamp-2 min-h-[2.7em]"
             : "text-base font-medium tracking-[-0.01em] text-[var(--color-text-primary)] leading-tight"
           }
         >
@@ -141,23 +144,21 @@ export default function MovieCard({ movie, priority = false, className = "", com
         </h2>
 
         {compact ? (
-          <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            {year && (
-              <span className="px-1.5 py-0.5 rounded bg-white/10 text-[10px] font-medium text-white/80">
-                {year}
-              </span>
-            )}
-            {lang && (
-              <span className="px-1.5 py-0.5 rounded bg-white/10 text-[10px] font-medium text-white/80">
-                {lang}
+          // One tidy row instead of wrapping pills: "year · lang" muted on the
+          // left, a single gold rating chip pushed to the right. nowrap + a
+          // fixed min-height keep every card's row the same height.
+          <div className="mt-2 flex items-center gap-1.5 min-h-[22px]">
+            {(year || lang) && (
+              <span className="min-w-0 truncate text-[10.5px] font-medium text-white/55">
+                {[year, lang].filter(Boolean).join(" · ")}
               </span>
             )}
             {imdb ? (
-              <span className="px-1.5 py-0.5 rounded bg-[#fbbf24]/15 text-[10px] font-bold text-[#fbbf24]">
+              <span className="ml-auto shrink-0 rounded bg-[#e8c84a]/15 px-1.5 py-0.5 text-[10px] font-bold text-[#e8c84a]">
                 IMDb {imdb}
               </span>
             ) : tmdbRating ? (
-              <span className="px-1.5 py-0.5 rounded bg-[#fbbf24]/15 text-[10px] font-bold text-[#fbbf24]">
+              <span className="ml-auto shrink-0 rounded bg-[#e8c84a]/15 px-1.5 py-0.5 text-[10px] font-bold text-[#e8c84a]">
                 ★ {tmdbRating}
               </span>
             ) : null}

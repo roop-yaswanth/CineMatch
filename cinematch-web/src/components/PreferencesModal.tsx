@@ -18,7 +18,9 @@ interface Preferences {
 
 interface Props {
   preferences: Preferences;
-  onUpdate: (prefs: Preferences) => void;
+  /** May be async (e.g. persisting prefs to the server); handleApply awaits it
+      before closing so navigation can't race ahead of the save. */
+  onUpdate: (prefs: Preferences) => void | Promise<void>;
   onClose: () => void;
   /** "recommendations" = Language + Genre only; "onboarding" = Region + Age + Language + Genre */
   mode?: "recommendations" | "onboarding";
@@ -54,6 +56,7 @@ const GENRES = [
 
 export default function PreferencesModal({ preferences, onUpdate, onClose, mode }: Props) {
   const [localPrefs, setLocalPrefs] = useState<Preferences>(preferences);
+  const [isApplying, setIsApplying] = useState(false);
 
   const toggle = (field: "languages" | "genres", value: string) => {
     const arr = localPrefs[field];
@@ -65,9 +68,16 @@ export default function PreferencesModal({ preferences, onUpdate, onClose, mode 
     });
   };
 
-  const handleApply = () => {
-    onUpdate(localPrefs);
-    onClose();
+  const handleApply = async () => {
+    if (isApplying) return;
+    setIsApplying(true);
+    try {
+      // Await in case onUpdate persists to the server — onClose typically
+      // navigates away, so it must not fire before the save completes.
+      await onUpdate(localPrefs);
+    } finally {
+      onClose();
+    }
   };
 
   return (
@@ -208,19 +218,22 @@ export default function PreferencesModal({ preferences, onUpdate, onClose, mode 
 
           {/* Apply */}
           <motion.button
-            whileHover={{ scale: 1.01 }}
-            whileTap={{ scale: 0.99 }}
+            whileHover={isApplying ? undefined : { scale: 1.01 }}
+            whileTap={isApplying ? undefined : { scale: 0.99 }}
             onClick={handleApply}
+            disabled={isApplying}
             className="glass-button"
             style={{
               marginTop: "8px", width: "100%", padding: "14px 0",
               background: "rgba(255,255,255,0.12)",
               color: "var(--color-text-primary)",
               fontSize: "14px", fontWeight: 500, letterSpacing: "0.02em",
-              borderRadius: "var(--radius-pill)", cursor: "pointer",
+              borderRadius: "var(--radius-pill)",
+              cursor: isApplying ? "default" : "pointer",
+              opacity: isApplying ? 0.7 : 1,
             }}
           >
-            Apply Changes
+            {isApplying ? "Applying…" : "Apply Changes"}
           </motion.button>
         </div>
       </motion.div>

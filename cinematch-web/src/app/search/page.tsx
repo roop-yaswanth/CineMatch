@@ -208,31 +208,40 @@ function SearchPage() {
         }
       >
         {/* Search input */}
-        <div style={{ padding: "0 var(--s-header-x) var(--s-3)", position: "relative" }}>
-          <input
-            ref={inputRef}
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search movies, TV shows, people…"
-            className="app-search-input"
-          />
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position: "absolute", left: "34px", top: "13px" }}>
+        <div style={{ padding: "0 var(--s-header-x) var(--s-3)" }}>
+          {/* Inner wrapper hugs the input exactly (no padding) so the absolutely
+              positioned icons center on the INPUT via top:50% — not on the padded
+              outer container, which would push them ~6px low. Horizontal offsets
+              are measured from the input edge here (they previously included the
+              outer 20px --s-header-x padding). */}
+          <div style={{ position: "relative" }}>
+            <input
+              ref={inputRef}
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search movies, TV shows, people…"
+              className="app-search-input"
+            />
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)" }}>
             <circle cx="11" cy="11" r="8" />
             <line x1="21" y1="21" x2="16.65" y2="16.65" />
           </svg>
           {/* Inline loading spinner — sits in place of the clear button while
               a fetch is in flight, so users always have a visible signal that
-              search is working. Backend latency on cold paths can hit ~1s. */}
+              search is working. Backend latency on cold paths can hit ~1s.
+              Matches the search icon's 18×18 size and is vertically centered the
+              same way (top:50% + translateY) so the two never look mismatched. */}
           {loading && (
             <div
               aria-hidden
               style={{
                 position: "absolute",
-                right: "34px",
-                top: "16px",
-                width: 14,
-                height: 14,
+                right: "14px",
+                top: "50%",
+                transform: "translateY(-50%)",
+                width: 18,
+                height: 18,
                 border: "2px solid rgba(255,255,255,0.18)",
                 borderTopColor: "rgba(255,255,255,0.85)",
                 borderRadius: "50%",
@@ -250,7 +259,7 @@ function SearchPage() {
               // easier to tap.
               style={{
                 position: "absolute",
-                right: "24px",
+                right: "4px",
                 top: "50%",
                 transform: "translateY(-50%)",
                 width: "40px",
@@ -271,6 +280,7 @@ function SearchPage() {
               </svg>
             </button>
           )}
+          </div>
         </div>
 
         {/* Tabs */}

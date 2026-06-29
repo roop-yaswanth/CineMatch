@@ -567,16 +567,21 @@ textarea,
 }
 
 
-/* Top-chrome (nav / sticky headers) */
+/* Top-chrome (nav / sticky headers).
+   Same luminous "liquid glass" material family as the floating bottom nav
+   (.liquid-glass), but tuned for a full-width bar: high saturation + brightness
+   so the content scrolling behind bleeds through vividly, with a bright top
+   specular line instead of an all-around rim (a rim on a full-bleed bar would
+   sit awkwardly against the viewport edges). */
 .glass {
   background: linear-gradient(180deg,
-      rgba(32, 34, 40, 0.6) 0%,
-      rgba(16, 18, 22, 0.75) 100%);
-  -webkit-backdrop-filter: blur(60px) saturate(2.0) brightness(1.06);
-  backdrop-filter: blur(60px) saturate(2.0) brightness(1.06);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      rgba(34, 36, 44, 0.5) 0%,
+      rgba(16, 18, 22, 0.66) 100%);
+  -webkit-backdrop-filter: blur(30px) saturate(200%) brightness(1.12);
+  backdrop-filter: blur(30px) saturate(200%) brightness(1.12);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
   box-shadow:
-    0 1px 0 0 rgba(255, 255, 255, 0.12) inset,
+    0 1px 0 0 rgba(255, 255, 255, 0.18) inset,
     0 8px 32px rgba(0, 0, 0, 0.32);
   position: relative;
 }
@@ -654,6 +659,71 @@ textarea,
 .poster-card.glass-card:hover {
   box-shadow: none;
   filter: none;
+}
+
+/* ── Liquid Glass ──────────────────────────────────────────────────────────
+   A richer take on the glass material for floating chrome (the bottom nav).
+   Apple's "Liquid Glass" is a proprietary NATIVE material — it can't be pulled
+   into a website, and installing the site as a PWA on macOS/iOS still renders
+   your CSS (the OS won't swap your <nav> for a native bar). So this approximates
+   the look in pure CSS: heavy blur + high saturation so the content behind
+   bleeds through vividly, a luminous top specular sheen, and a bright refractive
+   rim. Apply to rounded, floating elements. */
+.liquid-glass {
+  position: relative;
+  isolation: isolate;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.12) 0%,
+      rgba(255, 255, 255, 0.05) 38%,
+      rgba(255, 255, 255, 0.02) 100%
+    ),
+    rgba(18, 20, 26, 0.45);
+  -webkit-backdrop-filter: blur(28px) saturate(200%) brightness(1.15);
+  backdrop-filter: blur(28px) saturate(200%) brightness(1.15);
+  box-shadow:
+    0 14px 40px rgba(0, 0, 0, 0.5),
+    0 2px 8px rgba(0, 0, 0, 0.3),
+    0 1px 0 rgba(255, 255, 255, 0.30) inset;
+}
+
+/* Specular sheen — a soft highlight catching the top edge, like light on glass. */
+.liquid-glass::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(
+    140% 100% at 50% -10%,
+    rgba(255, 255, 255, 0.22) 0%,
+    rgba(255, 255, 255, 0.05) 35%,
+    rgba(255, 255, 255, 0) 60%
+  );
+  z-index: 0;
+}
+
+/* Refractive rim — a bright 1px gradient edge (masked ring), brighter up top. */
+.liquid-glass::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.45) 0%,
+    rgba(255, 255, 255, 0.12) 45%,
+    rgba(255, 255, 255, 0.06) 100%
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: 0;
 }
 
 .glass-modal {

@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  startTransition,
   useCallback,
   useEffect,
   useRef,
@@ -239,7 +238,11 @@ export default function RecommendationsView({
 
   const [showUpdateToast] = useState(false);
   const [activeStack, setActiveStack] = useState<StackId | null>(null);
-  const [preferences, setPreferences] = useState<RecommendationPreferences>(
+  // Derived once from the session profile at mount. Preference changes happen
+  // on the /preferences page, which persists the new profile and hard-navigates
+  // back here — so this component remounts and re-derives rather than mutating
+  // in place.
+  const [preferences] = useState<RecommendationPreferences>(
     () => preferencesFromProfile(session.profile)
   );
 
@@ -660,62 +663,14 @@ export default function RecommendationsView({
     [activeMovie, generate, onSessionUpdate, preferences, session.session_id, silentRefresh]
   );
 
-  const handlePreferenceUpdate = useCallback(
-    (nextPreferences: RecommendationPreferences) => {
-      setPreferences(nextPreferences);
-      startTransition(() => {
-        void generate(nextPreferences);
-      });
-    },
-    [generate]
-  );
-
-  // Pick up preference updates from /preferences page.
-  //
-  // Three delivery channels because the App Router caches /dashboard:
-  // back-navigation from /preferences DOES NOT remount this component, so
-  // a mount-only check is dead code on the common path.
-  //
-  //  (a) Custom window event — fires inline while we're still mounted, so
-  //      router.back() from /preferences delivers immediately. This is the
-  //      primary path.
-  //  (b) Mount-time sessionStorage check — covers cold reloads / hard
-  //      navigation where (a) was missed.
-  //  (c) visibilitychange — covers backgrounding the PWA and returning.
-  useEffect(() => {
-    const consumeStorage = () => {
-      try {
-        const raw = sessionStorage.getItem("cinematch_prefs_update");
-        if (raw) {
-          sessionStorage.removeItem("cinematch_prefs_update");
-          const nextPrefs = JSON.parse(raw) as RecommendationPreferences;
-          handlePreferenceUpdate(nextPrefs);
-        }
-      } catch { /* ignore */ }
-    };
-
-    const handleEvent = (e: Event) => {
-      const detail = (e as CustomEvent<RecommendationPreferences>).detail;
-      // Clear any stashed copy so the mount-time path doesn't double-apply.
-      try { sessionStorage.removeItem("cinematch_prefs_update"); } catch { /* ignore */ }
-      if (detail) handlePreferenceUpdate(detail);
-      else consumeStorage();
-    };
-
-    const handleVisibility = () => {
-      if (document.visibilityState === "visible") consumeStorage();
-    };
-
-    // Run once on mount in case we got here via a hard reload.
-    consumeStorage();
-
-    window.addEventListener("cinematch:prefs-update", handleEvent as EventListener);
-    document.addEventListener("visibilitychange", handleVisibility);
-    return () => {
-      window.removeEventListener("cinematch:prefs-update", handleEvent as EventListener);
-      document.removeEventListener("visibilitychange", handleVisibility);
-    };
-  }, [handlePreferenceUpdate]);
+  // Preference updates are now applied at the source: the /preferences page
+  // persists the new profile (server + cached session) and then hard-navigates
+  // to /dashboard. This component remounts with `preferences` already derived
+  // from the new `session.profile`, and the initial-load effect above fires a
+  // single generate() against it. That replaces the old three-channel
+  // sessionStorage-stash / custom-event / visibilitychange relay, which fired a
+  // SECOND generate() (often after an initial one with the OLD prefs) — the
+  // "old recs paint, then update 2-3s later" flash.
 
   return (
     <div
@@ -1683,17 +1638,62 @@ function PosterCard({
           style={{ position: "relative", aspectRatio: "2 / 3", borderRadius: "12px", overflow: "hidden", background: "transparent", cursor: "pointer", border: "1px solid transparent", transition: "border-color 0.22s ease" }}
         >
           <img src={poster} alt={movie.title} loading={priority ? "eager" : "lazy"} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
-          {imdb && (
-            <div style={{ position: "absolute", top: "8px", right: "8px", padding: "4px 8px", borderRadius: "8px", background: "rgba(0,0,0,0.82)", fontSize: "10px", fontWeight: 700, color: "#e8c84a", display: "flex", alignItems: "center", gap: "3px" }}>
-              <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>
-              {imdb}
-            </div>
-          )}
         </div>
         <div onClick={(e) => { e.stopPropagation(); if (onClick) onClick(); }} style={{ padding: "10px 8px 12px", cursor: "pointer" }}>
-          <p style={{ fontSize: "11px", fontWeight: 600, color: "var(--color-text-primary)", margin: 0, lineHeight: 1.3, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{movie.title}</p>
-          <div style={{ display: "flex", flexDirection: "column", gap: "3px", marginTop: "5px" }}>
-            <p style={{ fontSize: "10px", color: "var(--color-text-muted)", margin: 0 }}>{[movie.year, lang].filter(Boolean).join(" · ")}</p>
+          <p
+            style={{
+              fontSize: "12px",
+              fontWeight: 600,
+              color: "var(--color-text-primary)",
+              margin: 0,
+              lineHeight: 1.3,
+              // Reserve two lines so the metadata row lines up across every card
+              // in the rail whether the title wraps to one line or two — this is
+              // what fixes the ragged look where short titles sat higher.
+              minHeight: "2.6em",
+              display: "-webkit-box",
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden",
+            }}
+          >
+            {movie.title}
+          </p>
+          {/* One tidy metadata row — matches the compact rail cards: "year · lang"
+              muted on the left, a single gold rating chip pushed to the right. */}
+          <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "5px", minHeight: "18px" }}>
+            {(movie.year || lang) && (
+              <span
+                style={{
+                  fontSize: "10.5px",
+                  color: "var(--color-text-muted)",
+                  lineHeight: 1.2,
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  minWidth: 0,
+                }}
+              >
+                {[movie.year, lang].filter(Boolean).join(" · ")}
+              </span>
+            )}
+            {imdb && (
+              <span
+                style={{
+                  marginLeft: "auto",
+                  flexShrink: 0,
+                  padding: "2px 6px",
+                  borderRadius: "6px",
+                  background: "rgba(232,200,74,0.15)",
+                  color: "#e8c84a",
+                  fontSize: "10px",
+                  fontWeight: 700,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {movie.imdb_rating ? `IMDb ${imdb}` : `★ ${imdb}`}
+              </span>
+            )}
           </div>
         </div>
       </div>

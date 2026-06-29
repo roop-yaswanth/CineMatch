@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
-import { apiLogin, type UserSession } from "@/lib/api";
+import { apiLogin, apiLogout, type UserSession } from "@/lib/api";
 
 interface SessionContextType {
   session: UserSession | null;
@@ -14,11 +14,18 @@ interface SessionContextType {
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
 const STORAGE_KEY = "cinematch_email";
 const SESSION_CACHE_KEY = "cinematch_session";
+const ACTIVITY_KEY = "cinematch_last_activity";
 
-/** Safely read a cached session from sessionStorage */
+// Stay logged in until the user explicitly logs out or a full month passes with
+// no activity. We persist in localStorage (shared across tabs + survives browser
+// restarts) rather than sessionStorage (per-tab) — so opening the app in a new
+// tab no longer forces a re-login.
+const INACTIVITY_LIMIT_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+/** Safely read a cached session from localStorage */
 function readCachedSession(): UserSession | null {
   try {
-    const raw = sessionStorage.getItem(SESSION_CACHE_KEY);
+    const raw = localStorage.getItem(SESSION_CACHE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     // Basic shape check
@@ -34,15 +41,41 @@ function readCachedSession(): UserSession | null {
 /** Persist the full session object alongside the email identifier */
 function persistSession(s: UserSession) {
   try {
-    sessionStorage.setItem(STORAGE_KEY, s.identifier);
-    sessionStorage.setItem(SESSION_CACHE_KEY, JSON.stringify(s));
+    localStorage.setItem(STORAGE_KEY, s.identifier);
+    localStorage.setItem(SESSION_CACHE_KEY, JSON.stringify(s));
+    markActivity();
   } catch { /* storage full — non-critical */ }
 }
 
-/** Clear all session data from sessionStorage */
+/** Clear all session data from localStorage */
 function clearStoredSession() {
-  sessionStorage.removeItem(STORAGE_KEY);
-  sessionStorage.removeItem(SESSION_CACHE_KEY);
+  localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(SESSION_CACHE_KEY);
+  localStorage.removeItem(ACTIVITY_KEY);
+}
+
+/** Timestamp (ms epoch) of the user's last recorded activity; 0 if unknown. */
+function readLastActivity(): number {
+  try {
+    const raw = localStorage.getItem(ACTIVITY_KEY);
+    const n = raw ? parseInt(raw, 10) : 0;
+    return Number.isFinite(n) ? n : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** Record "user is active now" — drives the one-month inactivity logout. */
+function markActivity() {
+  try {
+    localStorage.setItem(ACTIVITY_KEY, String(Date.now()));
+  } catch { /* ignore */ }
+}
+
+/** True once a month has elapsed since the last recorded activity. */
+function inactivityExpired(): boolean {
+  const last = readLastActivity();
+  return last > 0 && Date.now() - last > INACTIVITY_LIMIT_MS;
 }
 
 export function SessionProvider({ children }: { children: ReactNode }) {
@@ -56,8 +89,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   // Restore: instant from cache, then silently validate with backend
   const restoreSession = useCallback(async () => {
+    // Enforce the one-month inactivity window across browser restarts: if the
+    // last recorded activity is older than the limit, clear and require login.
+    if (inactivityExpired()) {
+      clearStoredSession();
+      setSession(null);
+      setIsLoading(false);
+      return;
+    }
+
     const cached = readCachedSession();
-    const savedIdentifier = sessionStorage.getItem(STORAGE_KEY);
+    const savedIdentifier = localStorage.getItem(STORAGE_KEY);
 
     if (!cached && !savedIdentifier) {
       // Never logged in
@@ -68,6 +110,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
     // Instant restore from cache — no API needed, no loading flicker
     if (cached) {
+      markActivity(); // opening the app refreshes the inactivity window
       setSession(cached);
       setIsLoading(false);
 
@@ -109,18 +152,28 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(() => {
+    // Best-effort server-side invalidation, then clear locally regardless.
+    const sid = session?.session_id;
     clearSession();
-  }, [clearSession]);
+    if (sid) void apiLogout(sid).catch(() => { /* non-fatal */ });
+  }, [clearSession, session]);
 
   const updateSession = useCallback((newSession: UserSession) => {
     setSession(newSession);
     persistSession(newSession);
   }, []);
 
+  // Mirror login/logout that happened in another tab (localStorage `storage`
+  // events fire in every *other* tab). Keeps all tabs in sync: log out in one,
+  // they all log out; log in in one, the others pick it up.
   useEffect(() => {
     const handleStorage = (event: StorageEvent) => {
-      if (event.key === STORAGE_KEY && event.newValue === null) {
-        setSession(null);
+      if (event.key === STORAGE_KEY || event.key === SESSION_CACHE_KEY) {
+        if (event.key === STORAGE_KEY && event.newValue === null) {
+          setSession(null);
+        } else {
+          setSession(readCachedSession());
+        }
       }
     };
 
@@ -128,47 +181,36 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("storage", handleStorage);
   }, []);
 
-  // Session inactivity / out-of-focus logout.
-  // Logs out after 10 minutes of either: no user interaction, or document hidden.
+  // Inactivity logout: log out only after a FULL MONTH with no user interaction.
+  // We record the last-activity timestamp and poll, rather than using a single
+  // setTimeout — a 30-day delay overflows setTimeout's 32-bit millisecond range
+  // and would fire almost immediately. Crucially we do NOT log out just because
+  // the tab is hidden/backgrounded: switching tabs or apps keeps you logged in.
   useEffect(() => {
     if (!session) return; // Only track when logged in
 
-    const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minutes
+    markActivity(); // using the app counts as activity
 
-    let activityTimeoutId: ReturnType<typeof setTimeout> | null = null;
-    let hiddenTimeoutId: ReturnType<typeof setTimeout> | null = null;
-
-    const resetActivityTimer = () => {
-      if (activityTimeoutId) clearTimeout(activityTimeoutId);
-      activityTimeoutId = setTimeout(() => logout(), INACTIVITY_TIMEOUT);
-    };
-
-    const handleVisibility = () => {
-      if (document.hidden) {
-        // Tab/window hidden — start a separate timer; logout if still hidden after 10 min.
-        if (hiddenTimeoutId) clearTimeout(hiddenTimeoutId);
-        hiddenTimeoutId = setTimeout(() => logout(), INACTIVITY_TIMEOUT);
-      } else {
-        // Back in focus — cancel the hidden timer and reset the activity timer.
-        if (hiddenTimeoutId) {
-          clearTimeout(hiddenTimeoutId);
-          hiddenTimeoutId = null;
-        }
-        resetActivityTimer();
+    let lastWrite = Date.now();
+    const onActivity = () => {
+      const now = Date.now();
+      // Throttle localStorage writes to at most once a minute.
+      if (now - lastWrite > 60 * 1000) {
+        lastWrite = now;
+        markActivity();
       }
     };
 
-    resetActivityTimer();
-
     const events = ["mousemove", "keydown", "wheel", "touchstart", "click"];
-    events.forEach((event) => window.addEventListener(event, resetActivityTimer, { passive: true }));
-    document.addEventListener("visibilitychange", handleVisibility);
+    events.forEach((event) => window.addEventListener(event, onActivity, { passive: true }));
+
+    const interval = setInterval(() => {
+      if (inactivityExpired()) logout();
+    }, 5 * 60 * 1000); // re-check every 5 minutes
 
     return () => {
-      if (activityTimeoutId) clearTimeout(activityTimeoutId);
-      if (hiddenTimeoutId) clearTimeout(hiddenTimeoutId);
-      events.forEach((event) => window.removeEventListener(event, resetActivityTimer));
-      document.removeEventListener("visibilitychange", handleVisibility);
+      events.forEach((event) => window.removeEventListener(event, onActivity));
+      clearInterval(interval);
     };
   }, [session, logout]);
 

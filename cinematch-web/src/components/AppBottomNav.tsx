@@ -170,17 +170,13 @@ export default function AppBottomNav() {
     >
       <nav
         aria-label="Primary navigation"
+        className="liquid-glass"
         style={{
           display: "flex",
           alignItems: "center",
           gap: "2px",
           padding: "6px",
           borderRadius: "999px",
-          background: "rgba(20, 22, 28, 0.72)",
-          backdropFilter: "blur(40px) saturate(1.6)",
-          WebkitBackdropFilter: "blur(40px) saturate(1.6)",
-          border: "1px solid rgba(255,255,255,0.10)",
-          boxShadow: "0 12px 36px rgba(0,0,0,0.55), 0 1px 0 rgba(255,255,255,0.10) inset",
         }}
       >
         {NAV_ITEMS.map((item) => {
@@ -254,6 +250,7 @@ export default function AppBottomNav() {
         href="/search"
         prefetch
         aria-label="Search"
+        className="liquid-glass"
         style={{
           width: "56px",
           height: "56px",
@@ -262,16 +259,16 @@ export default function AppBottomNav() {
           alignItems: "center",
           justifyContent: "center",
           color: searchActive ? "var(--color-text-primary)" : "var(--color-text-muted)",
-          background: searchActive ? "rgba(255,255,255,0.18)" : "rgba(20, 22, 28, 0.72)",
-          backdropFilter: "blur(40px) saturate(1.6)",
-          WebkitBackdropFilter: "blur(40px) saturate(1.6)",
-          border: "1px solid rgba(255,255,255,0.10)",
-          boxShadow: "0 12px 36px rgba(0,0,0,0.55), 0 1px 0 rgba(255,255,255,0.10) inset",
+          // Active state brightens the glass; otherwise the .liquid-glass
+          // material (gradient + blur + rim) provides the surface.
+          background: searchActive ? "rgba(255,255,255,0.18)" : undefined,
           textDecoration: "none",
           transition: "background 220ms ease, color 220ms ease",
         }}
       >
-        <IconSearch />
+        <span style={{ position: "relative", zIndex: 1, display: "flex" }}>
+          <IconSearch />
+        </span>
       </Link>
 
       <style>{`

@@ -25,7 +25,39 @@ export default function PreferencesPage() {
   );
 
   const handleUpdate = async (prefs: RecommendationPreferences) => {
-    // (0) Update preferences on the server database backend.
+    // (1) Optimistically reflect the new prefs in the stored session so the
+    //     dashboard remount (hard-nav below) reads them INSTANTLY — even if the
+    //     network is slow or the server call fails. This is what kills the
+    //     "shows old recommendations for 2-3s, then updates" flash: the
+    //     dashboard now mounts already knowing the new preferences and fires a
+    //     single generate() against them.
+    if (session) {
+      updateSession({
+        ...session,
+        profile: {
+          ...session.profile,
+          preferred_languages: prefs.languages,
+          preferred_genres: prefs.genres,
+          genre_picks: prefs.genres,
+          include_classics: prefs.include_classics,
+          age_group: prefs.age_group,
+          region: prefs.region,
+        },
+      });
+    }
+
+    // (2) Drop the local recs cache for this user so the dashboard refetches
+    //     against the new prefs instead of restoring the old stacks.
+    try {
+      const uid = session?.user_id;
+      if (uid) localStorage.removeItem(`cinematch_recs_cache_${uid}`);
+    } catch { /* ignore */ }
+
+    // (3) Persist server-side (Mongo profile + per-user cache-version bump) and
+    //     adopt the authoritative session it returns. Awaited so the backend is
+    //     consistent BEFORE the hard-nav triggers a fresh login/restore on the
+    //     dashboard — otherwise that background re-validation could momentarily
+    //     restore the old profile. The modal awaits this before calling onClose.
     try {
       const sid = session?.session_id;
       if (sid) {
@@ -33,32 +65,16 @@ export default function PreferencesPage() {
           languages: prefs.languages,
           genres: prefs.genres,
           semantic_index: prefs.semantic_index,
+          age_group: prefs.age_group,
+          region: prefs.region,
+          include_classics: prefs.include_classics,
         });
         updateSession(freshSession);
       }
     } catch (err) {
       console.error("Failed to update preferences on server:", err);
     }
-
-    // (1) Stash for the dashboard to read on its next mount.
-    try {
-      sessionStorage.setItem("cinematch_prefs_update", JSON.stringify(prefs));
-    } catch { /* ignore */ }
-
-    // (2) Drop the local recs cache for this user (using persistent user_id).
-    try {
-      const uid = session?.user_id;
-      if (uid) localStorage.removeItem(`cinematch_recs_cache_${uid}`);
-    } catch { /* ignore */ }
-
-    // (3) Best-effort live event for the case where the dashboard is still
-    //     mounted (rare on the hard-nav path below, but harmless).
-    try {
-      window.dispatchEvent(
-        new CustomEvent("cinematch:prefs-update", { detail: prefs })
-      );
-    } catch { /* ignore */ }
-    // Navigation happens in onClose (PreferencesModal calls it right after).
+    // Navigation happens in onClose (PreferencesModal awaits this, then calls it).
   };
 
   if (isLoading || !session || !preferences) return null;
@@ -67,15 +83,16 @@ export default function PreferencesPage() {
   // state. Soft-nav variants (router.back / router.push / router.replace)
   // all hit the App Router's segment cache: the dashboard's
   // RecommendationsView is restored from cache with its old `stacks` and
-  // `bucketCache`, and even though the API call below fires with the new
+  // `bucketCache`, and even though the new recs fetch fires with the new
   // languages, the in-memory state from the prior visit can paint first
   // and stay (this is exactly the "other browser sees English-only but my
   // current tab still shows mixed" symptom).
   //
-  // A real navigation discards the cached segment outright, so the
-  // dashboard remounts clean, reads sessionStorage, and runs generate()
-  // against the new prefs from a known-empty state. Slight cost (full
-  // bundle re-eval) for a guaranteed-correct result.
+  // A real navigation discards the cached segment outright, so the dashboard
+  // remounts clean, derives preferences from the freshly-persisted session
+  // profile (updated in handleUpdate above), and runs a single generate()
+  // against the new prefs from a known-empty state. Slight cost (full bundle
+  // re-eval) for a guaranteed-correct result.
   const goToDashboard = () => {
     if (typeof window !== "undefined") {
       window.location.assign("/dashboard");
