@@ -56,7 +56,6 @@ const GENRES = [
 
 export default function PreferencesModal({ preferences, onUpdate, onClose, mode }: Props) {
   const [localPrefs, setLocalPrefs] = useState<Preferences>(preferences);
-  const [isApplying, setIsApplying] = useState(false);
 
   const toggle = (field: "languages" | "genres", value: string) => {
     const arr = localPrefs[field];
@@ -68,16 +67,12 @@ export default function PreferencesModal({ preferences, onUpdate, onClose, mode 
     });
   };
 
-  const handleApply = async () => {
-    if (isApplying) return;
-    setIsApplying(true);
-    try {
-      // Await in case onUpdate persists to the server — onClose typically
-      // navigates away, so it must not fire before the save completes.
-      await onUpdate(localPrefs);
-    } finally {
-      onClose();
-    }
+  const handleApply = () => {
+    // onUpdate applies the change optimistically and persists in the background
+    // (it must NOT block) — so we navigate immediately via onClose. Awaiting a
+    // network call here previously caused an indefinite "Applying…" hang.
+    onUpdate(localPrefs);
+    onClose();
   };
 
   return (
@@ -218,22 +213,19 @@ export default function PreferencesModal({ preferences, onUpdate, onClose, mode 
 
           {/* Apply */}
           <motion.button
-            whileHover={isApplying ? undefined : { scale: 1.01 }}
-            whileTap={isApplying ? undefined : { scale: 0.99 }}
+            whileHover={{ scale: 1.01 }}
+            whileTap={{ scale: 0.99 }}
             onClick={handleApply}
-            disabled={isApplying}
             className="glass-button"
             style={{
               marginTop: "8px", width: "100%", padding: "14px 0",
               background: "rgba(255,255,255,0.12)",
               color: "var(--color-text-primary)",
               fontSize: "14px", fontWeight: 500, letterSpacing: "0.02em",
-              borderRadius: "var(--radius-pill)",
-              cursor: isApplying ? "default" : "pointer",
-              opacity: isApplying ? 0.7 : 1,
+              borderRadius: "var(--radius-pill)", cursor: "pointer",
             }}
           >
-            {isApplying ? "Applying…" : "Apply Changes"}
+            Apply Changes
           </motion.button>
         </div>
       </motion.div>

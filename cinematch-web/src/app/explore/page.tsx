@@ -81,6 +81,12 @@ function ExplorePageInner() {
   const searchParams = useSearchParams();
   const { session, isLoading, logout } = useSession();
 
+  // Auth gate: this is an app page, so require a logged-in session (it must not
+  // be reachable by typing the URL while signed out).
+  useEffect(() => {
+    if (!isLoading && !session) router.replace("/login");
+  }, [session, isLoading, router]);
+
   // Initial tab read from URL (?tab=…) so deep links and back-nav restore the
   // user's last view. We validate against the known TabId set and fall back
   // to "all" for anything else.
@@ -173,7 +179,7 @@ function ExplorePageInner() {
     finally { setGridLoading(false); }
   }, [tab, gridPage, gridTotalPages, gridLoading, region]);
 
-  if (isLoading) return null;
+  if (isLoading || !session) return null;
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--color-bg)", display: "flex", flexDirection: "column" }}>

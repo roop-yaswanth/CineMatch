@@ -15,6 +15,10 @@ const SessionContext = createContext<SessionContextType | undefined>(undefined);
 const STORAGE_KEY = "cinematch_email";
 const SESSION_CACHE_KEY = "cinematch_session";
 const ACTIVITY_KEY = "cinematch_last_activity";
+// Set (to a future ms-epoch) by the preferences page right after a local change,
+// so the post-reload background re-validation here doesn't overwrite the
+// just-set profile with a briefly-stale server copy before the PUT lands.
+const PROFILE_OPTIMISTIC_KEY = "cinematch_profile_optimistic_until";
 
 // Stay logged in until the user explicitly logs out or a full month passes with
 // no activity. We persist in localStorage (shared across tabs + survives browser
@@ -52,6 +56,18 @@ function clearStoredSession() {
   localStorage.removeItem(STORAGE_KEY);
   localStorage.removeItem(SESSION_CACHE_KEY);
   localStorage.removeItem(ACTIVITY_KEY);
+  localStorage.removeItem(PROFILE_OPTIMISTIC_KEY);
+}
+
+/** True if a preferences change was just made locally and the server may not
+ *  reflect it yet — in which case we keep the local profile over a re-fetch. */
+function profileOptimisticActive(): boolean {
+  try {
+    const raw = localStorage.getItem(PROFILE_OPTIMISTIC_KEY);
+    return !!raw && Date.now() < parseInt(raw, 10);
+  } catch {
+    return false;
+  }
 }
 
 /** Timestamp (ms epoch) of the user's last recorded activity; 0 if unknown. */
@@ -117,8 +133,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       // Silently re-validate with the backend in the background
       try {
         const fresh = await apiLogin(cached.identifier);
-        setSession(fresh);
-        persistSession(fresh);
+        // If the user just changed preferences locally, the server copy may not
+        // reflect it yet — keep the optimistic profile (adopt everything else
+        // from the fresh session) so it doesn't flicker back to the old prefs.
+        const next = profileOptimisticActive() && cached.profile
+          ? { ...fresh, profile: cached.profile }
+          : fresh;
+        setSession(next);
+        persistSession(next);
       } catch {
         // Backend unavailable — keep the cached session, don't log out
         console.warn("[SessionProvider] Background re-validation failed; using cached session.");

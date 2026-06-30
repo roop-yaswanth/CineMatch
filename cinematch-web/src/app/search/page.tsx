@@ -53,6 +53,13 @@ function SearchPage() {
   const router = useRouter();
   const params = useSearchParams();
   const { session, isLoading, logout } = useSession();
+
+  // Auth gate: this is an app page, so require a logged-in session (it must not
+  // be reachable by typing the URL while signed out).
+  useEffect(() => {
+    if (!isLoading && !session) router.replace("/login");
+  }, [session, isLoading, router]);
+
   const initialQ = params.get("q") || "";
 
   const [query, setQuery] = useState(initialQ);
@@ -194,7 +201,7 @@ function SearchPage() {
     [session, active]
   );
 
-  if (isLoading) return null;
+  if (isLoading || !session) return null;
 
   const totalCount = results.movies.length + results.tv.length + results.people.length;
 

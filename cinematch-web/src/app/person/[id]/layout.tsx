@@ -119,7 +119,9 @@ export default async function PersonLayout({
       {jsonLd && (
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+          // Escape `<` so a TMDB biography containing a literal "</script>" (or
+          // any markup) can't break out of this inline script tag.
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
         />
       )}
       {children}

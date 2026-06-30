@@ -24,13 +24,14 @@ export default function PreferencesPage() {
     [session]
   );
 
-  const handleUpdate = async (prefs: RecommendationPreferences) => {
+  const handleUpdate = (prefs: RecommendationPreferences) => {
     // (1) Optimistically reflect the new prefs in the stored session so the
-    //     dashboard remount (hard-nav below) reads them INSTANTLY — even if the
-    //     network is slow or the server call fails. This is what kills the
-    //     "shows old recommendations for 2-3s, then updates" flash: the
-    //     dashboard now mounts already knowing the new preferences and fires a
-    //     single generate() against them.
+    //     dashboard remount (hard-nav below) reads them INSTANTLY. This is the
+    //     source of truth for the UI — we deliberately DON'T block navigation on
+    //     the network (awaiting it caused an indefinite "Applying…" hang when the
+    //     request was slow or the endpoint was unavailable). The dashboard also
+    //     sends prefs in the recommendations request body, so results reflect the
+    //     change regardless of whether the profile write has landed yet.
     if (session) {
       updateSession({
         ...session,
@@ -44,6 +45,12 @@ export default function PreferencesPage() {
           region: prefs.region,
         },
       });
+      // Tell SessionContext to keep this just-set profile and not let the
+      // post-reload background re-validation (apiLogin) overwrite it with a
+      // briefly-stale server copy before the PUT below lands.
+      try {
+        localStorage.setItem("cinematch_profile_optimistic_until", String(Date.now() + 15000));
+      } catch { /* ignore */ }
     }
 
     // (2) Drop the local recs cache for this user so the dashboard refetches
@@ -53,28 +60,23 @@ export default function PreferencesPage() {
       if (uid) localStorage.removeItem(`cinematch_recs_cache_${uid}`);
     } catch { /* ignore */ }
 
-    // (3) Persist server-side (Mongo profile + per-user cache-version bump) and
-    //     adopt the authoritative session it returns. Awaited so the backend is
-    //     consistent BEFORE the hard-nav triggers a fresh login/restore on the
-    //     dashboard — otherwise that background re-validation could momentarily
-    //     restore the old profile. The modal awaits this before calling onClose.
-    try {
-      const sid = session?.session_id;
-      if (sid) {
-        const freshSession = await apiUpdatePreferences(sid, {
-          languages: prefs.languages,
-          genres: prefs.genres,
-          semantic_index: prefs.semantic_index,
-          age_group: prefs.age_group,
-          region: prefs.region,
-          include_classics: prefs.include_classics,
-        });
-        updateSession(freshSession);
-      }
-    } catch (err) {
-      console.error("Failed to update preferences on server:", err);
+    // (3) Persist server-side (Mongo profile + per-user cache-version bump) in
+    //     the BACKGROUND — fire-and-forget. Adopt the authoritative session it
+    //     returns, but never make the UI wait on it.
+    const sid = session?.session_id;
+    if (sid) {
+      apiUpdatePreferences(sid, {
+        languages: prefs.languages,
+        genres: prefs.genres,
+        semantic_index: prefs.semantic_index,
+        age_group: prefs.age_group,
+        region: prefs.region,
+        include_classics: prefs.include_classics,
+      })
+        .then((freshSession) => updateSession(freshSession))
+        .catch((err) => console.error("Failed to update preferences on server:", err));
     }
-    // Navigation happens in onClose (PreferencesModal awaits this, then calls it).
+    // Navigation happens immediately in onClose (PreferencesModal calls it).
   };
 
   if (isLoading || !session || !preferences) return null;

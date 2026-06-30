@@ -27,6 +27,13 @@ export default function PersonPage() {
   const params = useParams<{ id: string }>();
   const personId = Number(params.id);
   const { session, isLoading, logout } = useSession();
+
+  // Auth gate: this is an app page, so require a logged-in session (it must not
+  // be reachable by typing the URL while signed out).
+  useEffect(() => {
+    if (!isLoading && !session) router.replace("/login");
+  }, [session, isLoading, router]);
+
   // We tag the fetched result with the id it was fetched for. `loading` is
   // derived as "no result yet for the current personId" — no setState-in-effect
   // for the loading flag.
@@ -61,7 +68,7 @@ export default function PersonPage() {
     });
   }, [data]);
 
-  if (isLoading) return null;
+  if (isLoading || !session) return null;
 
   const openMovie = (c: PersonCredit) => {
     if (c.media_type === "movie") {
