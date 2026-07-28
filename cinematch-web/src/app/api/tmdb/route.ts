@@ -9,7 +9,7 @@ const TMDB_HEADERS = {
 
 async function fetchTmdbEntity(kind: "movie" | "tv", tmdbId: string) {
   const response = await fetch(
-    `https://api.themoviedb.org/3/${kind}/${tmdbId}?language=en-US`,
+    `https://api.themoviedb.org/3/${kind}/${tmdbId}?append_to_response=images&include_image_language=en,null`,
     {
       headers: TMDB_HEADERS,
       next: { revalidate: 86400 },
@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
   const tmdbId = String(tmdbIdNum);
 
   if (!TMDB_BEARER) {
-    return NextResponse.json({ poster_path: null }, { status: 200 });
+    return NextResponse.json({ poster_path: null, logo_path: null }, { status: 200 });
   }
 
   try {
@@ -37,13 +37,18 @@ export async function GET(req: NextRequest) {
     const data = movie?.poster_path ? movie : tv ?? movie;
 
     if (!data) {
-      return NextResponse.json({ poster_path: null }, { status: 200 });
+      return NextResponse.json({ poster_path: null, logo_path: null }, { status: 200 });
     }
+
+    const logos: Array<{ file_path: string; iso_639_1?: string | null }> = data.images?.logos || [];
+    const englishLogo = logos.find((l) => l.iso_639_1 === "en") || logos[0];
+    const logo_path = englishLogo?.file_path || null;
 
     return NextResponse.json(
       {
         poster_path: data.poster_path || null,
         backdrop_path: data.backdrop_path || null,
+        logo_path,
         overview: data.overview || null,
         original_language: data.original_language || null,
         genres: (data.genres || []).map((g: { name: string }) => g.name),
@@ -53,6 +58,6 @@ export async function GET(req: NextRequest) {
       { headers: tmdbCacheHeaders(86400) }
     );
   } catch {
-    return NextResponse.json({ poster_path: null }, { status: 200 });
+    return NextResponse.json({ poster_path: null, logo_path: null }, { status: 200 });
   }
 }

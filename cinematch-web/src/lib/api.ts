@@ -677,6 +677,8 @@ export interface CreditsResponse {
   cast: CastMember[];
   directors: CrewMember[];
   writers: CrewMember[];
+  logo_path?: string | null;
+  logo_aspect_ratio?: number | null;
 }
 
 export interface PersonCredit {

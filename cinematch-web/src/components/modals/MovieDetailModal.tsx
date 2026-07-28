@@ -47,6 +47,7 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
   const [cast, setCast] = useState<CastMember[]>([]);
   const [directors, setDirectors] = useState<CrewMember[]>([]);
   const [writers, setWriters] = useState<CrewMember[]>([]);
+  const [logoPath, setLogoPath] = useState<string | null>(null);
   const [creditsLoading, setCreditsLoading] = useState(false);
   const [trailerKey, setTrailerKey] = useState<string | null>(null);
   const [trailerLanguages, setTrailerLanguages] = useState<Array<{ lang: string; label: string; key: string }>>([]);
@@ -82,6 +83,7 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
         setTrailerFetched(false);
         setShowTrailerPlayer(false);
         setShowWatchProviders(false);
+        setLogoPath(null);
       }, 0);
     }
     return () => {
@@ -133,12 +135,13 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
       /* eslint-disable react-hooks/set-state-in-effect */
       setCast([]); setDirectors([]); setWriters([]);
       setActivePersonId(null);
+      setLogoPath(null);
       /* eslint-enable react-hooks/set-state-in-effect */
       return;
     }
     let cancelled = false;
     setCreditsLoading(true);
-    setCast([]); setDirectors([]); setWriters([]);
+    setCast([]); setDirectors([]); setWriters([]); setLogoPath(null);
 
     apiCredits(id, "movie")
       .then((c) => {
@@ -146,6 +149,7 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
         setCast(c.cast);
         setDirectors(c.directors);
         setWriters(c.writers);
+        setLogoPath(c.logo_path || null);
       })
       .catch(() => { })
       .finally(() => { if (!cancelled) setCreditsLoading(false); });
@@ -564,19 +568,37 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                         pointerEvents: "none",
                       }}
                     >
-                      <h2
-                        style={{
-                          margin: "0 0 4px",
-                          fontSize: "clamp(18px, 5vw, 24px)",
-                          fontWeight: 700,
-                          color: "#fff",
-                          lineHeight: 1.15,
-                          textShadow: "0 2px 8px rgba(0,0,0,0.7)",
-                          letterSpacing: "-0.02em",
-                        }}
-                      >
-                        {movie.title}
-                      </h2>
+                      {logoPath ? (
+                        <div style={{ marginBottom: "6px" }}>
+                          <img
+                            src={posterUrl(logoPath, "w500")}
+                            alt={movie.title}
+                            style={{
+                              maxHeight: "56px",
+                              maxWidth: "220px",
+                              width: "auto",
+                              height: "auto",
+                              objectFit: "contain",
+                              filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.8))",
+                            }}
+                            onError={() => setLogoPath(null)}
+                          />
+                        </div>
+                      ) : (
+                        <h2
+                          style={{
+                            margin: "0 0 4px",
+                            fontSize: "clamp(18px, 5vw, 24px)",
+                            fontWeight: 700,
+                            color: "#fff",
+                            lineHeight: 1.15,
+                            textShadow: "0 2px 8px rgba(0,0,0,0.7)",
+                            letterSpacing: "-0.02em",
+                          }}
+                        >
+                          {movie.title}
+                        </h2>
+                      )}
                       <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                         {movie.year && (
                           <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.65)", textShadow: "0 1px 4px rgba(0,0,0,0.6)" }}>
@@ -819,9 +841,27 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                   {/* On mobile, title and meta are already overlaid on the hero poster */}
                   {!isMobile && (
                     <>
-                      <h2 style={{ margin: "0 0 6px 0", fontSize: "26px", fontWeight: 700, color: "var(--color-text-primary)", lineHeight: 1.1 }}>
-                        {movie.title}
-                      </h2>
+                      {logoPath ? (
+                        <div style={{ marginBottom: "10px", marginTop: "2px" }}>
+                          <img
+                            src={posterUrl(logoPath, "w500")}
+                            alt={movie.title}
+                            style={{
+                              maxHeight: "75px",
+                              maxWidth: "280px",
+                              width: "auto",
+                              height: "auto",
+                              objectFit: "contain",
+                              filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.6))",
+                            }}
+                            onError={() => setLogoPath(null)}
+                          />
+                        </div>
+                      ) : (
+                        <h2 style={{ margin: "0 0 6px 0", fontSize: "26px", fontWeight: 700, color: "var(--color-text-primary)", lineHeight: 1.1 }}>
+                          {movie.title}
+                        </h2>
+                      )}
 
                       <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", alignItems: "center", color: "var(--color-text-muted)", fontSize: "13px" }}>
                         {year && <span>{year}</span>}

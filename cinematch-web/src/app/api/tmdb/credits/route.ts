@@ -27,17 +27,18 @@ export async function GET(req: NextRequest) {
   const id = parseTmdbId(req.nextUrl.searchParams.get("id"));
   const kind = req.nextUrl.searchParams.get("kind") === "tv" ? "tv" : "movie";
   if (!id) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
-  if (!TMDB_BEARER) return NextResponse.json({ cast: [], directors: [], writers: [] });
+  if (!TMDB_BEARER) return NextResponse.json({ cast: [], directors: [], writers: [], logo_path: null });
 
   try {
     const res = await fetch(
-      `https://api.themoviedb.org/3/${kind}/${id}/credits?language=en-US`,
+      `https://api.themoviedb.org/3/${kind}/${id}?append_to_response=credits,images&include_image_language=en,null`,
       { headers: TMDB_HEADERS, next: { revalidate: 86400 } }
     );
-    if (!res.ok) return NextResponse.json({ cast: [], directors: [], writers: [] });
+    if (!res.ok) return NextResponse.json({ cast: [], directors: [], writers: [], logo_path: null });
     const data = await res.json();
 
-    const cast = ((data.cast || []) as TmdbCast[])
+    const creditsData = data.credits || {};
+    const cast = ((creditsData.cast || []) as TmdbCast[])
       .slice(0, 15)
       .map((c) => ({
         id: c.id,
@@ -46,7 +47,7 @@ export async function GET(req: NextRequest) {
         profile_path: c.profile_path || null,
       }));
 
-    const crew = (data.crew || []) as TmdbCrew[];
+    const crew = (creditsData.crew || []) as TmdbCrew[];
     const directors = crew
       .filter((c) => c.job === "Director")
       .map((c) => ({ id: c.id, name: c.name, profile_path: c.profile_path || null }));
@@ -54,11 +55,17 @@ export async function GET(req: NextRequest) {
       .filter((c) => c.department === "Writing" && (c.job === "Writer" || c.job === "Screenplay" || c.job === "Story"))
       .map((c) => ({ id: c.id, name: c.name, job: c.job, profile_path: c.profile_path || null }));
 
+    // Extract official title logo PNG from images.logos
+    const logos: Array<{ file_path: string; iso_639_1?: string | null; aspect_ratio?: number }> = data.images?.logos || [];
+    const englishLogo = logos.find((l) => l.iso_639_1 === "en") || logos[0];
+    const logo_path = englishLogo?.file_path || null;
+    const logo_aspect_ratio = englishLogo?.aspect_ratio || null;
+
     return NextResponse.json(
-      { cast, directors, writers },
+      { cast, directors, writers, logo_path, logo_aspect_ratio },
       { headers: tmdbCacheHeaders(86400) }
     );
   } catch {
-    return NextResponse.json({ cast: [], directors: [], writers: [] });
+    return NextResponse.json({ cast: [], directors: [], writers: [], logo_path: null });
   }
 }

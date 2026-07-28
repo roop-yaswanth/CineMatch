@@ -34,13 +34,14 @@ export default function HeroFeature({ movies, onOpenDetail, onWatchlist }: Props
   const wasInteractedRef = useRef(false);
 
   const [liveBackdrops, setLiveBackdrops] = useState<Record<number, string | null>>({});
+  const [liveLogos, setLiveLogos] = useState<Record<number, string | null>>({});
 
   // Reset when the movie list itself changes (e.g. new recommendations).
   useEffect(() => {
     Promise.resolve().then(() => setIndex(0));
     wasInteractedRef.current = false;
     
-    // Fetch live high-quality backdrops from TMDB for the hero items
+    // Fetch live high-quality backdrops & title logos from TMDB for the hero items
     items.forEach((m) => {
       const tmdbId = m.tmdb_id || m.id;
       if (!tmdbId) return;
@@ -49,6 +50,9 @@ export default function HeroFeature({ movies, onOpenDetail, onWatchlist }: Props
         .then((data) => {
           if (data.backdrop_path) {
             setLiveBackdrops((prev) => ({ ...prev, [m.id]: data.backdrop_path }));
+          }
+          if (data.logo_path) {
+            setLiveLogos((prev) => ({ ...prev, [m.id]: data.logo_path }));
           }
         })
         .catch(() => {});
@@ -155,20 +159,37 @@ export default function HeroFeature({ movies, onOpenDetail, onWatchlist }: Props
             >
               Featured for you
             </div>
-            <h1
-              style={{
-                margin: 0,
-                fontSize: "clamp(26px, 6vw, 44px)",
-                fontWeight: 800,
-                letterSpacing: "-0.03em",
-                lineHeight: 1.05,
-                color: "#fff",
-                textShadow: "0 2px 10px rgba(0,0,0,0.5)",
-                maxWidth: 600,
-              }}
-            >
-              {movie.title}
-            </h1>
+            {liveLogos[movie.id] ? (
+              <div style={{ margin: "4px 0 8px" }}>
+                <img
+                  src={posterUrl(liveLogos[movie.id]!, "w500")}
+                  alt={movie.title}
+                  style={{
+                    maxHeight: "80px",
+                    maxWidth: "min(340px, 80vw)",
+                    width: "auto",
+                    height: "auto",
+                    objectFit: "contain",
+                    filter: "drop-shadow(0 4px 14px rgba(0,0,0,0.85))",
+                  }}
+                />
+              </div>
+            ) : (
+              <h1
+                style={{
+                  margin: 0,
+                  fontSize: "clamp(26px, 6vw, 44px)",
+                  fontWeight: 800,
+                  letterSpacing: "-0.03em",
+                  lineHeight: 1.05,
+                  color: "#fff",
+                  textShadow: "0 2px 10px rgba(0,0,0,0.5)",
+                  maxWidth: 600,
+                }}
+              >
+                {movie.title}
+              </h1>
+            )}
             {movie.overview && (
               <p
                 style={{
