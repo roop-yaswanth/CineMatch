@@ -721,6 +721,7 @@ export default function RecommendationsView({
             }}
           >
             <div
+              className="dashboard-header-bar"
               style={{
                 width: "100%",
                 padding: "12px 16px 12px",
@@ -734,7 +735,7 @@ export default function RecommendationsView({
 
               {/* Center: title — absolutely positioned so it's always truly centered */}
               <h1
-                className="heading-display"
+                className="heading-display header-title-brand"
                 style={{
                   position: "absolute",
                   left: "50%",
@@ -814,6 +815,12 @@ export default function RecommendationsView({
                 />
               </div>
             </div>
+            <style>{`
+              @media (max-width: 899px) {
+                .header-title-brand { display: none !important; }
+                .dashboard-header-bar { padding: 8px 16px !important; }
+              }
+            `}</style>
           </header>
 
           {/* Content */}
@@ -916,27 +923,16 @@ export default function RecommendationsView({
                   paddingBottom: "calc(120px + env(safe-area-inset-bottom))",
                 }}
               >
-                {stacks.map((stack) =>
-                  stack.id === "matched" ? (
-                    <StackRow
-                      key={stack.id}
-                      stack={stack}
-                      disabled={loading}
-                      onAction={handleAction}
-                      onOpenDetail={() => setActiveStack(stack.id)}
-                      onMovieClick={(m) => setActiveMovie(toDetailMovie(m))}
-                    />
-                  ) : (
-                    <CompactRail
-                      key={stack.id}
-                      label={stack.label}
-                      subtitle={stack.subtitle}
-                      movies={stack.movies}
-                      onMovieClick={(m) => setActiveMovie(toDetailMovie(m))}
-                      onOpenDetail={() => setActiveStack(stack.id)}
-                    />
-                  )
-                )}
+                {stacks.map((stack) => (
+                  <StackRow
+                    key={stack.id}
+                    stack={stack}
+                    disabled={loading}
+                    onAction={handleAction}
+                    onOpenDetail={() => setActiveStack(stack.id)}
+                    onMovieClick={(m) => setActiveMovie(toDetailMovie(m))}
+                  />
+                ))}
               </div>
             )}
 
@@ -1429,7 +1425,7 @@ function PosterCard({
   }, []);
 
   const scheduleHoverOpen = useCallback(() => {
-    if (disabled || showFullInfo || !isDesktopHoverEnabled()) return;
+    if (disabled || !isDesktopHoverEnabled()) return;
     if (hoverCloseTimeoutRef.current) {
       clearTimeout(hoverCloseTimeoutRef.current);
       hoverCloseTimeoutRef.current = null;
@@ -1438,7 +1434,7 @@ function PosterCard({
     hoverTimeoutRef.current = setTimeout(() => {
       measureAndExpand();
     }, 280);
-  }, [disabled, isDesktopHoverEnabled, measureAndExpand, showFullInfo]);
+  }, [disabled, isDesktopHoverEnabled, measureAndExpand]);
 
   const scheduleHoverClose = useCallback((delay = 120) => {
     if (hoverTimeoutRef.current) {

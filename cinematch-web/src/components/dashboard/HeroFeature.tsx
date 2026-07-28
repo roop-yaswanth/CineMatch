@@ -73,6 +73,32 @@ export default function HeroFeature({ movies, onOpenDetail, onWatchlist }: Props
     setIndex(((i % items.length) + items.length) % items.length);
   }, [items.length]);
 
+  const touchStartXRef = useRef<number | null>(null);
+  const touchStartYRef = useRef<number | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setPaused(true);
+    touchStartXRef.current = e.touches[0].clientX;
+    touchStartYRef.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartXRef.current === null || touchStartYRef.current === null) return;
+    const deltaX = e.changedTouches[0].clientX - touchStartXRef.current;
+    const deltaY = e.changedTouches[0].clientY - touchStartYRef.current;
+
+    // Minimum swipe threshold (40px) and ensure horizontal swipe > vertical scroll
+    if (Math.abs(deltaX) > 40 && Math.abs(deltaX) > Math.abs(deltaY)) {
+      if (deltaX < 0) {
+        goTo(index + 1); // Swiped left -> Next title
+      } else {
+        goTo(index - 1); // Swiped right -> Previous title
+      }
+    }
+    touchStartXRef.current = null;
+    touchStartYRef.current = null;
+  };
+
   if (items.length === 0) return null;
   const movie = items[index];
   const backdropPath = liveBackdrops[movie.id] || movie.backdrop_path;
@@ -88,6 +114,9 @@ export default function HeroFeature({ movies, onOpenDetail, onWatchlist }: Props
         minHeight: 360,
         overflow: "hidden",
         marginBottom: 24,
+        touchAction: "pan-y", // Allow normal vertical page scrolling while capturing horizontal swipes
+        userSelect: "none",
+        WebkitUserSelect: "none",
         // Soft mask into the page background — avoids a hard horizontal seam
         // where the hero ends and the rails begin.
         WebkitMaskImage:
@@ -97,7 +126,8 @@ export default function HeroFeature({ movies, onOpenDetail, onWatchlist }: Props
       }}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
-      onTouchStart={() => setPaused(true)}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
     >
       <AnimatePresence mode="popLayout">
         <motion.div
