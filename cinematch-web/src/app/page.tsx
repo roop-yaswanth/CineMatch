@@ -147,13 +147,37 @@ export default function HomePage() {
             taste — from world-cinema hidden gems to the blockbusters you already love.
           </p>
 
-          {/* Sign-in */}
-          <div style={{ marginTop: "38px" }}>
-            <GoogleSignInButton onLogin={handleLogin} />
+          {/* Sign-in Card */}
+          <div
+            style={{
+              marginTop: "38px",
+              display: "inline-flex",
+              flexDirection: "column",
+              alignItems: "flex-start",
+              gap: "14px",
+              padding: "24px 28px",
+              borderRadius: "20px",
+              background: "rgba(16, 16, 22, 0.65)",
+              backdropFilter: "blur(20px)",
+              WebkitBackdropFilter: "blur(20px)",
+              border: "1px solid rgba(255, 255, 255, 0.12)",
+              boxShadow:
+                "0 20px 40px -10px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.05) inset",
+            }}
+          >
+            <GoogleSignInButton onLogin={handleLogin} theme="filled_blue" />
+            <p
+              style={{
+                fontSize: "12px",
+                color: "rgba(255, 255, 255, 0.75)",
+                maxWidth: "320px",
+                lineHeight: 1.5,
+                margin: 0,
+              }}
+            >
+              Free to use. We use your Google account only to sign you in and sync your taste profile.
+            </p>
           </div>
-          <p style={{ marginTop: "14px", fontSize: "12px", color: "var(--color-text-secondary)", opacity: 0.7 }}>
-            Free to use. We use your Google account only to sign you in and sync your taste profile.
-          </p>
         </motion.div>
 
         {/* Feature highlights */}

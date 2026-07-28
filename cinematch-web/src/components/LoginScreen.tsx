@@ -74,23 +74,41 @@ export default function LoginScreen({ onLogin }: Props) {
           </p>
         </motion.div>
 
-        {/* Google sign-in */}
+        {/* Google sign-in card */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
           style={{
             width: "100%",
-            maxWidth: "420px",
+            maxWidth: "380px",
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
-            gap: "18px",
+            gap: "20px",
+            padding: "32px 28px 24px",
+            borderRadius: "24px",
+            background: "rgba(16, 16, 22, 0.75)",
+            backdropFilter: "blur(24px)",
+            WebkitBackdropFilter: "blur(24px)",
+            border: "1px solid rgba(255, 255, 255, 0.12)",
+            boxShadow:
+              "0 24px 48px -12px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.05) inset, 0 0 30px rgba(26, 115, 232, 0.08)",
           }}
         >
-          <GoogleSignInButton onLogin={onLogin} />
+          <GoogleSignInButton onLogin={onLogin} theme="filled_blue" />
 
-          <p style={{ fontSize: "12px", color: "var(--color-text-secondary)", opacity: 0.7, textAlign: "center", maxWidth: "320px", lineHeight: 1.5 }}>
+          <p
+            style={{
+              fontSize: "12px",
+              color: "rgba(255, 255, 255, 0.75)",
+              textAlign: "center",
+              maxWidth: "300px",
+              lineHeight: 1.55,
+              margin: 0,
+              fontWeight: 400,
+            }}
+          >
             We use your Google account to keep your taste profile in sync across devices.
           </p>
         </motion.div>
