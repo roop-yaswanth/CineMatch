@@ -916,12 +916,6 @@ export default function RecommendationsView({
                 style={{
                   display: "grid",
                   gap: "40px",
-                  // Reserve space at the bottom of the scroll content so the
-                  // last rail's titles aren't covered by the floating bottom
-                  // nav (pill ≈ 72 px + 28 px static lift + safe-area inset).
-                  // Without this, "Tabu / Oslo / Doctor" titles in the Global
-                  // Cinema row got clipped by the nav.
-                  paddingBottom: "calc(120px + env(safe-area-inset-bottom))",
                 }}
               >
                 {stacks.map((stack) => (
