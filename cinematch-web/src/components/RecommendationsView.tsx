@@ -17,6 +17,7 @@ import dynamic from "next/dynamic";
 import BackButton from "@/components/ui/BackButton";
 import HeroFeature from "@/components/dashboard/HeroFeature";
 import CompactRail from "@/components/dashboard/CompactRail";
+import AppFooter from "@/components/AppFooter";
 import { toast } from "@/components/ui/Toast";
 import type { DetailMovie } from "@/components/modals/MovieDetailModal";
 
@@ -933,6 +934,7 @@ export default function RecommendationsView({
                     onMovieClick={(m) => setActiveMovie(toDetailMovie(m))}
                   />
                 ))}
+                <AppFooter />
               </div>
             )}
 
