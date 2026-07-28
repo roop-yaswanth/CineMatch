@@ -281,8 +281,8 @@ function Rail({
   onSelect: (m: ExploreMovie) => void;
 }) {
   return (
-    <section>
-      <div style={{ padding: "0 20px 10px", display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
+    <section style={{ overflow: "visible" }}>
+      <div style={{ padding: "0 clamp(20px, 4vw, 40px) 12px", display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
         <div>
           <h2 style={{ fontSize: "18px", fontWeight: 600, color: "var(--color-text-primary)", margin: 0, letterSpacing: "-0.02em" }}>
             {category.label}
@@ -293,9 +293,25 @@ function Rail({
         </div>
         <button
           onClick={onSeeAll}
-          style={{ background: "none", border: "none", color: "var(--color-text-secondary)", fontSize: "13px", fontWeight: 500, cursor: "pointer", padding: "4px 8px" }}
+          style={{
+            background: "rgba(255,255,255,0.06)",
+            border: "1px solid rgba(255,255,255,0.12)",
+            color: "var(--color-text-primary)",
+            fontSize: "12px",
+            fontWeight: 600,
+            cursor: "pointer",
+            padding: "6px 14px",
+            borderRadius: "999px",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "5px",
+            transition: "all 0.18s ease",
+          }}
         >
-          See all →
+          <span>See all</span>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
         </button>
       </div>
 
@@ -307,9 +323,10 @@ function Rail({
         <div
           style={{
             display: "flex",
-            gap: "12px",
+            gap: "14px",
             overflowX: "auto",
-            padding: "0 20px 4px",
+            padding: "12px clamp(20px, 4vw, 40px) 16px",
+            margin: "-12px 0 -12px",
             scrollSnapType: "x mandatory",
             scrollbarWidth: "none",
           }}
@@ -318,7 +335,7 @@ function Rail({
             <motion.div
               key={m.tmdb_id}
               onClick={() => onSelect(m)}
-              style={{ width: "140px", flexShrink: 0, scrollSnapAlign: "start", cursor: "pointer" }}
+              style={{ width: "140px", flexShrink: 0, scrollSnapAlign: "start", cursor: "pointer", position: "relative", zIndex: 1 }}
               whileTap={{ scale: 0.97 }}
             >
               <MovieCard movie={m} compact noLayout showFullDate={category.id === "upcoming"} />
@@ -347,13 +364,13 @@ function Grid({
   categoryId?: string;
 }) {
   if (movies.length === 0 && loading) {
-    return <div style={{ padding: "0 20px" }}><SkeletonGrid count={12} /></div>;
+    return <div style={{ padding: "0 clamp(20px, 4vw, 40px)" }}><SkeletonGrid count={12} /></div>;
   }
   if (movies.length === 0) {
     return <EmptyState title="No results" description="Try a different category or filter." />;
   }
   return (
-    <div style={{ padding: "0 20px" }}>
+    <div style={{ padding: "0 clamp(20px, 4vw, 40px)" }}>
       <div
         style={{
           display: "grid",
@@ -477,7 +494,7 @@ function Discover({
   const reset = () => setFilters({ sort_by: "popularity.desc", with_genres: [], region });
 
   return (
-    <div style={{ padding: "0 20px" }}>
+    <div style={{ padding: "0 clamp(20px, 4vw, 40px)" }}>
       {/* Filter panel */}
       <div
         style={{

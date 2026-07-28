@@ -111,10 +111,11 @@ export default function MovieCard({ movie, priority = false, className = "", com
   return (
     <motion.div
       layout={!noLayout}
-      whileHover={{ scale: 1.03, y: -4 }}
-      transition={{ type: "spring", stiffness: 300, damping: 20 }}
+      whileHover={{ scale: 1.06, y: -6, zIndex: 30 }}
+      transition={{ type: "spring", stiffness: 350, damping: 22 }}
       onHoverStart={() => prefetchMovieDetails(recommendationId(movie))}
       className={`relative flex flex-col items-center no-select ${className}`}
+      style={{ position: "relative" }}
     >
       {/* Poster */}
       <div
