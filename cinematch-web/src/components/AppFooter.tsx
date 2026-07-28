@@ -24,8 +24,6 @@ const HIDDEN_ROUTES: Array<(p: string) => boolean> = [
   (p) => p.startsWith("/onboarding"),
   // Preferences renders a fixed modal; hide the footer so it doesn't bleed through.
   (p) => p === "/preferences",
-  // Dashboard handles its own scroll container and renders AppFooter inline at the bottom of its content.
-  (p) => p === "/dashboard",
 ];
 
 export default function AppFooter() {

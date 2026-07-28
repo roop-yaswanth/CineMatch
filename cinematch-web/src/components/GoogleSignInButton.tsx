@@ -58,6 +58,13 @@ export default function GoogleSignInButton({
     [onLogin]
   );
 
+  const handleCredentialRef = useRef(handleCredential);
+  useEffect(() => {
+    handleCredentialRef.current = handleCredential;
+  }, [handleCredential]);
+
+  const initializedRef = useRef(false);
+
   useEffect(() => {
     if (!GOOGLE_CLIENT_ID) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -69,12 +76,15 @@ export default function GoogleSignInButton({
     const init = () => {
       const g = (window as unknown as { google?: GoogleIdentity }).google;
       if (!g?.accounts?.id || !btnRef.current) return;
-      g.accounts.id.initialize({
-        client_id: GOOGLE_CLIENT_ID,
-        callback: (resp: { credential?: string }) => {
-          if (resp?.credential) void handleCredential(resp.credential);
-        },
-      });
+      if (!initializedRef.current) {
+        g.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: (resp: { credential?: string }) => {
+            if (resp?.credential) void handleCredentialRef.current(resp.credential);
+          },
+        });
+        initializedRef.current = true;
+      }
       g.accounts.id.renderButton(btnRef.current, {
         theme,
         size: "large",
@@ -100,7 +110,7 @@ export default function GoogleSignInButton({
     script.onload = init;
     script.onerror = () => setError("Couldn't load Google sign-in. Check your connection.");
     document.head.appendChild(script);
-  }, [handleCredential, oneTap, theme, shape, width]);
+  }, [oneTap, theme, shape, width]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px", width: "100%" }}>
