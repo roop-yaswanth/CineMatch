@@ -2,14 +2,16 @@
  * CineMatch Service Worker — PWA Caching Strategy
  *
  * Strategies:
- *  - App Shell (HTML/JS/CSS/fonts): Cache-first with network fallback
  *  - TMDB Poster Images: Stale-while-revalidate (long-lived cache)
  *  - API Calls (/api/*): Network-first with short-lived cache fallback
+ *  - Next.js RSC Requests (_rsc query or RSC header): Network-only (never cached)
+ *  - HTML Navigation Requests: Network-first with offline shell fallback
+ *  - Static Assets (_next/static/*, manifest, icons): Cache-first
  *
- * No inactivity logout — session is managed by the app itself.
+ * Session & Auth management is handled on the client via SessionContext.
  */
 
-const CACHE_VERSION = "12.1";
+const CACHE_VERSION = "13.0";
 const SHELL_CACHE = `cinematch-shell-${CACHE_VERSION}`;
 const IMAGE_CACHE = `cinematch-images-${CACHE_VERSION}`;
 const API_CACHE = `cinematch-api-${CACHE_VERSION}`;
@@ -63,8 +65,21 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Navigation requests & app shell — cache first, network fallback
-  if (request.mode === "navigate" || url.origin === self.location.origin) {
+  // Next.js React Server Components (RSC) requests — DO NOT intercept or cache.
+  // Next.js router navigation fetches RSC payloads using ?_rsc=... or RSC request header.
+  // Serving cached responses for RSC requests breaks router navigation and auth redirects.
+  if (url.searchParams.has("_rsc") || request.headers.get("RSC") === "1") {
+    return;
+  }
+
+  // Navigation requests (HTML pages) — Network-first, fallback to cache/shell if offline
+  if (request.mode === "navigate") {
+    event.respondWith(networkFirstNavigation(request, SHELL_CACHE));
+    return;
+  }
+
+  // Next.js immutable static build assets & same-origin public files — cache first
+  if (url.origin === self.location.origin) {
     event.respondWith(cacheFirstWithNetwork(request, SHELL_CACHE));
     return;
   }
@@ -79,7 +94,6 @@ async function staleWhileRevalidate(request, cacheName, maxAgeSeconds) {
   const fetchPromise = fetch(request)
     .then((response) => {
       if (response.ok) {
-        // Clone before using — response body can only be consumed once
         const headers = new Headers(response.headers);
         headers.set("x-cached-at", Date.now().toString());
         const cloned = new Response(response.clone().body, {
@@ -94,13 +108,11 @@ async function staleWhileRevalidate(request, cacheName, maxAgeSeconds) {
     .catch(() => null);
 
   if (cached) {
-    // Check max age
     const cachedAt = parseInt(cached.headers.get("x-cached-at") || "0", 10);
     const age = (Date.now() - cachedAt) / 1000;
     if (age < maxAgeSeconds) {
       return cached;
     }
-    // Stale — return cached but still revalidate in background
     fetchPromise; // fire & forget
     return cached;
   }
@@ -137,6 +149,30 @@ async function networkFirstWithCache(request, cacheName, maxAgeSeconds) {
   }
 }
 
+async function networkFirstNavigation(request, cacheName) {
+  try {
+    const response = await fetch(request);
+    if (response.ok && response.status < 400) {
+      const cache = await caches.open(cacheName);
+      cache.put(request, response.clone());
+    }
+    return response;
+  } catch {
+    const cache = await caches.open(cacheName);
+    const cached = await cache.match(request);
+    if (cached) return cached;
+
+    const fallback = await cache.match("/");
+    return (
+      fallback ||
+      new Response("Offline", {
+        status: 503,
+        headers: { "Content-Type": "text/html" },
+      })
+    );
+  }
+}
+
 async function cacheFirstWithNetwork(request, cacheName) {
   const cache = await caches.open(cacheName);
   const cached = await cache.match(request);
@@ -149,7 +185,6 @@ async function cacheFirstWithNetwork(request, cacheName) {
     }
     return response;
   } catch {
-    // For navigation, return the cached root as fallback (SPA)
     const fallback = await cache.match("/");
     return fallback || new Response("Offline", { status: 503 });
   }
