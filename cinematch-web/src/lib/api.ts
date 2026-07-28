@@ -70,6 +70,7 @@ export interface Movie {
   vote_count?: number;
   director?: string;
   imdb_rating?: number;
+  imdb_id?: string;
   runtime?: number;
 }
 
@@ -94,6 +95,10 @@ export interface UserSession {
   onboarding_likes: number;
   min_likes_needed: number;
   has_recommendations: boolean;
+  // Server-signed, expiring token used to re-establish this session on later
+  // visits (see apiAuthRefresh) — issued by Google sign-in, not forgeable from
+  // a bare email. Persisted with the session; never sent anywhere but our API.
+  auth_token?: string;
 }
 
 export interface OnboardingState {
@@ -236,10 +241,22 @@ export function regionLanguages(region?: string): string[] {
 
 /* ─── Endpoints ─────────────────────────────────────────────── */
 
-export async function apiLogin(email: string): Promise<UserSession> {
-  return request<UserSession>("/api/login", {
+/** Exchange a Google Identity Services ID token for a CineMatch session. The
+ *  returned session carries an `auth_token` used to silently re-establish the
+ *  session on later visits (see apiAuthRefresh). */
+export async function apiGoogleLogin(credential: string): Promise<UserSession> {
+  return request<UserSession>("/api/auth/google", {
     method: "POST",
-    body: JSON.stringify({ email }),
+    body: JSON.stringify({ credential }),
+  });
+}
+
+/** Re-establish a session from a previously issued signed auth token. Throws on
+ *  401 (expired/invalid) — callers should treat that as "must sign in again". */
+export async function apiAuthRefresh(authToken: string): Promise<UserSession> {
+  return request<UserSession>("/api/auth/refresh", {
+    method: "POST",
+    body: JSON.stringify({ auth_token: authToken }),
   });
 }
 
@@ -250,6 +267,58 @@ export async function apiLogout(sessionId: string): Promise<void> {
     method: "POST",
     body: JSON.stringify({ session_id: sessionId }),
   });
+}
+
+/* ─── IMDB enrichment (detail modal only) ─────────────────────────────────────
+ * Live IMDB rating for the detail modal. Best-effort and non-blocking: a null
+ * result just means the modal keeps its instant CSV/TMDB rating. Small in-memory
+ * LRU cache (mirroring similarCache/creditsCache) avoids refetching within a session. */
+
+export interface ImdbTitle {
+  imdb_id?: string;
+  title?: string;
+  year?: number;
+  image?: string;
+  plot?: string;
+  runtime?: string;
+  rating?: number; // upstream rating.star
+  votes?: number;  // upstream rating.count
+  genre?: string[];
+}
+
+const imdbTitleCache = new Map<string, ImdbTitle | null>();
+const IMDB_TITLE_CACHE_MAX = 300;
+
+/** Live IMDB info for a movie. Pass a tmdb_id (backend maps it to an imdb_id via
+ *  the catalog) and/or an imdb_id directly. Returns null when nothing is found. */
+export async function apiImdbTitle(opts: { tmdbId?: number; imdbId?: string }): Promise<ImdbTitle | null> {
+  const key = opts.imdbId ? `i:${opts.imdbId}` : `t:${opts.tmdbId ?? ""}`;
+  if (key === "t:") return null;
+  if (imdbTitleCache.has(key)) {
+    const hit = imdbTitleCache.get(key)!;
+    imdbTitleCache.delete(key);
+    imdbTitleCache.set(key, hit); // LRU touch
+    return hit;
+  }
+  const params = new URLSearchParams();
+  if (opts.imdbId) params.set("imdb_id", opts.imdbId);
+  if (opts.tmdbId != null) params.set("tmdb_id", String(opts.tmdbId));
+  let data: ImdbTitle | null = null;
+  try {
+    const res = await fetch(`/api/imdb/title?${params.toString()}`);
+    if (res.ok) {
+      const json = await res.json();
+      data = json && json.imdb_id ? (json as ImdbTitle) : null;
+    }
+  } catch {
+    data = null;
+  }
+  imdbTitleCache.set(key, data);
+  if (imdbTitleCache.size > IMDB_TITLE_CACHE_MAX) {
+    const oldest = imdbTitleCache.keys().next().value;
+    if (oldest !== undefined) imdbTitleCache.delete(oldest);
+  }
+  return data;
 }
 
 export async function apiBuildSlate(

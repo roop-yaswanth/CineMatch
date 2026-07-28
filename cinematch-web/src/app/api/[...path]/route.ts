@@ -39,8 +39,7 @@ async function proxy(
   }
   const path = segments.join("/");
 
-  // Rate-limit by client IP. Login gets a tighter bucket than the rest.
-  const isLogin = segments[0] === "login";
+  const isLogin = segments[0] === "login" || segments[0] === "auth";
   const limiter = isLogin ? loginLimiter : generalLimiter;
   const rl = limiter.check(clientIp(req));
   if (!rl.allowed) {

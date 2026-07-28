@@ -2,7 +2,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState, useRef } from "react";
 
 import { createPortal } from "react-dom";
-import { posterUrl, languageLabel, apiSimilarMovies, apiCredits, type Recommendation, type CastMember, type CrewMember } from "@/lib/api";
+import { posterUrl, languageLabel, apiSimilarMovies, apiCredits, apiImdbTitle, type Recommendation, type CastMember, type CrewMember, type ImdbTitle } from "@/lib/api";
 import { PersonDetailOverlay } from "./PersonDetailOverlay";
 import WatchProvidersPanel, { REGION_TO_COUNTRY } from "@/components/WatchProvidersPanel";
 import { pushBackHandler } from "@/lib/backStack";
@@ -15,6 +15,7 @@ export interface DetailMovie {
   backdrop_path?: string;
   year?: number | string;
   original_language?: string;
+  imdb_id?: string;
   imdb_rating?: number;
   imdb_votes?: number;
   vote_average?: number;
@@ -55,6 +56,7 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
   const [showTrailerPlayer, setShowTrailerPlayer] = useState(false);
   const [activePersonId, setActivePersonId] = useState<number | null>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const [imdbLive, setImdbLive] = useState<ImdbTitle | null>(null);
   const similarRowRef = useRef<HTMLDivElement>(null);
   const castRowRef = useRef<HTMLDivElement>(null);
 
@@ -145,10 +147,30 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
         setDirectors(c.directors);
         setWriters(c.writers);
       })
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => { if (!cancelled) setCreditsLoading(false); });
     return () => { cancelled = true; };
   }, [movie?.id, movie?.tmdb_id, isOpen]);
+
+  // Fetch live IMDB rating on open.
+  // Best-effort and non-blocking: the CSV/TMDB rating renders immediately and
+  // is only replaced if a live value arrives. Backend maps tmdb_id → imdb_id via the catalog.
+  useEffect(() => {
+    const id = movie?.tmdb_id ?? movie?.id;
+    if (!isOpen || (!id && !movie?.imdb_id)) {
+      setTimeout(() => { setImdbLive(null); }, 0);
+      return;
+    }
+    let cancelled = false;
+    setTimeout(() => { setImdbLive(null); }, 0);
+    apiImdbTitle({ tmdbId: id, imdbId: movie?.imdb_id })
+      .then((info) => {
+        if (cancelled || !info) return;
+        setImdbLive(info);
+      })
+      .catch(() => { });
+    return () => { cancelled = true; };
+  }, [movie?.id, movie?.tmdb_id, movie?.imdb_id, isOpen]);
 
   const handleActionClick = (action: "like" | "okay" | "dislike" | "watchlist" | "skip") => {
     if (!onAction) return;
@@ -200,7 +222,12 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
   const lang = movie.original_language ? languageLabel(movie.original_language) : "";
   const year = movie.year || "";
   const genres = movie.genres?.join(", ") || movie.primary_genre || "";
-  const imdb = movie.imdb_rating ? movie.imdb_rating.toFixed(1) : movie.vote_average ? movie.vote_average.toFixed(1) : null;
+  // Prefer the live IMDB rating when it has loaded; otherwise the instant
+  // CSV rating, then TMDB's vote_average.
+  const imdb = imdbLive?.rating != null
+    ? imdbLive.rating.toFixed(1)
+    : movie.imdb_rating ? movie.imdb_rating.toFixed(1)
+      : movie.vote_average ? movie.vote_average.toFixed(1) : null;
   const overview = movie.overview || "No overview available.";
   const runtime = movie.runtime ? `${Math.floor(movie.runtime / 60)}h ${movie.runtime % 60}m` : null;
   const matchPct = movie.score !== undefined && movie.score >= 0.70 ? Math.round(movie.score * 100) : null;
@@ -1257,6 +1284,8 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                 )}
               </div>
             )}
+
+
 
             <AnimatePresence>
               {activePersonId && (

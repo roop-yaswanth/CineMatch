@@ -1,12 +1,11 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
-import { apiLogin, apiLogout, type UserSession } from "@/lib/api";
+import { apiAuthRefresh, apiLogout, type UserSession } from "@/lib/api";
 
 interface SessionContextType {
   session: UserSession | null;
   isLoading: boolean;
-  login: (email: string) => Promise<UserSession>;
   logout: () => void;
   updateSession: (session: UserSession) => void;
 }
@@ -130,48 +129,46 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setSession(cached);
       setIsLoading(false);
 
-      // Silently re-validate with the backend in the background
-      try {
-        const fresh = await apiLogin(cached.identifier);
-        // If the user just changed preferences locally, the server copy may not
-        // reflect it yet — keep the optimistic profile (adopt everything else
-        // from the fresh session) so it doesn't flicker back to the old prefs.
-        const next = profileOptimisticActive() && cached.profile
-          ? { ...fresh, profile: cached.profile }
-          : fresh;
-        setSession(next);
-        persistSession(next);
-      } catch {
-        // Backend unavailable — keep the cached session, don't log out
-        console.warn("[SessionProvider] Background re-validation failed; using cached session.");
+      // Silently re-establish the server session from our signed token. Legacy
+      // sessions saved before Google sign-in have no auth_token — keep those
+      // as-is (they ride until the server evicts them; no forced re-auth
+      // mid-session, and they can't be forged since minting is now closed).
+      if (cached.auth_token) {
+        try {
+          const fresh = await apiAuthRefresh(cached.auth_token);
+          // If the user just changed preferences locally, the server copy may not
+          // reflect it yet — keep the optimistic profile (adopt everything else
+          // from the fresh session, including the renewed token) so it doesn't
+          // flicker back to the old prefs.
+          const next = profileOptimisticActive() && cached.profile
+            ? { ...fresh, profile: cached.profile, auth_token: fresh.auth_token ?? cached.auth_token }
+            : fresh;
+          setSession(next);
+          persistSession(next);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : "";
+          if (msg.includes("401")) {
+            // Signed token genuinely expired/invalid → require a fresh sign-in.
+            clearStoredSession();
+            setSession(null);
+          } else {
+            // Transient (backend cold-start / offline) → keep cached session.
+            console.warn("[SessionProvider] Token refresh failed; keeping cached session.");
+          }
+        }
       }
       return;
     }
 
-    // Fallback: have an identifier but no cached session (e.g. old storage format)
-    try {
-      const restored = await apiLogin(savedIdentifier!);
-      setSession(restored);
-      persistSession(restored);
-    } catch {
-      // Can't reach backend and no cached session — show login, but keep identifier
-      // so next refresh can try again
-      setSession(null);
-    } finally {
-      setIsLoading(false);
-    }
+    // Have a stored identifier but no cached session object: without a cached
+    // session there's no signed token to refresh, so require a fresh sign-in.
+    setSession(null);
+    setIsLoading(false);
   }, []);
 
   useEffect(() => {
     void restoreSession();
   }, [restoreSession]);
-
-  const login = useCallback(async (email: string) => {
-    const newSession = await apiLogin(email);
-    setSession(newSession);
-    persistSession(newSession);
-    return newSession;
-  }, []);
 
   const logout = useCallback(() => {
     // Best-effort server-side invalidation, then clear locally regardless.
@@ -237,7 +234,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [session, logout]);
 
   return (
-    <SessionContext.Provider value={{ session, isLoading, login, logout, updateSession }}>
+    <SessionContext.Provider value={{ session, isLoading, logout, updateSession }}>
       {children}
     </SessionContext.Provider>
   );

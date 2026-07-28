@@ -26,7 +26,7 @@ const nextConfig: NextConfig = {
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
     minimumCacheTTL: 60 * 60 * 24 * 30, // 30d — TMDB image URLs are immutable per id+size
   },
-  
+
   // Enforce strict security headers across the entire app
   async headers() {
     // Content Security Policy.
@@ -41,14 +41,18 @@ const nextConfig: NextConfig = {
     //   base-uri 'self'            — block <base> tag injection.
     //   form-action 'self'         — forms can only submit back to us.
     //   upgrade-insecure-requests  — auto-rewrite any http: subresource to https:.
+    // https://accounts.google.com is allow-listed for Google Identity Services
+    // sign-in: the gsi/client script (script-src), the button stylesheet it
+    // injects (style-src), the button/One-Tap iframe (frame-src), and its
+    // token XHRs (connect-src).
     const csp = [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com",
-      "style-src 'self' 'unsafe-inline'",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com https://accounts.google.com",
+      "style-src 'self' 'unsafe-inline' https://accounts.google.com",
       "img-src 'self' data: blob: https://image.tmdb.org https://www.themoviedb.org https://http.cat",
       "font-src 'self' data:",
-      "frame-src 'self' https://www.youtube-nocookie.com https://www.youtube.com",
-      "connect-src 'self' https://image.tmdb.org https://vitals.vercel-insights.com https://va.vercel-scripts.com",
+      "frame-src 'self' https://www.youtube-nocookie.com https://www.youtube.com https://accounts.google.com",
+      "connect-src 'self' https://image.tmdb.org https://vitals.vercel-insights.com https://va.vercel-scripts.com https://accounts.google.com",
       "worker-src 'self'",
       "frame-ancestors 'none'",
       "object-src 'none'",
@@ -99,7 +103,10 @@ const nextConfig: NextConfig = {
             ].join(", "),
           },
           { key: "X-DNS-Prefetch-Control", value: "on" },
-          { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+          // same-origin-allow-popups (not the stricter same-origin) so Google
+          // Identity Services' sign-in flow isn't broken by COOP severing the
+          // opener relationship. Still blocks arbitrary cross-origin openers.
+          { key: "Cross-Origin-Opener-Policy", value: "same-origin-allow-popups" },
           { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
         ],
       },

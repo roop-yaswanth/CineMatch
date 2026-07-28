@@ -46,8 +46,8 @@ export default function PreferencesPage() {
         },
       });
       // Tell SessionContext to keep this just-set profile and not let the
-      // post-reload background re-validation (apiLogin) overwrite it with a
-      // briefly-stale server copy before the PUT below lands.
+      // post-reload background re-validation (apiAuthRefresh) overwrite it with
+      // a briefly-stale server copy before the PUT below lands.
       try {
         localStorage.setItem("cinematch_profile_optimistic_until", String(Date.now() + 15000));
       } catch { /* ignore */ }
@@ -76,25 +76,9 @@ export default function PreferencesPage() {
         .then((freshSession) => updateSession(freshSession))
         .catch((err) => console.error("Failed to update preferences on server:", err));
     }
-    // Navigation happens immediately in onClose (PreferencesModal calls it).
   };
 
   if (isLoading || !session || !preferences) return null;
-
-  // After Apply we ALWAYS want to land on /dashboard with completely fresh
-  // state. Soft-nav variants (router.back / router.push / router.replace)
-  // all hit the App Router's segment cache: the dashboard's
-  // RecommendationsView is restored from cache with its old `stacks` and
-  // `bucketCache`, and even though the new recs fetch fires with the new
-  // languages, the in-memory state from the prior visit can paint first
-  // and stay (this is exactly the "other browser sees English-only but my
-  // current tab still shows mixed" symptom).
-  //
-  // A real navigation discards the cached segment outright, so the dashboard
-  // remounts clean, derives preferences from the freshly-persisted session
-  // profile (updated in handleUpdate above), and runs a single generate()
-  // against the new prefs from a known-empty state. Slight cost (full bundle
-  // re-eval) for a guaranteed-correct result.
   const goToDashboard = () => {
     if (typeof window !== "undefined") {
       window.location.assign("/dashboard");
