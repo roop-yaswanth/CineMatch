@@ -15,11 +15,17 @@ function YourLikesContent() {
   // Route protection
   useEffect(() => {
     if (!isLoading && !session) {
-      router.replace("/login");
+      if (typeof window !== "undefined") {
+        window.location.replace("/login");
+      } else {
+        router.replace("/login");
+      }
     }
   }, [session, isLoading, router]);
 
-  if (isLoading || !session) return null;
+  if (isLoading || !session) {
+    return <div style={{ minHeight: "100vh", background: "var(--color-bg)" }} />;
+  }
 
   return (
     // Intentionally NOT keyed by `filter`: the view already syncs the

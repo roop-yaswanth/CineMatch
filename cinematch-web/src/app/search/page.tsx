@@ -57,7 +57,13 @@ function SearchPage() {
   // Auth gate: this is an app page, so require a logged-in session (it must not
   // be reachable by typing the URL while signed out).
   useEffect(() => {
-    if (!isLoading && !session) router.replace("/login");
+    if (!isLoading && !session) {
+      if (typeof window !== "undefined") {
+        window.location.replace("/login");
+      } else {
+        router.replace("/login");
+      }
+    }
   }, [session, isLoading, router]);
 
   const initialQ = params.get("q") || "";
@@ -201,7 +207,9 @@ function SearchPage() {
     [session, active]
   );
 
-  if (isLoading || !session) return null;
+  if (isLoading || !session) {
+    return <div style={{ minHeight: "100vh", background: "var(--color-bg)" }} />;
+  }
 
   const totalCount = results.movies.length + results.tv.length + results.people.length;
 

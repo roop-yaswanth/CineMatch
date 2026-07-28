@@ -21,7 +21,11 @@ export default function DashboardPage() {
   useEffect(() => {
     if (isLoading) return;
     if (!session) {
-      router.replace("/login");
+      if (typeof window !== "undefined") {
+        window.location.replace("/login");
+      } else {
+        router.replace("/login");
+      }
       return;
     }
     if (!onboardingGateChecked.current) {
@@ -82,7 +86,9 @@ export default function DashboardPage() {
   }, [session, updateSession, router]);
 
 
-  if (isLoading || !session) return null;
+  if (isLoading || !session) {
+    return <div style={{ minHeight: "100vh", background: "var(--color-bg)" }} />;
+  }
 
   return (
     <RecommendationsView

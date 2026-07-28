@@ -1424,7 +1424,7 @@ export function TrailerOverlay({
         background: "#000",
         boxShadow: "0 32px 80px rgba(0,0,0,0.8)",
       }}>
-        {/* Hardened YouTube embed:
+        {/*  YouTube embed:
             - Validate the key (YouTube IDs are 11 chars [A-Za-z0-9_-]); refuse anything else.
             - youtube-nocookie.com instead of youtube.com (privacy + matches CSP allow-list).
             - Sandbox limits what the embed can do (no top-nav, no form posts, no popups).
@@ -1436,7 +1436,7 @@ export function TrailerOverlay({
             allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
             allowFullScreen
             referrerPolicy="strict-origin-when-cross-origin"
-            sandbox="allow-scripts allow-same-origin allow-presentation"
+            sandbox="allow-scripts allow-same-origin allow-presentation allow-fullscreen"
             style={{ width: "100%", height: "100%", border: "none", display: "block" }}
           />
         )}
