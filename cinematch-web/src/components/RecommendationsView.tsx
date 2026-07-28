@@ -825,7 +825,7 @@ export default function RecommendationsView({
           </header>
 
           {/* Content */}
-          <div className="app-container" style={{ flex: 1, width: "100%", padding: "0 0 48px" }}>
+          <div className="app-container" style={{ flex: 1, width: "100%", padding: 0 }}>
 
             {/* Loading skeleton */}
             {loading && movies.length === 0 && (
