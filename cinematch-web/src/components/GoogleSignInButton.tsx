@@ -104,20 +104,24 @@ export default function GoogleSignInButton({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "14px", width: "100%" }}>
-      {/* Container for official Google button */}
-      <div
-        ref={btnRef}
-        style={{
-          minHeight: "44px",
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          opacity: loading ? 0.6 : 1,
-          pointerEvents: loading ? "none" : "auto",
-          transition: "opacity 0.2s ease",
-          width: "100%",
-        }}
-      >
+      {/* Relative wrapper holding both the Google iframe container and the React placeholder */}
+      <div style={{ position: "relative", minHeight: "44px", width: `${width}px`, maxWidth: "100%", display: "flex", justifyContent: "center", alignItems: "center" }}>
+        {/* Dedicated target node for Google Identity Services iframe */}
+        <div
+          ref={btnRef}
+          style={{
+            minHeight: "44px",
+            display: ready ? "flex" : "none",
+            justifyContent: "center",
+            alignItems: "center",
+            opacity: loading ? 0.6 : 1,
+            pointerEvents: loading ? "none" : "auto",
+            transition: "opacity 0.2s ease",
+            width: "100%",
+          }}
+        />
+
+        {/* React placeholder button shown before Google iframe renders */}
         {!ready && !error && (
           <div
             style={{
@@ -143,7 +147,6 @@ export default function GoogleSignInButton({
                 theme === "filled_blue"
                   ? "0 4px 14px rgba(26, 115, 232, 0.4)"
                   : "0 2px 8px rgba(0, 0, 0, 0.2)",
-              cursor: "pointer",
               userSelect: "none",
             }}
           >
