@@ -10,19 +10,19 @@ import type { UserSession } from "@/lib/api";
 
 const FEATURES = [
   {
-    icon: "🌍",
-    title: "Cross-cultural discovery",
-    body: "Hidden gems from Korean, Japanese, Telugu, Spanish, and 20+ other languages — not just the usual Hollywood rows.",
+    num: "01",
+    title: "Beyond Hollywood",
+    body: "Korean thrillers, Japanese dramas, Telugu epics. CineMatch surfaces films from more than 10 languages that the usual charts never show you.",
   },
   {
-    icon: "🎯",
-    title: "Tuned to your taste",
-    body: "Rate a few films and get recommendations shaped by your own profile, powered by a semantic taste model.",
+    num: "02",
+    title: "Learns your taste",
+    body: "Rate a few films you know. A semantic taste model matches you on mood, tone, and style rather than popularity.",
   },
   {
-    icon: "🎬",
-    title: "Track & organize",
-    body: "Build a watchlist, mark what you've seen, and keep everything you love in one place across your devices.",
+    num: "03",
+    title: "Everything in one place",
+    body: "Keep a watchlist, mark what you've seen, and carry your favorites with you across all your devices.",
   },
 ];
 
@@ -87,7 +87,7 @@ export default function HomePage() {
         style={{
           position: "relative",
           zIndex: 1,
-          maxWidth: "980px",
+          maxWidth: "1040px",
           margin: "0 auto",
           padding: "clamp(56px, 10vh, 120px) 24px 48px",
           display: "flex",
@@ -137,45 +137,38 @@ export default function HomePage() {
           <p
             style={{
               marginTop: "14px",
-              maxWidth: "580px",
+              maxWidth: "520px",
               fontSize: "clamp(0.95rem, 2vw, 1.1rem)",
               lineHeight: 1.6,
               color: "var(--color-text-secondary)",
             }}
           >
-            CineMatch is a movie recommender that surfaces cross-cultural cinema tuned to your
-            taste — from world-cinema hidden gems to the blockbusters you already love.
+            Rate a few films and CineMatch finds your next favorite whether it&apos;s from
+            Seoul, Hyderabad, or Hollywood.
           </p>
 
-          {/* Sign-in Card */}
+          {/* Sign-in */}
           <div
             style={{
-              marginTop: "38px",
-              display: "inline-flex",
+              marginTop: "44px",
+              display: "flex",
               flexDirection: "column",
-              alignItems: "flex-start",
+              alignItems: "center",
               gap: "14px",
-              padding: "24px 28px",
-              borderRadius: "20px",
-              background: "rgba(16, 16, 22, 0.65)",
-              backdropFilter: "blur(20px)",
-              WebkitBackdropFilter: "blur(20px)",
-              border: "1px solid rgba(255, 255, 255, 0.12)",
-              boxShadow:
-                "0 20px 40px -10px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.05) inset",
             }}
           >
             <GoogleSignInButton onLogin={handleLogin} theme="filled_blue" />
             <p
               style={{
                 fontSize: "12px",
-                color: "rgba(255, 255, 255, 0.75)",
-                maxWidth: "320px",
+                color: "var(--color-text-muted)",
+                maxWidth: "300px",
                 lineHeight: 1.5,
                 margin: 0,
+                textAlign: "center",
               }}
             >
-              Free to use. We use your Google account only to sign you in and sync your taste profile.
+              Your Google account is used only to sign you in and sync your taste profile.
             </p>
           </div>
         </motion.div>
@@ -187,29 +180,55 @@ export default function HomePage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
           style={{
-            marginTop: "clamp(56px, 9vh, 96px)",
+            marginTop: "clamp(64px, 11vh, 110px)",
             width: "100%",
+            maxWidth: "960px",
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-            gap: "16px",
+            gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+            columnGap: "48px",
+            rowGap: "36px",
           }}
         >
           {FEATURES.map((f) => (
             <div
               key={f.title}
               style={{
-                background: "rgba(255,255,255,0.04)",
-                border: "1px solid rgba(255,255,255,0.08)",
-                borderRadius: "16px",
-                padding: "24px 22px",
                 textAlign: "left",
+                borderTop: "1px solid rgba(255, 255, 255, 0.14)",
+                paddingTop: "18px",
               }}
             >
-              <div style={{ fontSize: "26px", marginBottom: "12px" }} aria-hidden>{f.icon}</div>
-              <h2 style={{ margin: "0 0 8px", fontSize: "16px", fontWeight: 600, color: "var(--color-text-primary)" }}>
-                {f.title}
-              </h2>
-              <p style={{ margin: 0, fontSize: "14px", lineHeight: 1.55, color: "var(--color-text-secondary)" }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "baseline",
+                  gap: "10px",
+                  marginBottom: "8px",
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: "12px",
+                    fontWeight: 500,
+                    color: "var(--color-text-faint)",
+                    fontVariantNumeric: "tabular-nums",
+                  }}
+                >
+                  {f.num}
+                </span>
+                <h2
+                  style={{
+                    margin: 0,
+                    fontSize: "16px",
+                    fontWeight: 600,
+                    letterSpacing: "-0.01em",
+                    color: "var(--color-text-primary)",
+                  }}
+                >
+                  {f.title}
+                </h2>
+              </div>
+              <p style={{ margin: 0, fontSize: "13.5px", lineHeight: 1.6, color: "var(--color-text-secondary)" }}>
                 {f.body}
               </p>
             </div>
