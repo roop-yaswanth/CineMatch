@@ -1431,12 +1431,11 @@ export function TrailerOverlay({
             - referrerpolicy avoids leaking our path to YouTube. */}
         {/^[A-Za-z0-9_-]{11}$/.test(videoKey) && (
           <iframe
-            src={`https://www.youtube-nocookie.com/embed/${videoKey}?autoplay=1&playsinline=1&rel=0&modestbranding=1`}
+            src={`https://www.youtube-nocookie.com/embed/${videoKey}?autoplay=1&playsinline=1&rel=0&modestbranding=1&enablejsapi=1`}
             title={`${title} trailer`}
-            allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
             allowFullScreen
             referrerPolicy="strict-origin-when-cross-origin"
-            sandbox="allow-scripts allow-same-origin allow-presentation allow-fullscreen"
             style={{ width: "100%", height: "100%", border: "none", display: "block" }}
           />
         )}

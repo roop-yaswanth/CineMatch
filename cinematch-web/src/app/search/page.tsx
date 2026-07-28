@@ -253,16 +253,28 @@ function SearchPage() {
               style={{
                 position: "absolute",
                 right: "14px",
-                top: "50%",
-                transform: "translateY(-50%)",
+                top: 0,
+                bottom: 0,
+                margin: "auto 0",
                 width: 18,
                 height: 18,
-                border: "2px solid rgba(255,255,255,0.18)",
-                borderTopColor: "rgba(255,255,255,0.85)",
-                borderRadius: "50%",
-                animation: "spin 0.7s linear infinite",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                pointerEvents: "none",
               }}
-            />
+            >
+              <div
+                style={{
+                  width: 18,
+                  height: 18,
+                  border: "2px solid rgba(255,255,255,0.18)",
+                  borderTopColor: "rgba(255,255,255,0.85)",
+                  borderRadius: "50%",
+                  animation: "spin 0.7s linear infinite",
+                }}
+              />
+            </div>
           )}
           {query && !loading && (
             <button

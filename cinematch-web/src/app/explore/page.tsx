@@ -13,11 +13,14 @@ import EmptyState from "@/components/ui/EmptyState";
 import { SkeletonGrid, SkeletonRail } from "@/components/ui/Skeleton";
 
 const MovieDetailModal = dynamic(() => import("@/components/modals/MovieDetailModal"), { ssr: false });
+import { PosterCard } from "@/components/RecommendationsView";
+import { toast } from "@/components/ui/Toast";
 import { useSession } from "@/context/SessionContext";
 import {
   apiDiscover,
   apiExplore,
   apiGenres,
+  apiRecommendationAction,
   LANGUAGE_LABELS,
   languageLabel,
   type DiscoverFilters,
@@ -189,6 +192,25 @@ function ExplorePageInner() {
     return <div style={{ minHeight: "100vh", background: "var(--color-bg)" }} />;
   }
 
+  const handleAction = useCallback(
+    async (m: any, action: "like" | "okay" | "dislike" | "watchlist" | "skip") => {
+      if (!session) return;
+      try {
+        await apiRecommendationAction(session.session_id, m.id || m.tmdb_id, action);
+        if (action === "watchlist") {
+          toast({ message: `Added "${m.title}" to your watchlist`, tone: "success" });
+        } else if (action === "like") {
+          toast({ message: `Liked "${m.title}"`, tone: "success" });
+        } else if (action === "dislike") {
+          toast({ message: `Disliked "${m.title}"`, tone: "neutral" });
+        }
+      } catch (err) {
+        console.error("Action failed:", err);
+      }
+    },
+    [session]
+  );
+
   return (
     <div style={{ minHeight: "100vh", background: "var(--color-bg)", display: "flex", flexDirection: "column" }}>
       {/* Header — uses the shared <PageHeader> so back-button placement,
@@ -242,6 +264,7 @@ function ExplorePageInner() {
                 loading={railLoading && !rails[cat.id]}
                 onSeeAll={() => setTab(cat.id)}
                 onSelect={(m) => setActive(toDetailMovie(m))}
+                onAction={handleAction}
               />
             ))}
           </div>
@@ -281,16 +304,18 @@ function Rail({
   loading,
   onSeeAll,
   onSelect,
+  onAction,
 }: {
   category: CategoryDef;
   movies: ExploreMovie[];
   loading: boolean;
   onSeeAll: () => void;
   onSelect: (m: ExploreMovie) => void;
+  onAction: (movie: any, action: any) => void;
 }) {
   return (
     <section style={{ overflow: "visible" }}>
-      <div style={{ padding: "0 clamp(20px, 4vw, 40px) 12px", display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
+      <div style={{ padding: "0 20px 10px", display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
         <div>
           <h2 style={{ fontSize: "18px", fontWeight: 600, color: "var(--color-text-primary)", margin: 0, letterSpacing: "-0.02em" }}>
             {category.label}
@@ -329,25 +354,24 @@ function Rail({
         <EmptyState title="Nothing here yet" description="Check back soon — TMDB updates this list often." />
       ) : (
         <div
+          className="hide-scrollbar"
           style={{
             display: "flex",
             gap: "14px",
             overflowX: "auto",
-            padding: "12px clamp(20px, 4vw, 40px) 16px",
-            margin: "-12px 0 -12px",
+            padding: "4px 20px 16px",
             scrollSnapType: "x mandatory",
             scrollbarWidth: "none",
           }}
         >
           {movies.slice(0, 18).map((m) => (
-            <motion.div
+            <PosterCard
               key={m.tmdb_id}
+              movie={m as any}
+              disabled={false}
+              onAction={onAction}
               onClick={() => onSelect(m)}
-              style={{ width: "140px", flexShrink: 0, scrollSnapAlign: "start", cursor: "pointer", position: "relative", zIndex: 1 }}
-              whileTap={{ scale: 0.97 }}
-            >
-              <MovieCard movie={m} compact noLayout showFullDate={category.id === "upcoming"} />
-            </motion.div>
+            />
           ))}
         </div>
       )}

@@ -11,7 +11,7 @@
  * Session & Auth management is handled on the client via SessionContext.
  */
 
-const CACHE_VERSION = "14";
+const CACHE_VERSION = "15";
 const SHELL_CACHE = `cinematch-shell-${CACHE_VERSION}`;
 const IMAGE_CACHE = `cinematch-images-${CACHE_VERSION}`;
 const API_CACHE = `cinematch-api-${CACHE_VERSION}`;

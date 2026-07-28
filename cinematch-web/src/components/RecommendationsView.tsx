@@ -1382,7 +1382,7 @@ function StackRow({
 
 
 
-function PosterCard({
+export function PosterCard({
   movie,
   disabled,
   onAction,
