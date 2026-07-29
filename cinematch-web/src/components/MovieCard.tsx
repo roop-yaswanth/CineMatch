@@ -131,14 +131,14 @@ export default function MovieCard({ movie, priority = false, className = "", com
       </div>
 
       {/* Info below poster */}
-      <div className={compact ? "mt-3 w-full px-1" : "mt-2 w-full text-center px-2"}>
+      <div className={compact ? "mt-3 w-full px-1" : "mt-3 w-full text-left px-0.5"}>
         <h2
           className={compact
             // min-h reserves two lines so the metadata row lines up across every
             // card in the rail whether a title wraps to one line or two (fixes
             // the ragged look where short titles sat higher).
             ? "text-[13px] font-semibold tracking-tight text-white leading-snug line-clamp-2 min-h-[2.7em]"
-            : "text-[14px] font-medium tracking-[-0.01em] text-[var(--color-text-primary)] leading-tight line-clamp-2"
+            : "text-[13.5px] font-semibold tracking-tight text-white leading-snug line-clamp-2 min-h-[2.5em]"
           }
         >
           {movie.title}
@@ -172,27 +172,35 @@ export default function MovieCard({ movie, priority = false, className = "", com
               </div>
             )}
 
-            {/* Metadata line: Year · Language · IMDb */}
-            <div className="mt-1.5 flex items-center justify-center gap-1.5 text-[11px] text-[var(--color-text-muted)] font-light flex-wrap">
-              {year && <span>{year}</span>}
-              {year && lang && <span style={{ opacity: 0.4 }}>·</span>}
-              {lang && <span>{lang}</span>}
-              {(year || lang) && (imdb || tmdbRating) && <span style={{ opacity: 0.4 }}>·</span>}
+            {/* Metadata line: Year badge, Language badge, IMDb/TMDB rating chip */}
+            <div className="mt-2 flex items-center gap-1.5 flex-wrap min-h-[22px]">
+              {year && (
+                <span className="rounded bg-white/[0.07] border border-white/10 px-1.5 py-0.5 text-[10.5px] font-medium text-zinc-300 leading-none">
+                  {year}
+                </span>
+              )}
+              {lang && (
+                <span className="rounded bg-white/[0.07] border border-white/10 px-1.5 py-0.5 text-[10.5px] font-medium text-zinc-300 leading-none">
+                  {lang}
+                </span>
+              )}
               {imdb ? (
-                <span className="flex items-center gap-1">
-                  <span style={{ color: "var(--color-accent-warm)" }}>★</span> {imdb}
+                <span className="ml-auto shrink-0 rounded bg-amber-400/15 border border-amber-400/30 px-1.5 py-0.5 text-[10.5px] font-bold text-amber-300 flex items-center gap-0.5 leading-none">
+                  <span className="text-amber-400 text-[10px]">★</span> {imdb}
                 </span>
               ) : tmdbRating ? (
-                <span className="flex items-center gap-1">
-                  <span style={{ color: "var(--color-accent-warm)" }}>★</span> {tmdbRating}
+                <span className="ml-auto shrink-0 rounded bg-amber-400/15 border border-amber-400/30 px-1.5 py-0.5 text-[10.5px] font-bold text-amber-300 flex items-center gap-0.5 leading-none">
+                  <span className="text-amber-400 text-[10px]">★</span> {tmdbRating}
                 </span>
               ) : null}
             </div>
 
-            {/* Genre line */}
+            {/* Genre line: Accent Pill / Tag */}
             {(primaryGenre || genres.length > 0) && (
-              <div className="mt-1 text-[11px] text-[var(--color-text-muted)] font-light">
-                {primaryGenre || genres.join(", ")}
+              <div className="mt-1.5 flex items-center gap-1 flex-wrap">
+                <span className="rounded-full bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 text-[10px] font-medium text-purple-300/90 truncate max-w-full leading-tight">
+                  {primaryGenre || genres.join(", ")}
+                </span>
               </div>
             )}
           </>

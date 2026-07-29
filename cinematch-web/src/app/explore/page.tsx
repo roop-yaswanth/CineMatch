@@ -300,11 +300,12 @@ function ExplorePageInner() {
               display: "flex",
               flexWrap: "wrap",
               alignItems: "center",
-              gap: "8px",
-              paddingTop: "8px",
+              gap: "10px",
+              paddingTop: "10px",
+              paddingBottom: "16px",
               paddingLeft: "var(--s-header-x)",
               paddingRight: "var(--s-header-x)",
-              borderTop: "1px solid rgba(255,255,255,0.05)",
+              borderTop: "1px solid rgba(255,255,255,0.06)",
             }}
           >
             <PillSelect
@@ -368,7 +369,7 @@ function ExplorePageInner() {
       </PageHeader>
 
       {/* Content */}
-      <div className="app-container" style={{ flex: 1, width: "100%", padding: "var(--s-5) 24px var(--s-bottom-clearance)" }}>
+      <div className="app-container" style={{ flex: 1, width: "100%", padding: "32px 24px var(--s-bottom-clearance)" }}>
         {isDiscover ? (
           <Discover
             region={region}
@@ -418,7 +419,7 @@ function Grid({
 
   return (
     <div>
-      <div style={{ marginBottom: "20px" }}>
+      <div style={{ marginBottom: "24px" }}>
         <h2 style={{ fontSize: "22px", fontWeight: 700, color: "var(--color-text-primary)", margin: 0 }}>
           {cat?.label || "Explore"}
         </h2>
@@ -436,8 +437,8 @@ function Grid({
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
-              gap: "16px",
+              gridTemplateColumns: "repeat(auto-fill, minmax(165px, 1fr))",
+              gap: "24px 18px",
             }}
           >
             {movies.map((m) => (
@@ -710,8 +711,8 @@ function Discover({
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
-              gap: "16px",
+              gridTemplateColumns: "repeat(auto-fill, minmax(165px, 1fr))",
+              gap: "24px 18px",
             }}
           >
             {results.map((m) => (

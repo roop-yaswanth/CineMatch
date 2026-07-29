@@ -81,7 +81,7 @@ export default function PreferencesModal({ preferences, onUpdate, onClose, mode 
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.22 }}
+      transition={{ duration: 0.16, ease: "easeOut" }}
       style={{
         position: "fixed",
         inset: 0,
@@ -98,23 +98,24 @@ export default function PreferencesModal({ preferences, onUpdate, onClose, mode 
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        transition={{ duration: 0.22 }}
+        transition={{ duration: 0.16, ease: "easeOut" }}
         onClick={onClose}
         style={{
           position: "absolute",
           inset: 0,
           backgroundColor: "rgba(0, 0, 0, 0.65)",
-          backdropFilter: "blur(14px)",
-          WebkitBackdropFilter: "blur(14px)",
+          backdropFilter: "blur(10px)",
+          WebkitBackdropFilter: "blur(10px)",
+          willChange: "opacity",
         }}
       />
 
-      {/* Modal - Apple Genie Morphing Card */}
+      {/* Modal - GPU-accelerated smooth spring card */}
       <motion.div
-        initial={{ opacity: 0, scale: 0.35, y: -70 }}
+        initial={{ opacity: 0, scale: 0.95, y: -10 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.3, y: -80 }}
-        transition={{ type: "spring", stiffness: 320, damping: 25, mass: 0.7 }}
+        exit={{ opacity: 0, scale: 0.96, y: -6 }}
+        transition={{ type: "spring", stiffness: 420, damping: 32, mass: 0.8 }}
         className="glass-modal"
         style={{
           position: "relative",
@@ -128,7 +129,8 @@ export default function PreferencesModal({ preferences, onUpdate, onClose, mode 
           pointerEvents: "auto",
           overscrollBehavior: "contain",
           touchAction: "pan-y",
-          transformOrigin: "top center",
+          transformOrigin: "center center",
+          willChange: "transform, opacity",
         }}
       >
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "24px" }}>
