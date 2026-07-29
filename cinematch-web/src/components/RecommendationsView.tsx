@@ -21,8 +21,7 @@ import AppFooter from "@/components/AppFooter";
 import { toast } from "@/components/ui/Toast";
 import type { DetailMovie } from "@/components/modals/MovieDetailModal";
 
-const MovieDetailModal = dynamic(() => import("@/components/modals/MovieDetailModal"), { ssr: false });
-import MobileMenu from "@/components/MobileMenu";
+import MobileMenu, { DesktopNavTabs } from "@/components/MobileMenu";
 import {
   apiMultiRecommendations,
   apiRecommendationAction,
@@ -40,6 +39,7 @@ import {
 } from "@/lib/api";
 import { usePoster } from "@/lib/usePoster";
 import { pushBackHandler } from "@/lib/backStack";
+import MovieDetailModal from "@/components/modals/MovieDetailModal";
 
 interface Props {
   session: UserSession;
@@ -227,6 +227,11 @@ export default function RecommendationsView({
   onLogout,
 }: Props) {
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // ── Try to restore from navigation cache on mount ─────────────────────────
   const cachedRef = useRef(readRecsCache(session.user_id));
@@ -315,7 +320,7 @@ export default function RecommendationsView({
         let results = resp.results;
         if (langCode) {
           const match = results.filter((r) => r.original_language === langCode);
-          const rest  = results.filter((r) => r.original_language !== langCode);
+          const rest = results.filter((r) => r.original_language !== langCode);
           results = [...match, ...rest];
         }
         if (year) {
@@ -534,8 +539,8 @@ export default function RecommendationsView({
           // directly to the front.
           bucketCacheRef.current = {
             hollywood: newEn,
-            matched:   newReg,
-            other:     newGlob,
+            matched: newReg,
+            other: newGlob,
           };
 
           // Persist to localStorage so a dashboard remount doesn't lose
@@ -731,33 +736,33 @@ export default function RecommendationsView({
                 position: "relative",   // needed for absolute title centering
               }}
             >
-              {/* Left: empty flex spacer */}
-              <div style={{ flex: 1 }} />
+              {/* Left: Brand logo title */}
+              <div style={{ flex: 1, display: "flex", alignItems: "center" }}>
+                <h1
+                  className="heading-display header-title-brand"
+                  style={{
+                    fontSize: "21px",
+                    fontWeight: 700,
+                    letterSpacing: "-0.035em",
+                    background: "linear-gradient(180deg, #ffffff 0%, #a0a0a0 100%)",
+                    WebkitBackgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
+                    backgroundClip: "text",
+                    margin: 0,
+                    whiteSpace: "nowrap",
+                    cursor: "pointer",
+                  }}
+                  onClick={() => router.push("/dashboard")}
+                >
+                  CineMatch
+                </h1>
+              </div>
 
-              {/* Center: title — absolutely positioned so it's always truly centered */}
-              <h1
-                className="heading-display header-title-brand"
-                style={{
-                  position: "absolute",
-                  left: "50%",
-                  transform: "translateX(-50%)",
-                  fontSize: "21px",
-                  fontWeight: 700,
-                  letterSpacing: "-0.035em",
-                  background: "linear-gradient(180deg, #ffffff 0%, #a0a0a0 100%)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  backgroundClip: "text",
-                  margin: 0,
-                  whiteSpace: "nowrap",
-                  pointerEvents: "none",
-                }}
-              >
-                CineMatch
-              </h1>
+              {/* Center: Desktop Navigation Bar */}
+              <DesktopNavTabs onPreferences={openPrefs} onWatchlist={openWatchlist} />
 
-              {/* Right: search + hamburger */}
-              <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "4px" }}>
+              {/* Right: search + user account menu */}
+              <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "8px" }}>
                 {/* Desktop mini search box — hidden on mobile via CSS */}
                 <button
                   className="header-search-box"
@@ -957,7 +962,7 @@ export default function RecommendationsView({
             rebuild was running. Now it's a small glass pill in the
             bottom-left corner; the rest of the dashboard stays
             interactive throughout the rerun. */}
-        {typeof document !== 'undefined' && createPortal(
+        {mounted && createPortal(
           <AnimatePresence>
             {(showUpdateToast || isUpdating) && (
               <motion.div
@@ -1160,7 +1165,12 @@ function StackDetailView({
     </motion.div>
   );
 
-  if (typeof document === "undefined") return null;
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) return null;
   return createPortal(content, document.body);
 }
 

@@ -253,7 +253,7 @@ function ExplorePageInner() {
 
       {/* Content. Bottom padding (`--s-bottom-clearance`) reserves space
           for the floating bottom-nav so the last row isn't hidden. */}
-      <div className="app-container" style={{ flex: 1, width: "100%", padding: "var(--s-5) 0 var(--s-bottom-clearance)" }}>
+      <div className="app-container" style={{ flex: 1, width: "100%", padding: "var(--s-5) 24px var(--s-bottom-clearance)" }}>
         {tab === "all" ? (
           <div style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
             {CATEGORIES.map((cat) => (

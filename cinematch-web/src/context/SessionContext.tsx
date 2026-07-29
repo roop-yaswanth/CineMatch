@@ -1,37 +1,40 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
-import { apiAuthRefresh, apiLogout, type UserSession } from "@/lib/api";
+import { AnimatePresence } from "framer-motion";
+import {
+  apiAuthRefresh,
+  apiLogout,
+  apiUpdatePreferences,
+  preferencesFromProfile,
+  type UserSession,
+  type RecommendationPreferences,
+} from "@/lib/api";
+import PreferencesModal from "@/components/PreferencesModal";
 
 interface SessionContextType {
   session: UserSession | null;
   isLoading: boolean;
   logout: () => void;
   updateSession: (session: UserSession) => void;
+  openPreferences: () => void;
+  closePreferences: () => void;
+  isPreferencesOpen: boolean;
 }
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
 const STORAGE_KEY = "cinematch_email";
 const SESSION_CACHE_KEY = "cinematch_session";
 const ACTIVITY_KEY = "cinematch_last_activity";
-// Set (to a future ms-epoch) by the preferences page right after a local change,
-// so the post-reload background re-validation here doesn't overwrite the
-// just-set profile with a briefly-stale server copy before the PUT lands.
 const PROFILE_OPTIMISTIC_KEY = "cinematch_profile_optimistic_until";
 
-// Stay logged in until the user explicitly logs out or a full month passes with
-// no activity. We persist in localStorage (shared across tabs + survives browser
-// restarts) rather than sessionStorage (per-tab) — so opening the app in a new
-// tab no longer forces a re-login.
 const INACTIVITY_LIMIT_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
-/** Safely read a cached session from localStorage */
 function readCachedSession(): UserSession | null {
   try {
     const raw = localStorage.getItem(SESSION_CACHE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    // Basic shape check
     if (parsed && typeof parsed.session_id === "string" && typeof parsed.identifier === "string") {
       return parsed as UserSession;
     }
@@ -41,16 +44,14 @@ function readCachedSession(): UserSession | null {
   }
 }
 
-/** Persist the full session object alongside the email identifier */
 function persistSession(s: UserSession) {
   try {
     localStorage.setItem(STORAGE_KEY, s.identifier);
     localStorage.setItem(SESSION_CACHE_KEY, JSON.stringify(s));
     markActivity();
-  } catch { /* storage full — non-critical */ }
+  } catch { /* storage full */ }
 }
 
-/** Clear all session data from localStorage */
 function clearStoredSession() {
   localStorage.removeItem(STORAGE_KEY);
   localStorage.removeItem(SESSION_CACHE_KEY);
@@ -58,8 +59,6 @@ function clearStoredSession() {
   localStorage.removeItem(PROFILE_OPTIMISTIC_KEY);
 }
 
-/** True if a preferences change was just made locally and the server may not
- *  reflect it yet — in which case we keep the local profile over a re-fetch. */
 function profileOptimisticActive(): boolean {
   try {
     const raw = localStorage.getItem(PROFILE_OPTIMISTIC_KEY);
@@ -69,7 +68,6 @@ function profileOptimisticActive(): boolean {
   }
 }
 
-/** Timestamp (ms epoch) of the user's last recorded activity; 0 if unknown. */
 function readLastActivity(): number {
   try {
     const raw = localStorage.getItem(ACTIVITY_KEY);
@@ -80,14 +78,12 @@ function readLastActivity(): number {
   }
 }
 
-/** Record "user is active now" — drives the one-month inactivity logout. */
 function markActivity() {
   try {
     localStorage.setItem(ACTIVITY_KEY, String(Date.now()));
   } catch { /* ignore */ }
 }
 
-/** True once a month has elapsed since the last recorded activity. */
 function inactivityExpired(): boolean {
   const last = readLastActivity();
   return last > 0 && Date.now() - last > INACTIVITY_LIMIT_MS;
@@ -96,16 +92,22 @@ function inactivityExpired(): boolean {
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<UserSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isPreferencesOpen, setIsPreferencesOpen] = useState(false);
+
+  const openPreferences = useCallback(() => {
+    setIsPreferencesOpen(true);
+  }, []);
+
+  const closePreferences = useCallback(() => {
+    setIsPreferencesOpen(false);
+  }, []);
 
   const clearSession = useCallback(() => {
     clearStoredSession();
     setSession(null);
   }, []);
 
-  // Restore: instant from cache, then silently validate with backend
   const restoreSession = useCallback(async () => {
-    // Enforce the one-month inactivity window across browser restarts: if the
-    // last recorded activity is older than the limit, clear and require login.
     if (inactivityExpired()) {
       clearStoredSession();
       setSession(null);
@@ -117,29 +119,19 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const savedIdentifier = localStorage.getItem(STORAGE_KEY);
 
     if (!cached && !savedIdentifier) {
-      // Never logged in
       setSession(null);
       setIsLoading(false);
       return;
     }
 
-    // Instant restore from cache — no API needed, no loading flicker
     if (cached) {
-      markActivity(); // opening the app refreshes the inactivity window
+      markActivity();
       setSession(cached);
       setIsLoading(false);
 
-      // Silently re-establish the server session from our signed token. Legacy
-      // sessions saved before Google sign-in have no auth_token — keep those
-      // as-is (they ride until the server evicts them; no forced re-auth
-      // mid-session, and they can't be forged since minting is now closed).
       if (cached.auth_token) {
         try {
           const fresh = await apiAuthRefresh(cached.auth_token);
-          // If the user just changed preferences locally, the server copy may not
-          // reflect it yet — keep the optimistic profile (adopt everything else
-          // from the fresh session, including the renewed token) so it doesn't
-          // flicker back to the old prefs.
           const next = profileOptimisticActive() && cached.profile
             ? { ...fresh, profile: cached.profile, auth_token: fresh.auth_token ?? cached.auth_token }
             : fresh;
@@ -148,11 +140,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         } catch (err) {
           const msg = err instanceof Error ? err.message : "";
           if (msg.includes("401")) {
-            // Signed token genuinely expired/invalid → require a fresh sign-in.
             clearStoredSession();
             setSession(null);
           } else {
-            // Transient (backend cold-start / offline) → keep cached session.
             console.warn("[SessionProvider] Token refresh failed; keeping cached session.");
           }
         }
@@ -160,8 +150,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // Have a stored identifier but no cached session object: without a cached
-    // session there's no signed token to refresh, so require a fresh sign-in.
     setSession(null);
     setIsLoading(false);
   }, []);
@@ -171,7 +159,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [restoreSession]);
 
   const logout = useCallback(() => {
-    // Best-effort server-side invalidation, then clear locally regardless.
     const sid = session?.session_id;
     clearSession();
     if (sid) void apiLogout(sid).catch(() => { /* non-fatal */ });
@@ -182,9 +169,48 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     persistSession(newSession);
   }, []);
 
-  // Mirror login/logout that happened in another tab (localStorage `storage`
-  // events fire in every *other* tab). Keeps all tabs in sync: log out in one,
-  // they all log out; log in in one, the others pick it up.
+  const handlePreferencesUpdate = useCallback(
+    (prefs: RecommendationPreferences) => {
+      if (session) {
+        updateSession({
+          ...session,
+          profile: {
+            ...session.profile,
+            preferred_languages: prefs.languages,
+            preferred_genres: prefs.genres,
+            genre_picks: prefs.genres,
+            include_classics: prefs.include_classics,
+            age_group: prefs.age_group,
+            region: prefs.region,
+          },
+        });
+        try {
+          localStorage.setItem("cinematch_profile_optimistic_until", String(Date.now() + 15000));
+        } catch { /* ignore */ }
+      }
+
+      try {
+        const uid = session?.user_id;
+        if (uid) localStorage.removeItem(`cinematch_recs_cache_${uid}`);
+      } catch { /* ignore */ }
+
+      const sid = session?.session_id;
+      if (sid) {
+        apiUpdatePreferences(sid, {
+          languages: prefs.languages,
+          genres: prefs.genres,
+          semantic_index: prefs.semantic_index,
+          age_group: prefs.age_group,
+          region: prefs.region,
+          include_classics: prefs.include_classics,
+        })
+          .then((freshSession) => updateSession(freshSession))
+          .catch((err) => console.error("Failed to update preferences on server:", err));
+      }
+    },
+    [session, updateSession]
+  );
+
   useEffect(() => {
     const handleStorage = (event: StorageEvent) => {
       if (event.key === STORAGE_KEY || event.key === SESSION_CACHE_KEY) {
@@ -200,20 +226,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("storage", handleStorage);
   }, []);
 
-  // Inactivity logout: log out only after a FULL MONTH with no user interaction.
-  // We record the last-activity timestamp and poll, rather than using a single
-  // setTimeout — a 30-day delay overflows setTimeout's 32-bit millisecond range
-  // and would fire almost immediately. Crucially we do NOT log out just because
-  // the tab is hidden/backgrounded: switching tabs or apps keeps you logged in.
   useEffect(() => {
-    if (!session) return; // Only track when logged in
+    if (!session) return;
 
-    markActivity(); // using the app counts as activity
+    markActivity();
 
     let lastWrite = Date.now();
     const onActivity = () => {
       const now = Date.now();
-      // Throttle localStorage writes to at most once a minute.
       if (now - lastWrite > 60 * 1000) {
         lastWrite = now;
         markActivity();
@@ -225,7 +245,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
     const interval = setInterval(() => {
       if (inactivityExpired()) logout();
-    }, 5 * 60 * 1000); // re-check every 5 minutes
+    }, 5 * 60 * 1000);
 
     return () => {
       events.forEach((event) => window.removeEventListener(event, onActivity));
@@ -234,8 +254,30 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [session, logout]);
 
   return (
-    <SessionContext.Provider value={{ session, isLoading, logout, updateSession }}>
+    <SessionContext.Provider
+      value={{
+        session,
+        isLoading,
+        logout,
+        updateSession,
+        openPreferences,
+        closePreferences,
+        isPreferencesOpen,
+      }}
+    >
       {children}
+
+      <AnimatePresence>
+        {isPreferencesOpen && session && (
+          <PreferencesModal
+            key="preferences-genie-modal"
+            preferences={preferencesFromProfile(session.profile)}
+            onUpdate={handlePreferencesUpdate}
+            onClose={closePreferences}
+            mode="recommendations"
+          />
+        )}
+      </AnimatePresence>
     </SessionContext.Provider>
   );
 }

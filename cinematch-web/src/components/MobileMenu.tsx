@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
+import { useSession } from "@/context/SessionContext";
 
 interface MobileMenuProps {
   onLogout: () => void;
@@ -16,13 +17,6 @@ const IconCompass = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="12" cy="12" r="10" />
     <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" />
-  </svg>
-);
-
-const IconSearch = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="11" cy="11" r="8" />
-    <line x1="21" y1="21" x2="16.65" y2="16.65" />
   </svg>
 );
 
@@ -67,6 +61,77 @@ const IconLogOut = () => (
   </svg>
 );
 
+const IconUser = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+    <circle cx="12" cy="7" r="4" />
+  </svg>
+);
+
+const IconChevronDown = () => (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="6 9 12 15 18 9" />
+  </svg>
+);
+
+export function DesktopNavTabs({
+  onPreferences,
+  onWatchlist,
+}: {
+  onPreferences?: () => void;
+  onWatchlist?: () => void;
+}) {
+  const router = useRouter();
+  const { openPreferences, isPreferencesOpen } = useSession();
+  const pathname = usePathname() ?? "/";
+  const [filterParam, setFilterParam] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      setFilterParam(params.get("filter"));
+    }
+  }, [pathname]);
+
+  const isExploreActive = pathname.startsWith("/explore");
+  const isWatchlistActive = pathname.startsWith("/your-likes") && filterParam === "watchlist";
+  const isPreferencesActive = pathname.startsWith("/preferences") || isPreferencesOpen;
+
+  return (
+    <nav className="desktop-center-nav" aria-label="Primary Navigation">
+      <button
+        className={`desktop-center-tab ${isExploreActive ? "active" : ""}`}
+        onClick={() => router.push("/explore")}
+      >
+        <span className="desktop-tab-icon"><IconCompass /></span>
+        <span>Explore</span>
+      </button>
+
+      <button
+        className={`desktop-center-tab ${isWatchlistActive ? "active" : ""}`}
+        onClick={() => {
+          if (onWatchlist) onWatchlist();
+          else router.push("/your-likes?filter=watchlist");
+        }}
+      >
+        <span className="desktop-tab-icon"><IconBookmark /></span>
+        <span>Watchlist</span>
+      </button>
+
+      <button
+        className={`desktop-center-tab ${isPreferencesActive ? "active" : ""}`}
+        onClick={() => {
+          if (onPreferences) onPreferences();
+          else openPreferences();
+        }}
+      >
+        <span className="desktop-tab-icon"><IconPreferences /></span>
+        <span>Preferences</span>
+      </button>
+    </nav>
+  );
+}
+
 export default function MobileMenu({
   onLogout,
   onReset,
@@ -75,6 +140,7 @@ export default function MobileMenu({
   onWatchlist,
 }: MobileMenuProps) {
   const router = useRouter();
+  const pathname = usePathname() ?? "/";
   const [isOpen, setIsOpen] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
@@ -101,6 +167,35 @@ export default function MobileMenu({
     if (action) action();
   };
 
+  const handleExplore = () => {
+    setIsOpen(false);
+    setShowResetConfirm(false);
+    router.push("/explore");
+  };
+
+  const handleWatchlist = () => {
+    setIsOpen(false);
+    setShowResetConfirm(false);
+    if (onWatchlist) onWatchlist();
+    else router.push("/your-likes?filter=watchlist");
+  };
+
+  const handleYourLikes = () => {
+    setIsOpen(false);
+    setShowResetConfirm(false);
+    if (onYourLikes) onYourLikes();
+    else router.push("/your-likes");
+  };
+
+  const { openPreferences } = useSession();
+
+  const handlePreferences = () => {
+    setIsOpen(false);
+    setShowResetConfirm(false);
+    if (onPreferences) onPreferences();
+    else openPreferences();
+  };
+
   const handleClose = () => {
     setIsOpen(false);
     setShowResetConfirm(false);
@@ -108,8 +203,25 @@ export default function MobileMenu({
 
   return (
     <div style={{ position: "relative" }} ref={containerRef}>
+      {/* DESKTOP ACCOUNT BUTTON (Visible >= 900px) */}
       <button
-        className="glass-button"
+        className="desktop-account-btn"
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen((prev) => !prev);
+        }}
+        aria-label="Account settings"
+      >
+        <span className="desktop-account-icon"><IconUser /></span>
+        <span>Account</span>
+        <span className={`desktop-account-chevron ${isOpen ? "open" : ""}`}>
+          <IconChevronDown />
+        </span>
+      </button>
+
+      {/* MOBILE HAMBURGER TRIGGER BUTTON (Visible < 900px) */}
+      <button
+        className="glass-button mobile-menu-trigger"
         onClick={(e) => {
           e.stopPropagation();
           setIsOpen((prev) => !prev);
@@ -133,6 +245,7 @@ export default function MobileMenu({
         </svg>
       </button>
 
+      {/* DROPDOWN CARD (Shared between desktop account button & mobile menu trigger) */}
       <AnimatePresence>
         {isOpen && (
           <>
@@ -152,10 +265,10 @@ export default function MobileMenu({
             />
 
             <motion.div
-              initial={{ opacity: 0, scale: 0.94, y: -8 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.94, y: -8 }}
-              transition={{ type: "spring", damping: 25, stiffness: 350 }}
+              initial={{ opacity: 0, scale: 0.72, y: -16, filter: "blur(6px)" }}
+              animate={{ opacity: 1, scale: 1, y: 0, filter: "blur(0px)" }}
+              exit={{ opacity: 0, scale: 0.72, y: -16, filter: "blur(6px)" }}
+              transition={{ type: "spring", damping: 24, stiffness: 380, mass: 0.8 }}
               style={{
                 position: "absolute",
                 top: "52px",
@@ -164,6 +277,7 @@ export default function MobileMenu({
                 padding: "6px",
                 overflow: "hidden",
                 zIndex: 100,
+                transformOrigin: "top right",
                 display: "flex",
                 flexDirection: "column",
                 gap: "2px",
@@ -178,6 +292,32 @@ export default function MobileMenu({
                 `,
               }}
             >
+              {/* Mobile-only navigation items */}
+              <div className="mobile-only-items">
+                <button className="menu-btn" onClick={handleExplore}>
+                  <span className="menu-btn-icon"><IconCompass /></span>
+                  <span>Explore</span>
+                </button>
+
+                <button className="menu-btn" onClick={handleWatchlist}>
+                  <span className="menu-btn-icon"><IconBookmark /></span>
+                  <span>Watchlist</span>
+                </button>
+
+                <div className="menu-divider" />
+              </div>
+
+              {/* Your Collection is moved to the account dropdown menu */}
+              <button className="menu-btn" onClick={handleYourLikes}>
+                <span className="menu-btn-icon"><IconHeart /></span>
+                <span>Your Collection</span>
+              </button>
+
+              <button className="menu-btn" onClick={handlePreferences}>
+                <span className="menu-btn-icon"><IconPreferences /></span>
+                <span>Preferences</span>
+              </button>
+
               {onReset && !showResetConfirm && (
                 <button className="menu-btn" onClick={() => setShowResetConfirm(true)}>
                   <span className="menu-btn-icon"><IconReset /></span>
@@ -209,33 +349,6 @@ export default function MobileMenu({
 
               <div className="menu-divider" />
 
-              <button className="menu-btn menu-mobile-hide" onClick={() => handleAction(() => router.push("/search"))}>
-                <span className="menu-btn-icon"><IconSearch /></span>
-                <span>Search TMDB</span>
-              </button>
-
-              <button className="menu-btn menu-mobile-hide" onClick={() => handleAction(() => router.push("/explore"))}>
-                <span className="menu-btn-icon"><IconCompass /></span>
-                <span>Explore</span>
-              </button>
-
-              <button className="menu-btn menu-mobile-hide" onClick={() => handleAction(onWatchlist)}>
-                <span className="menu-btn-icon"><IconBookmark /></span>
-                <span>Watchlist</span>
-              </button>
-
-              <button className="menu-btn menu-mobile-hide" onClick={() => handleAction(onYourLikes)}>
-                <span className="menu-btn-icon"><IconHeart /></span>
-                <span>Your Collection</span>
-              </button>
-
-              <button className="menu-btn" onClick={() => handleAction(onPreferences)}>
-                <span className="menu-btn-icon"><IconPreferences /></span>
-                <span>Preferences</span>
-              </button>
-
-              <div className="menu-divider" />
-
               <button
                 className="menu-btn menu-btn-danger"
                 onClick={() => handleAction(onLogout)}
@@ -249,6 +362,112 @@ export default function MobileMenu({
       </AnimatePresence>
 
       <style>{`
+        @media (min-width: 900px) {
+          .mobile-menu-trigger { display: none !important; }
+          .mobile-only-items { display: none !important; }
+          .desktop-account-btn { display: flex !important; }
+          .desktop-center-nav { display: flex !important; }
+        }
+
+        @media (max-width: 899px) {
+          .mobile-menu-trigger { display: flex !important; }
+          .mobile-only-items { display: flex !important; }
+          .desktop-account-btn { display: none !important; }
+          .desktop-center-nav { display: none !important; }
+        }
+
+        .desktop-center-nav {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          padding: 4px;
+          background: rgba(22, 24, 32, 0.65);
+          backdrop-filter: blur(24px) saturate(1.8);
+          -webkit-backdrop-filter: blur(24px) saturate(1.8);
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          border-radius: 14px;
+          box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+        }
+
+        .desktop-center-tab {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          padding: 6px 14px;
+          height: 32px;
+          border-radius: 10px;
+          border: 1px solid transparent;
+          background: transparent;
+          color: rgba(255, 255, 255, 0.72);
+          font-size: 13px;
+          font-weight: 500;
+          cursor: pointer;
+          white-space: nowrap;
+          transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .desktop-center-tab:hover {
+          background: rgba(255, 255, 255, 0.08);
+          color: #ffffff;
+        }
+
+        .desktop-center-tab.active {
+          background: rgba(255, 255, 255, 0.14);
+          color: #ffffff;
+          font-weight: 600;
+          border-color: rgba(255, 255, 255, 0.16);
+          box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+        }
+
+        .desktop-tab-icon {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          opacity: 0.85;
+        }
+
+        .desktop-account-btn {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 7px 14px;
+          height: 38px;
+          border-radius: 12px;
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          background: rgba(255, 255, 255, 0.06);
+          backdrop-filter: blur(20px);
+          -webkit-backdrop-filter: blur(20px);
+          color: rgba(255, 255, 255, 0.9);
+          font-size: 13px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.18s ease;
+        }
+
+        .desktop-account-btn:hover {
+          background: rgba(255, 255, 255, 0.12);
+          border-color: rgba(255, 255, 255, 0.2);
+          color: #ffffff;
+        }
+
+        .desktop-account-icon {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: rgba(255, 255, 255, 0.75);
+        }
+
+        .desktop-account-chevron {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: rgba(255, 255, 255, 0.5);
+          transition: transform 0.2s ease;
+        }
+        .desktop-account-chevron.open {
+          transform: rotate(180deg);
+        }
+
         .menu-btn {
           width: 100%;
           text-align: left;
@@ -311,9 +530,6 @@ export default function MobileMenu({
           height: 1px;
           background: rgba(255, 255, 255, 0.07);
           margin: 4px 6px;
-        }
-        @media (max-width: 899px) {
-          .menu-mobile-hide { display: none !important; }
         }
         .menu-confirm-btn {
           flex: 1;

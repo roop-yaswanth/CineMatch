@@ -8,6 +8,9 @@ import { apiGetHistory, languageLabel, apiRecommendationAction, type HistoryItem
 import { usePoster } from "@/lib/usePoster";
 import PageHeader from "@/components/ui/PageHeader";
 import EmptyState from "@/components/ui/EmptyState";
+import { useRouter } from "next/navigation";
+import MobileMenu from "@/components/MobileMenu";
+import { useSession } from "@/context/SessionContext";
 import type { DetailMovie } from "@/components/modals/MovieDetailModal";
 
 const MovieDetailModal = dynamic(() => import("@/components/modals/MovieDetailModal"), { ssr: false });
@@ -115,6 +118,8 @@ function toDetailMovie(item: HistoryListItem): DetailMovie {
 }
 
 export default function YourLikesView({ sessionId, onClose, initialFilter = "all" }: Props) {
+  const { logout } = useSession();
+  const router = useRouter();
   const initialCache = readHistoryCache(sessionId);
   // Stale-while-revalidate: if we have ANY cached items at all (fresh OR
   // stale), paint them immediately and skip the skeleton state. The
@@ -237,6 +242,9 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
               </span>
               Your Collection
             </span>
+          }
+          rightSlot={
+            <MobileMenu onLogout={() => { logout(); router.replace("/login"); }} />
           }
         />
 

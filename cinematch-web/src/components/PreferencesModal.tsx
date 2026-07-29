@@ -76,52 +76,60 @@ export default function PreferencesModal({ preferences, onUpdate, onClose, mode 
   };
 
   return (
-    <>
+    <motion.div
+      key="preferences-genie-modal-container"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.22 }}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 9999,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        paddingTop: "env(safe-area-inset-top)",
+        paddingBottom: "env(safe-area-inset-bottom)",
+      }}
+    >
       {/* Backdrop */}
       <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
+        initial={{ opacity: 0, backdropFilter: "blur(0px)" }}
+        animate={{ opacity: 1, backdropFilter: "blur(14px)" }}
+        exit={{ opacity: 0, backdropFilter: "blur(0px)" }}
+        transition={{ duration: 0.22 }}
         onClick={onClose}
         style={{
-          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-          zIndex: 50, backgroundColor: "rgba(0,0,0,0.5)",
-          backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
+          position: "absolute",
+          inset: 0,
+          backgroundColor: "rgba(0, 0, 0, 0.65)",
+          WebkitBackdropFilter: "blur(14px)",
         }}
       />
 
-      {/* Modal */}
+      {/* Modal - Apple Genie Morphing Card */}
       <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.2 }}
+        initial={{ opacity: 0, scale: 0.35, y: -70, filter: "blur(10px)" }}
+        animate={{ opacity: 1, scale: 1, y: 0, filter: "blur(0px)" }}
+        exit={{ opacity: 0, scale: 0.3, y: -80, filter: "blur(12px)" }}
+        transition={{ type: "spring", stiffness: 320, damping: 25, mass: 0.7 }}
+        className="glass-modal"
         style={{
-          position: "fixed", zIndex: 51,
-          inset: 0,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          pointerEvents: "none",
-          // Respect iOS PWA safe areas so the modal can't drift under the
-          // status bar / home indicator when content is taller than the
-          // visible viewport.
-          paddingTop: "env(safe-area-inset-top)",
-          paddingBottom: "env(safe-area-inset-bottom)",
+          position: "relative",
+          zIndex: 10,
+          width: "90%",
+          maxWidth: "520px",
+          maxHeight: "85dvh",
+          overflowY: "auto",
+          boxSizing: "border-box",
+          padding: "24px",
+          pointerEvents: "auto",
+          overscrollBehavior: "contain",
+          touchAction: "pan-y",
+          transformOrigin: "top center",
         }}
       >
-        <div
-          className="glass-modal"
-          style={{
-            width: "90%", maxWidth: "520px", maxHeight: "85dvh",
-            overflowY: "auto", boxSizing: "border-box",
-            padding: "24px", pointerEvents: "auto",
-            // Contain scroll-chain so a swipe inside the modal never bubbles
-            // up to the page (which on iOS PWA would expose the status-bar
-            // area as overscroll). `touch-action: pan-y` makes the contain
-            // effective on Safari which otherwise ignores it for body bounce.
-            overscrollBehavior: "contain",
-            touchAction: "pan-y",
-          }}
-        >
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "24px" }}>
             <h2 className="h-section" style={{ margin: 0 }}>
               Preferences
@@ -227,10 +235,9 @@ export default function PreferencesModal({ preferences, onUpdate, onClose, mode 
           >
             Apply Changes
           </motion.button>
-        </div>
+        </motion.div>
       </motion.div>
-    </>
-  );
+    );
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {

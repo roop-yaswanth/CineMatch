@@ -2,26 +2,11 @@
 
 /**
  * One canonical sticky page header.
- *
- * Before this component every full-page route (Explore, Search, Person,
- * Your Likes) hand-rolled the same layout — back button on the left,
- * centered title, optional right slot — with subtly different padding,
- * title sizes, and right-spacer widths. That drift was the #1 finding
- * of the UI/UX audit. Centralizing the layout here means: tune the
- * spacing/typography in ONE place, and every page picks it up.
- *
- * Layout contract:
- *   ┌────────────────────────────────────────────────────┐
- *   │ [44px back]    centered title (flex:1)    [44px R] │
- *   └────────────────────────────────────────────────────┘
- *
- * The right slot defaults to a 44 px invisible spacer so the title is
- * optically centered. Pass `rightSlot` to put something there (e.g.
- * the mobile menu).
  */
 
 import type { ReactNode } from "react";
 import BackButton from "@/components/ui/BackButton";
+import { DesktopNavTabs } from "@/components/MobileMenu";
 
 interface Props {
   title: ReactNode;
@@ -63,37 +48,33 @@ export default function PageHeader({
           padding: "var(--s-header-y) var(--s-header-x)",
           display: "flex",
           alignItems: "center",
-          gap: "var(--s-3)",
+          justifyContent: "space-between",
+          position: "relative",
         }}
       >
-        <BackButton href={backHref} onClick={onBack} ariaLabel={backAriaLabel} />
+        {/* Left Column: Back button */}
+        <div style={{ display: "flex", alignItems: "center", minWidth: "44px", zIndex: 10 }}>
+          <BackButton href={backHref} onClick={onBack} ariaLabel={backAriaLabel} />
+        </div>
 
-        <h1
-          className="h-page"
-          style={{
-            flex: 1,
-            margin: 0,
-            textAlign: "center",
-            // Optical balance with the back button + right spacer (both
-            // 44px). Title cannot push them out of position because flex:1
-            // owns the slack.
-            minWidth: 0,
-          }}
-        >
-          {title}
-        </h1>
+        {/* Center Column: Desktop Navigation Tabs (>=900px) OR Mobile Title (<900px) */}
+        <div className="page-header-center">
+          <div className="desktop-header-tabs">
+            <DesktopNavTabs />
+          </div>
+          <h1 className="h-page mobile-header-title" style={{ margin: 0, textAlign: "center" }}>
+            {title}
+          </h1>
+        </div>
 
-        {/* Right slot: defaults to an invisible 44 px spacer to balance
-            the BackButton on the left, so the title sits optically
-            centered between them. Pages that need an action here pass
-            their own element via `rightSlot`. */}
+        {/* Right Column: rightSlot (MobileMenu -> Account button on desktop) */}
         <div
           style={{
-            width: "44px",
-            minWidth: "44px",
             display: "flex",
+            alignItems: "center",
             justifyContent: "flex-end",
-            flexShrink: 0,
+            minWidth: "44px",
+            zIndex: 10,
           }}
           aria-hidden={!rightSlot}
         >
@@ -102,6 +83,28 @@ export default function PageHeader({
       </div>
 
       {children}
+
+      <style>{`
+        .page-header-center {
+          position: absolute;
+          left: 50%;
+          transform: translateX(-50%);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          pointer-events: auto;
+        }
+
+        @media (min-width: 900px) {
+          .desktop-header-tabs { display: flex !important; }
+          .mobile-header-title { display: none !important; }
+        }
+
+        @media (max-width: 899px) {
+          .desktop-header-tabs { display: none !important; }
+          .mobile-header-title { display: flex !important; }
+        }
+      `}</style>
     </header>
   );
 }
