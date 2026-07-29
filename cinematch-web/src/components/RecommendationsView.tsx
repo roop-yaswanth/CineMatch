@@ -1136,7 +1136,7 @@ function StackDetailView({
         className="stack-detail-grid app-container"
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))",
           gap: "18px",
           padding: "24px clamp(20px, 4vw, 40px) 80px",
         }}
@@ -1491,18 +1491,21 @@ export function PosterCard({
     const vw = window.innerWidth / zoom;
     const vh = window.innerHeight / zoom;
 
+    const forceHorizontal = showFullInfo;
+    const useHorizontal = forceHorizontal || hasBackdrop;
+
     // Scale wider for aesthetic 
-    const scaleFactor = hasBackdrop ? 2.0 : 1.65;
+    const scaleFactor = useHorizontal ? 2.0 : 1.65;
 
     const expandedWidth = Math.max(280, s.width * scaleFactor);
-    const expandedImgHeight = hasBackdrop ? (expandedWidth * 9 / 16) : (expandedWidth * 1.5);
-    const detailsHeight = 170; // Adjusted for overlap
+    const expandedImgHeight = useHorizontal ? (expandedWidth * 9 / 16) : (expandedWidth * 1.5);
+    const detailsHeight = 180; // Adjusted for overlap
     const targetHeight = expandedImgHeight + detailsHeight;
 
     // tLeft centers the width
     let tLeft = s.left - (expandedWidth - s.width) / 2;
-    // tTop centers the IMAGE part only!
-    let tTop = s.top - (expandedImgHeight - s.height) / 2;
+    // tTop centers the ENTIRE card vertically so it doesn't hang completely down below the row!
+    let tTop = s.top - (targetHeight - s.height) / 2;
 
     // Bounds check to keep entirely within screen
     if (tLeft < 25) tLeft = 25;
@@ -1543,7 +1546,9 @@ export function PosterCard({
             style={{
               position: "fixed",
               zIndex: 999999,
-              background: "var(--color-surface, #18191c)",
+              background: "rgba(22, 22, 28, 0.85)", // Solid Frosted Glass Base
+              backdropFilter: "blur(24px) saturate(120%)", // Beautiful Blur
+              WebkitBackdropFilter: "blur(24px) saturate(120%)",
               boxShadow: "0 30px 60px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.08) inset",
               overflow: "hidden",
               display: "flex",
@@ -1559,7 +1564,7 @@ export function PosterCard({
           >
             {/* The Image Header (Poster or Backdrop) */}
             <div style={{ position: "relative", width: "100%", height: expandedImgHeight, flexShrink: 0 }}>
-              <img src={hasBackdrop ? backdrop : poster} alt={movie.title} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 20%" }} />
+              <img src={useHorizontal ? backdrop : poster} alt={movie.title} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 20%" }} />
               <div style={{ position: "absolute", bottom: -2, left: 0, right: 0, height: "65%", background: "linear-gradient(to top, #18191c 0%, rgba(24,25,28,0.95) 20%, rgba(24,25,28,0.6) 50%, rgba(24,25,28,0) 100%)", pointerEvents: "none" }} />
               {imdb && (
                 <div style={{ position: "absolute", top: "12px", right: "12px", padding: "4px 8px", borderRadius: "8px", background: "rgba(0,0,0,0.7)", fontSize: "11px", fontWeight: 700, color: "#e8c84a", display: "flex", alignItems: "center", gap: "4px", boxShadow: "0 4px 12px rgba(0,0,0,0.4)" }}>
@@ -1570,10 +1575,10 @@ export function PosterCard({
             </div>
 
             {/* The Extra Info Panel under the Image */}
-            <div style={{ marginTop: "-40px", padding: "0 18px 20px 18px", flex: 1, display: "flex", flexDirection: "column", gap: "8px", zIndex: 2, background: "transparent" }}>
-              <h3 style={{ fontSize: "18px", fontWeight: 700, color: "#fff", margin: 0, lineHeight: 1.2 }}>{movie.title}</h3>
+            <div style={{ marginTop: "-40px", padding: "0 18px 20px 18px", flex: 1, display: "flex", flexDirection: "column", gap: "8px", zIndex: 2, background: "transparent", overflow: "hidden" }}>
+              <h3 style={{ fontSize: "18px", fontWeight: 700, color: "#fff", margin: 0, lineHeight: 1.2, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{movie.title}</h3>
               <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", alignItems: "center" }}>
                   <span style={{ color: "rgba(255,255,255,0.9)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "6px", padding: "2px 6px", fontSize: "10px", fontWeight: 600 }}>{movie.year || "--"}</span>
                   <span style={{ color: "rgba(255,255,255,0.9)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "6px", padding: "2px 6px", fontSize: "10px", fontWeight: 600 }}>{lang || "Global"}</span>
                 </div>
@@ -1586,16 +1591,16 @@ export function PosterCard({
                 )}
               </div>
               {movie.overview && (
-                <p style={{ margin: "2px 0 0", fontSize: "12px", color: "rgba(255,255,255,0.75)", lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{movie.overview}</p>
+                <p style={{ margin: "2px 0 0", fontSize: "11px", color: "rgba(255,255,255,0.65)", lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{movie.overview}</p>
               )}
               <div style={{ marginTop: "auto", marginBottom: "4px", display: "flex", gap: "10px", alignItems: "center" }}>
-                <button onClick={(e) => { e.stopPropagation(); if (onClick) onClick(); setIsExpanded(false); }} style={{ background: "#fff", color: "#000", border: "none", borderRadius: "100px", padding: "8px 16px", fontSize: "13px", fontWeight: 700, display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", flex: 1, justifyContent: "center" }}>
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg> View
+                <button onClick={(e) => { e.stopPropagation(); if (onClick) onClick(); setIsExpanded(false); }} style={{ background: "#fff", color: "#000", border: "none", borderRadius: "100px", padding: "6px 14px", fontSize: "12px", fontWeight: 700, display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", flex: 1, justifyContent: "center" }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg> View
                 </button>
-                <button onClick={(e) => { e.stopPropagation(); onAction(movie, "watchlist"); setIsExpanded(false); }} title="Add to watchlist" aria-label="Add to watchlist" style={{ background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "50%", width: "34px", height: "34px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" /></svg>
+                <button onClick={(e) => { e.stopPropagation(); onAction(movie, "watchlist"); setIsExpanded(false); }} title="Add to watchlist" aria-label="Add to watchlist" style={{ background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "50%", width: "32px", height: "32px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" /></svg>
                 </button>
-                <button onClick={(e) => { e.stopPropagation(); onAction(movie, "dislike"); setIsExpanded(false); }} title="Show me less of this" aria-label="Show me less of this" style={{ background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "50%", width: "34px", height: "34px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
+                <button onClick={(e) => { e.stopPropagation(); onAction(movie, "dislike"); setIsExpanded(false); }} title="Show me less of this" aria-label="Show me less of this" style={{ background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "50%", width: "32px", height: "32px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
                 </button>
               </div>
@@ -1607,145 +1612,7 @@ export function PosterCard({
     );
   }
 
-  if (showFullInfo) {
-    return (
-      <motion.article
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.94 }}
-        transition={{ duration: 0.2 }}
-        className="horizontal-poster-card glass-card"
-        onClick={(e) => { e.stopPropagation(); if (onClick) onClick(); }}
-        style={{
-          width: "100%",
-          display: "flex",
-          gap: "14px",
-          padding: "12px",
-          borderRadius: "14px",
-          background: "rgba(255, 255, 255, 0.04)",
-          border: "1px solid rgba(255, 255, 255, 0.08)",
-          cursor: "pointer",
-          position: "relative",
-          boxSizing: "border-box",
-          transition: "background 0.2s ease, border-color 0.2s ease, transform 0.2s ease",
-        }}
-      >
-        {/* Poster Image */}
-        <div
-          style={{
-            width: "105px",
-            aspectRatio: "2 / 3",
-            borderRadius: "10px",
-            overflow: "hidden",
-            position: "relative",
-            flexShrink: 0,
-            background: "var(--color-surface)",
-          }}
-        >
-          <img
-            src={poster}
-            alt={movie.title}
-            loading={priority ? "eager" : "lazy"}
-            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
-          />
-        </div>
 
-        {/* Content Column */}
-        <div style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0, justifyContent: "space-between" }}>
-          <div>
-            {/* Title */}
-            <h3
-              style={{
-                fontSize: "15px",
-                fontWeight: 600,
-                color: "#fff",
-                margin: 0,
-                lineHeight: 1.3,
-                display: "-webkit-box",
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: "vertical",
-                overflow: "hidden",
-              }}
-            >
-              {movie.title}
-            </h3>
-
-            {/* Badges: Year, Language, IMDb */}
-            <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "6px", flexWrap: "wrap" }}>
-              {movie.year && (
-                <span style={{ fontSize: "10.5px", fontWeight: 600, color: "rgba(255,255,255,0.8)", background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)", padding: "1.5px 6px", borderRadius: "5px" }}>
-                  {movie.year}
-                </span>
-              )}
-              {lang && (
-                <span style={{ fontSize: "10.5px", fontWeight: 600, color: "rgba(255,255,255,0.8)", background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)", padding: "1.5px 6px", borderRadius: "5px" }}>
-                  {lang}
-                </span>
-              )}
-              {imdb && (
-                <span style={{ fontSize: "10.5px", fontWeight: 700, color: "#e8c84a", background: "rgba(232,200,74,0.15)", border: "1px solid rgba(232,200,74,0.3)", padding: "1.5px 6px", borderRadius: "5px", display: "inline-flex", alignItems: "center", gap: "3px" }}>
-                  ★ {imdb}
-                </span>
-              )}
-            </div>
-
-            {/* Genre Pills */}
-            {genreList.length > 0 && (
-              <div style={{ display: "flex", gap: "4px", marginTop: "6px", flexWrap: "wrap" }}>
-                {genreList.map((g) => (
-                  <span key={g} style={{ fontSize: "10px", fontWeight: 500, color: "rgba(216, 180, 254, 0.9)", background: "rgba(168, 85, 247, 0.12)", border: "1px solid rgba(168, 85, 247, 0.22)", padding: "1px 7px", borderRadius: "999px" }}>
-                    {g}
-                  </span>
-                ))}
-              </div>
-            )}
-
-            {/* Overview paragraph */}
-            {movie.overview && (
-              <p
-                style={{
-                  margin: "8px 0 0",
-                  fontSize: "12px",
-                  color: "rgba(255,255,255,0.65)",
-                  lineHeight: 1.4,
-                  display: "-webkit-box",
-                  WebkitLineClamp: 3,
-                  WebkitBoxOrient: "vertical",
-                  overflow: "hidden",
-                }}
-              >
-                {movie.overview}
-              </p>
-            )}
-          </div>
-
-          {/* Action Row */}
-          <div style={{ marginTop: "10px", display: "flex", gap: "8px", alignItems: "center" }}>
-            <button
-              onClick={(e) => { e.stopPropagation(); onAction(movie, "watchlist"); }}
-              title="Add to Watchlist"
-              style={{
-                fontSize: "11px",
-                fontWeight: 600,
-                color: "#fff",
-                background: "rgba(255,255,255,0.08)",
-                border: "1px solid rgba(255,255,255,0.15)",
-                borderRadius: "20px",
-                padding: "4px 10px",
-                cursor: "pointer",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "4px",
-                transition: "background 0.15s ease",
-              }}
-            >
-              + Watchlist
-            </button>
-          </div>
-        </div>
-      </motion.article>
-    );
-  }
 
   return (
     <motion.article
