@@ -95,24 +95,25 @@ export default function PreferencesModal({ preferences, onUpdate, onClose, mode 
     >
       {/* Backdrop */}
       <motion.div
-        initial={{ opacity: 0, backdropFilter: "blur(0px)" }}
-        animate={{ opacity: 1, backdropFilter: "blur(14px)" }}
-        exit={{ opacity: 0, backdropFilter: "blur(0px)" }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
         transition={{ duration: 0.22 }}
         onClick={onClose}
         style={{
           position: "absolute",
           inset: 0,
           backgroundColor: "rgba(0, 0, 0, 0.65)",
+          backdropFilter: "blur(14px)",
           WebkitBackdropFilter: "blur(14px)",
         }}
       />
 
       {/* Modal - Apple Genie Morphing Card */}
       <motion.div
-        initial={{ opacity: 0, scale: 0.35, y: -70, filter: "blur(10px)" }}
-        animate={{ opacity: 1, scale: 1, y: 0, filter: "blur(0px)" }}
-        exit={{ opacity: 0, scale: 0.3, y: -80, filter: "blur(12px)" }}
+        initial={{ opacity: 0, scale: 0.35, y: -70 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.3, y: -80 }}
         transition={{ type: "spring", stiffness: 320, damping: 25, mass: 0.7 }}
         className="glass-modal"
         style={{

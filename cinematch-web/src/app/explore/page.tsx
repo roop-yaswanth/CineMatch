@@ -266,7 +266,7 @@ function ExplorePageInner() {
         }
       >
         {/* Category Tabs */}
-        <div style={{ display: "flex", gap: "6px", overflowX: "auto", scrollbarWidth: "none", paddingBottom: "8px" }}>
+        <div style={{ display: "flex", gap: "6px", overflowX: "auto", scrollbarWidth: "none", paddingBottom: "8px", paddingLeft: "var(--s-header-x)", paddingRight: "var(--s-header-x)" }}>
           {TAB_OPTIONS.map((t) => {
             const isActive = tab === t.id;
             return (
@@ -302,6 +302,8 @@ function ExplorePageInner() {
               alignItems: "center",
               gap: "8px",
               paddingTop: "8px",
+              paddingLeft: "var(--s-header-x)",
+              paddingRight: "var(--s-header-x)",
               borderTop: "1px solid rgba(255,255,255,0.05)",
             }}
           >
@@ -309,7 +311,7 @@ function ExplorePageInner() {
               value={selectedLanguage}
               onChange={(v) => setSelectedLanguage(v)}
               options={[
-                { value: "", label: "🌐  All Languages" },
+                { value: "", label: "All Languages" },
                 ...LANGUAGE_OPTIONS.filter((c) => c !== "").map((c) => ({
                   value: c,
                   label: LANGUAGE_LABELS[c] || languageLabel(c),
@@ -321,7 +323,7 @@ function ExplorePageInner() {
               value={selectedGenre}
               onChange={(v) => setSelectedGenre(v)}
               options={[
-                { value: "", label: "🎭  All Genres" },
+                { value: "", label: "All Genres" },
                 ...genresList.map((g) => ({ value: String(g.id), label: g.name })),
               ]}
             />

@@ -30,16 +30,7 @@ import HighlightedText from "@/components/ui/HighlightedText";
 import EmptyState from "@/components/ui/EmptyState";
 import { SkeletonGrid } from "@/components/ui/Skeleton";
 
-type Tab = "movies" | "tv" | "people";
-
-const TABS: Array<{ id: Tab; label: string }> = [
-  // Movies first because (a) it's the default surface, and (b) it can
-  // answer instantly from the local CSV-backed library before we ever hit
-  // TMDB. TV / People always go through TMDB and are typically slower.
-  { id: "movies", label: "Movies" },
-  { id: "tv", label: "TV" },
-  { id: "people", label: "People" },
-];
+// Removed TABS definition
 
 export default function SearchPageWrapper() {
   return (
@@ -70,13 +61,6 @@ function SearchPage() {
 
   const [query, setQuery] = useState(initialQ);
   const [debounced, setDebounced] = useState(initialQ);
-  const [tab, setTab] = useState<Tab>("movies");
-  // Movies search starts with library (DB) results only; the user opts in to
-  // see TMDB matches with a "Show TMDB results" button. Keeps the page snappy
-  // and avoids paying TMDB latency unless the user asks for it.
-  const [showTmdbMovies, setShowTmdbMovies] = useState(false);
-  // Collapse on every fresh debounced query so each search starts library-first.
-  useEffect(() => { Promise.resolve().then(() => setShowTmdbMovies(false)); }, [debounced]);
   // Holds the most recent successful response. Crucially we keep showing the
   // last results while the user types — only when *new* results land for the
   // current query do we swap them in. No flash of empty state on every keystroke.
@@ -154,8 +138,6 @@ function SearchPage() {
 
   const dbMovies = results.movies.filter((m) => m.source === "db");
   const hasDb = dbMovies.length > 0;
-  const hasYear = /\b(18[89]\d|19\d{2}|20\d{2})\b/.test(debounced);
-  const autoShowMovies = showTmdbMovies || !hasDb || hasYear;
 
   const openMovie = useCallback((m: MultiSearchMovie) => {
     setActive({
@@ -310,40 +292,6 @@ function SearchPage() {
           </div>
         </div>
 
-        {/* Tabs */}
-        <div style={{ padding: "0 20px 12px", display: "flex", gap: "8px", overflowX: "auto", scrollbarWidth: "none" }}>
-          {TABS.map((t) => {
-            const isActive = tab === t.id;
-            // Movies count: only the library hits are shown by default, so
-            // the badge reflects that. TMDB matches are opt-in via the
-            // "Search TMDB" button below the library results.
-            const count =
-              t.id === "movies"
-                ? (autoShowMovies ? results.movies.length : dbMovies.length)
-                : t.id === "tv"
-                ? results.tv.length
-                : results.people.length;
-            return (
-              <button
-                key={t.id}
-                onClick={() => setTab(t.id)}
-                style={{
-                  padding: "7px 14px",
-                  borderRadius: "999px",
-                  border: isActive ? "1px solid rgba(255,255,255,0.32)" : "1px solid rgba(255,255,255,0.10)",
-                  background: isActive ? "rgba(255,255,255,0.14)" : "rgba(28,30,36,0.66)",
-                  color: isActive ? "var(--color-text-primary)" : "var(--color-text-secondary)",
-                  fontSize: "13px",
-                  fontWeight: 500,
-                  whiteSpace: "nowrap",
-                  cursor: "pointer",
-                }}
-              >
-                {t.label}{debounced && ` (${count})`}
-              </button>
-            );
-          })}
-        </div>
       </PageHeader>
 
       {/* Body */}
@@ -368,67 +316,40 @@ function SearchPage() {
               transition: "opacity 160ms ease",
             }}
           >
-            {tab === "movies" && (() => {
-              // Split results by source so the local-library hits feel
-              // immediate and TMDB-only matches are opt-in.
+            {(() => {
               const tmdbMovies = results.movies.filter((m) => m.source === "tmdb");
               const hasTmdb = tmdbMovies.length > 0;
+              const hasTv = results.tv.length > 0;
+              const hasPeople = results.people.length > 0;
+
               return (
                 <>
                   {hasDb && (
-                    <Section title={null}>
+                    <Section title="Movies (Library)">
                       <MovieGrid movies={dbMovies} onSelect={openMovie} query={debounced} />
                     </Section>
                   )}
 
-                  {hasTmdb && !autoShowMovies && (
-                    <div style={{ display: "flex", justifyContent: "center", padding: "12px 0 4px" }}>
-                      <button
-                        type="button"
-                        className="btn btn-secondary btn-sm"
-                        onClick={() => setShowTmdbMovies(true)}
-                      >
-                        Search TMDB ({tmdbMovies.length})
-                      </button>
-                    </div>
-                  )}
-
-                  {hasTmdb && autoShowMovies && (
-                    <Section title="From TMDB">
+                  {hasTmdb && (
+                    <Section title={hasDb ? "Movies (TMDB)" : "Movies"}>
                       <MovieGrid movies={tmdbMovies} onSelect={openMovie} query={debounced} />
                     </Section>
                   )}
 
-                  {!hasDb && !hasTmdb && (
-                    <EmptyState
-                      title={`No movies for "${debounced}"`}
-                      tone="search"
-                      description="Try a different spelling or shorten the query."
-                    />
+                  {hasTv && (
+                    <Section title="TV Shows">
+                      <TvGrid items={results.tv} query={debounced} />
+                    </Section>
+                  )}
+
+                  {hasPeople && (
+                    <Section title="People">
+                      <PeopleGrid people={results.people} query={debounced} />
+                    </Section>
                   )}
                 </>
               );
             })()}
-
-            {tab === "tv" && (
-              results.tv.length > 0 ? (
-                <Section title={null}>
-                  <TvGrid items={results.tv} query={debounced} />
-                </Section>
-              ) : (
-                <EmptyState title={`No TV results for "${debounced}"`} tone="search" />
-              )
-            )}
-
-            {tab === "people" && (
-              results.people.length > 0 ? (
-                <Section title={null}>
-                  <PeopleGrid people={results.people} query={debounced} />
-                </Section>
-              ) : (
-                <EmptyState title={`No people for "${debounced}"`} tone="search" />
-              )
-            )}
           </div>
         )}
 
@@ -553,28 +474,48 @@ function RecentSearchesPanel({
 function MovieGrid({ movies, onSelect, query }: { movies: MultiSearchMovie[]; onSelect: (m: MultiSearchMovie) => void; query: string }) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: "20px 14px" }}>
-      {movies.map((m) => (
-        <motion.button
-          key={`${m.tmdb_id}-${m.source}`}
-          onClick={() => onSelect(m)}
-          whileTap={{ scale: 0.97 }}
-          style={{ background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left", display: "flex", flexDirection: "column", outline: "none" }}
-        >
-          <div style={{ position: "relative", width: "100%", aspectRatio: "2 / 3", borderRadius: "14px", overflow: "hidden", background: "var(--color-surface)" }}>
-            {m.poster_path ? (
-              <img src={posterUrl(m.poster_path, "w342")} alt={m.title} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
-            ) : null}
-          </div>
-          <div style={{ padding: "8px 2px 0" }}>
-            <div style={{ fontSize: "13px", fontWeight: 500, color: "var(--color-text-primary)", lineHeight: 1.25, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
-              <HighlightedText text={m.title} query={query} />
+      {movies.map((m) => {
+        const isImdb = m.source === "imdb";
+        const inner = (
+          <>
+            <div style={{ position: "relative", width: "100%", aspectRatio: "2 / 3", borderRadius: "14px", overflow: "hidden", background: "var(--color-surface)" }}>
+              {m.poster_path ? (
+                <img src={posterUrl(m.poster_path, "w342")} alt={m.title} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+              ) : null}
+              {isImdb && (
+                <div style={{ position: "absolute", top: "6px", right: "6px", background: "rgba(245,197,24,0.92)", color: "#000", fontSize: "9px", fontWeight: 700, padding: "2px 6px", borderRadius: "4px", letterSpacing: "0.04em" }}>IMDb</div>
+              )}
             </div>
-            <div style={{ marginTop: "3px", fontSize: "11px", color: "var(--color-text-muted)" }}>
-              {m.year || ""}{m.year && m.original_language ? " · " : ""}{m.original_language ? languageLabel(m.original_language) : ""}
+            <div style={{ padding: "8px 2px 0" }}>
+              <div style={{ fontSize: "13px", fontWeight: 500, color: "var(--color-text-primary)", lineHeight: 1.25, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                <HighlightedText text={m.title} query={query} />
+              </div>
+              <div style={{ marginTop: "3px", fontSize: "11px", color: "var(--color-text-muted)" }}>
+                {m.year || ""}{m.year && m.original_language ? " · " : ""}{m.original_language ? languageLabel(m.original_language) : ""}
+              </div>
             </div>
-          </div>
-        </motion.button>
-      ))}
+          </>
+        );
+
+        if (isImdb && m.imdb_url) {
+          return (
+            <a key={`${m.imdb_url}-imdb`} href={m.imdb_url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", color: "inherit", display: "flex", flexDirection: "column" }}>
+              {inner}
+            </a>
+          );
+        }
+
+        return (
+          <motion.button
+            key={`${m.tmdb_id}-${m.source}`}
+            onClick={() => onSelect(m)}
+            whileTap={{ scale: 0.97 }}
+            style={{ background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left", display: "flex", flexDirection: "column", outline: "none" }}
+          >
+            {inner}
+          </motion.button>
+        );
+      })}
     </div>
   );
 }

@@ -138,7 +138,7 @@ export default function MovieCard({ movie, priority = false, className = "", com
             // card in the rail whether a title wraps to one line or two (fixes
             // the ragged look where short titles sat higher).
             ? "text-[13px] font-semibold tracking-tight text-white leading-snug line-clamp-2 min-h-[2.7em]"
-            : "text-base font-medium tracking-[-0.01em] text-[var(--color-text-primary)] leading-tight"
+            : "text-[14px] font-medium tracking-[-0.01em] text-[var(--color-text-primary)] leading-tight line-clamp-2"
           }
         >
           {movie.title}
@@ -167,21 +167,23 @@ export default function MovieCard({ movie, priority = false, className = "", com
         ) : (
           <>
             {fullDate && (
-              <div className="mt-1.5 text-xs text-[var(--color-text-muted)] font-light">
+              <div className="mt-1 text-[11px] text-[var(--color-text-muted)] font-light">
                 {fullDate}
               </div>
             )}
 
             {/* Metadata line: Year · Language · IMDb */}
-            <div className="mt-2 flex items-center justify-center gap-2 text-xs text-[var(--color-text-muted)] font-light flex-wrap">
+            <div className="mt-1.5 flex items-center justify-center gap-1.5 text-[11px] text-[var(--color-text-muted)] font-light flex-wrap">
               {year && <span>{year}</span>}
               {year && lang && <span style={{ opacity: 0.4 }}>·</span>}
               {lang && <span>{lang}</span>}
               {(year || lang) && (imdb || tmdbRating) && <span style={{ opacity: 0.4 }}>·</span>}
               {imdb ? (
-                <span>IMDb {imdb}</span>
+                <span className="flex items-center gap-1">
+                  <span style={{ color: "var(--color-accent-warm)" }}>★</span> {imdb}
+                </span>
               ) : tmdbRating ? (
-                <span>
+                <span className="flex items-center gap-1">
                   <span style={{ color: "var(--color-accent-warm)" }}>★</span> {tmdbRating}
                 </span>
               ) : null}
@@ -189,7 +191,7 @@ export default function MovieCard({ movie, priority = false, className = "", com
 
             {/* Genre line */}
             {(primaryGenre || genres.length > 0) && (
-              <div className="mt-1.5 text-xs text-[var(--color-text-muted)] font-light">
+              <div className="mt-1 text-[11px] text-[var(--color-text-muted)] font-light">
                 {primaryGenre || genres.join(", ")}
               </div>
             )}

@@ -88,6 +88,15 @@ function extractLangFromQuery(raw: string): { cleanQuery: string; langCode: stri
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+interface ImdbSearchResult {
+  imdb_id: string;
+  title: string;
+  year?: number;
+  type?: string;
+  image?: string;
+  imdb_url?: string;
+}
+
 interface DbMovieResult {
   tmdb_id: number;
   title: string;
@@ -136,6 +145,41 @@ interface TmdbPerson {
   known_for_department?: string;
   popularity?: number;
   known_for?: Array<{ id: number; title?: string; name?: string; media_type?: string; poster_path?: string | null }>;
+}
+
+// Unified shape for a movie from any source (db, tmdb, or imdb).
+interface MergedMovieItem {
+  tmdb_id: number;
+  title: string;
+  year?: number;
+  original_language?: string;
+  poster_path?: string;
+  backdrop_path?: string;
+  overview?: string;
+  genres?: string[];
+  primary_genre?: string;
+  vote_average?: number;
+  imdb_rating?: number;
+  imdb_votes?: number;
+  source: "db" | "tmdb" | "imdb";
+  imdb_id?: string;
+  imdb_url?: string;
+}
+
+async function searchImdb(q: string): Promise<ImdbSearchResult[]> {
+  try {
+    const url = `${HF_API_URL}/api/imdb/search?q=${encodeURIComponent(q)}&limit=8`;
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      ...(HF_TOKEN ? { Authorization: `Bearer ${HF_TOKEN}` } : {}),
+    };
+    const res = await fetch(url, { headers });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data.results || []) as ImdbSearchResult[];
+  } catch {
+    return [];
+  }
 }
 
 async function searchDbMovies(q: string, limit: number, langCode?: string | null): Promise<DbMovieResult[]> {
@@ -199,13 +243,14 @@ export async function GET(req: NextRequest) {
   // Detect and strip language keyword + year (e.g. "rebel telugu 2012" → query="rebel", lang="te", year=2012)
   const { cleanQuery: q, langCode, year } = extractLangFromQuery(rawQ);
 
-  const [dbMovies, tmdbMovies, tmdbTv, tmdbPeople, genreMap] = await Promise.all([
+  const [dbMovies, tmdbMovies, tmdbTv, tmdbPeople, genreMap, imdbMovies] = await Promise.all([
     searchDbMovies(q, 20, langCode),
     searchTmdb("movie", q, langCode, year),
     searchTmdb("tv", q, langCode, year),
     // People search: still use full raw query so language/year words don't break actor lookups
     searchTmdb("person", rawQ),
     getGenreMap(),
+    searchImdb(q),
   ]);
 
   // Merge movies: DB first, supplement with TMDB hits not already present
@@ -231,7 +276,7 @@ export async function GET(req: NextRequest) {
       };
     });
 
-  let mergedMovies = [
+  let mergedMovies: MergedMovieItem[] = [
     ...dbMovies.map((m) => ({ ...m, source: "db" as const })),
     ...fallback,
   ];
@@ -249,6 +294,38 @@ export async function GET(req: NextRequest) {
     const other = mergedMovies.filter((m) => !m.year || Math.abs(m.year - year) > 1);
     mergedMovies = [...exact, ...other];
   }
+
+  // Merge IMDb-only results: append titles not already present by imdb_id or by title+year match.
+  // IMDb results only have title/year/image — no TMDB metadata — so they open to imdb_url.
+  const seenImdbIds = new Set<string>(
+    dbMovies.map((m) => (m as DbMovieResult & { imdb_id?: string }).imdb_id).filter(Boolean) as string[]
+  );
+  const seenTitlesYears = new Set<string>(
+    mergedMovies.map((m) => `${(m.title || "").toLowerCase().trim()}:${m.year ?? ""}`)
+  );
+  const imdbFallback = imdbMovies
+    .filter((r) => {
+      if (r.imdb_id && seenImdbIds.has(r.imdb_id)) return false;
+      const key = `${(r.title || "").toLowerCase().trim()}:${r.year ?? ""}`;
+      return !seenTitlesYears.has(key);
+    })
+    .map((r) => ({
+      tmdb_id: 0, // no TMDB id — signals frontend to use imdb_url
+      title: r.title || "",
+      year: r.year,
+      original_language: undefined,
+      poster_path: r.image,  // Amazon image URL — posterUrl() will detect the http prefix
+      backdrop_path: undefined,
+      overview: undefined,
+      genres: [] as string[],
+      primary_genre: undefined,
+      vote_average: undefined,
+      imdb_id: r.imdb_id,
+      imdb_url: r.imdb_url,
+      source: "imdb" as const,
+    }));
+
+  mergedMovies = [...mergedMovies, ...imdbFallback];
 
   const tv = (tmdbTv as TmdbTv[]).map((t) => {
     const dateStr = t.first_air_date || "";

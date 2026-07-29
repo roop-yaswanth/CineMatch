@@ -20,6 +20,13 @@ const IconCompass = () => (
   </svg>
 );
 
+const IconHome = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+    <polyline points="9 22 9 12 15 12 15 22" />
+  </svg>
+);
+
 const IconBookmark = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
     <path d="M19 21l-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
@@ -93,12 +100,21 @@ export function DesktopNavTabs({
     }
   }, [pathname]);
 
+  const isDashboardActive = pathname.startsWith("/dashboard");
   const isExploreActive = pathname.startsWith("/explore");
   const isWatchlistActive = pathname.startsWith("/your-likes") && filterParam === "watchlist";
   const isPreferencesActive = isPreferencesOpen;
 
   return (
     <nav className="desktop-center-nav" aria-label="Primary Navigation">
+      <button
+        className={`desktop-center-tab ${isDashboardActive ? "active" : ""}`}
+        onClick={() => router.push("/dashboard")}
+      >
+        <span className="desktop-tab-icon"><IconHome /></span>
+        <span>Dashboard</span>
+      </button>
+
       <button
         className={`desktop-center-tab ${isExploreActive ? "active" : ""}`}
         onClick={() => router.push("/explore")}
@@ -165,6 +181,12 @@ export default function MobileMenu({
     setIsOpen(false);
     setShowResetConfirm(false);
     if (action) action();
+  };
+
+  const handleDashboard = () => {
+    setIsOpen(false);
+    setShowResetConfirm(false);
+    router.push("/dashboard");
   };
 
   const handleExplore = () => {
@@ -294,6 +316,11 @@ export default function MobileMenu({
             >
               {/* Mobile-only navigation items */}
               <div className="mobile-only-items">
+                <button className="menu-btn" onClick={handleDashboard}>
+                  <span className="menu-btn-icon"><IconHome /></span>
+                  <span>Dashboard</span>
+                </button>
+
                 <button className="menu-btn" onClick={handleExplore}>
                   <span className="menu-btn-icon"><IconCompass /></span>
                   <span>Explore</span>

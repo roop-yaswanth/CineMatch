@@ -466,7 +466,8 @@ export interface SearchResponse {
 export interface MultiSearchMovie extends SearchResult {
   primary_genre?: string;
   vote_average?: number;
-  source: "db" | "tmdb";
+  source: "db" | "tmdb" | "imdb";
+  imdb_url?: string;
 }
 export interface MultiSearchTv {
   tmdb_id: number;
