@@ -1136,8 +1136,8 @@ function StackDetailView({
         className="stack-detail-grid app-container"
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
-          gap: "24px",
+          gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))",
+          gap: "18px",
           padding: "24px clamp(20px, 4vw, 40px) 80px",
         }}
       >
@@ -1604,6 +1604,146 @@ export function PosterCard({
         )}
       </AnimatePresence>,
       document.body
+    );
+  }
+
+  if (showFullInfo) {
+    return (
+      <motion.article
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.94 }}
+        transition={{ duration: 0.2 }}
+        className="horizontal-poster-card glass-card"
+        onClick={(e) => { e.stopPropagation(); if (onClick) onClick(); }}
+        style={{
+          width: "100%",
+          display: "flex",
+          gap: "14px",
+          padding: "12px",
+          borderRadius: "14px",
+          background: "rgba(255, 255, 255, 0.04)",
+          border: "1px solid rgba(255, 255, 255, 0.08)",
+          cursor: "pointer",
+          position: "relative",
+          boxSizing: "border-box",
+          transition: "background 0.2s ease, border-color 0.2s ease, transform 0.2s ease",
+        }}
+      >
+        {/* Poster Image */}
+        <div
+          style={{
+            width: "105px",
+            aspectRatio: "2 / 3",
+            borderRadius: "10px",
+            overflow: "hidden",
+            position: "relative",
+            flexShrink: 0,
+            background: "var(--color-surface)",
+          }}
+        >
+          <img
+            src={poster}
+            alt={movie.title}
+            loading={priority ? "eager" : "lazy"}
+            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+          />
+        </div>
+
+        {/* Content Column */}
+        <div style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0, justifyContent: "space-between" }}>
+          <div>
+            {/* Title */}
+            <h3
+              style={{
+                fontSize: "15px",
+                fontWeight: 600,
+                color: "#fff",
+                margin: 0,
+                lineHeight: 1.3,
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+              }}
+            >
+              {movie.title}
+            </h3>
+
+            {/* Badges: Year, Language, IMDb */}
+            <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "6px", flexWrap: "wrap" }}>
+              {movie.year && (
+                <span style={{ fontSize: "10.5px", fontWeight: 600, color: "rgba(255,255,255,0.8)", background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)", padding: "1.5px 6px", borderRadius: "5px" }}>
+                  {movie.year}
+                </span>
+              )}
+              {lang && (
+                <span style={{ fontSize: "10.5px", fontWeight: 600, color: "rgba(255,255,255,0.8)", background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)", padding: "1.5px 6px", borderRadius: "5px" }}>
+                  {lang}
+                </span>
+              )}
+              {imdb && (
+                <span style={{ fontSize: "10.5px", fontWeight: 700, color: "#e8c84a", background: "rgba(232,200,74,0.15)", border: "1px solid rgba(232,200,74,0.3)", padding: "1.5px 6px", borderRadius: "5px", display: "inline-flex", alignItems: "center", gap: "3px" }}>
+                  ★ {imdb}
+                </span>
+              )}
+            </div>
+
+            {/* Genre Pills */}
+            {genreList.length > 0 && (
+              <div style={{ display: "flex", gap: "4px", marginTop: "6px", flexWrap: "wrap" }}>
+                {genreList.map((g) => (
+                  <span key={g} style={{ fontSize: "10px", fontWeight: 500, color: "rgba(216, 180, 254, 0.9)", background: "rgba(168, 85, 247, 0.12)", border: "1px solid rgba(168, 85, 247, 0.22)", padding: "1px 7px", borderRadius: "999px" }}>
+                    {g}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Overview paragraph */}
+            {movie.overview && (
+              <p
+                style={{
+                  margin: "8px 0 0",
+                  fontSize: "12px",
+                  color: "rgba(255,255,255,0.65)",
+                  lineHeight: 1.4,
+                  display: "-webkit-box",
+                  WebkitLineClamp: 3,
+                  WebkitBoxOrient: "vertical",
+                  overflow: "hidden",
+                }}
+              >
+                {movie.overview}
+              </p>
+            )}
+          </div>
+
+          {/* Action Row */}
+          <div style={{ marginTop: "10px", display: "flex", gap: "8px", alignItems: "center" }}>
+            <button
+              onClick={(e) => { e.stopPropagation(); onAction(movie, "watchlist"); }}
+              title="Add to Watchlist"
+              style={{
+                fontSize: "11px",
+                fontWeight: 600,
+                color: "#fff",
+                background: "rgba(255,255,255,0.08)",
+                border: "1px solid rgba(255,255,255,0.15)",
+                borderRadius: "20px",
+                padding: "4px 10px",
+                cursor: "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "4px",
+                transition: "background 0.15s ease",
+              }}
+            >
+              + Watchlist
+            </button>
+          </div>
+        </div>
+      </motion.article>
     );
   }
 
