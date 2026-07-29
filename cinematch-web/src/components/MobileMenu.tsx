@@ -95,7 +95,7 @@ export function DesktopNavTabs({
 
   const isExploreActive = pathname.startsWith("/explore");
   const isWatchlistActive = pathname.startsWith("/your-likes") && filterParam === "watchlist";
-  const isPreferencesActive = pathname.startsWith("/preferences") || isPreferencesOpen;
+  const isPreferencesActive = isPreferencesOpen;
 
   return (
     <nav className="desktop-center-nav" aria-label="Primary Navigation">

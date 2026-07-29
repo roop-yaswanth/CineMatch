@@ -1,98 +1,23 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import PreferencesModal from "@/components/PreferencesModal";
-import { useSession } from "@/context/SessionContext";
-import { preferencesFromProfile, apiUpdatePreferences, type RecommendationPreferences } from "@/lib/api";
 
-export default function PreferencesPage() {
+/**
+ * Legacy /preferences route — redirect to dashboard.
+ * Preferences are now rendered as an overlay modal (PreferencesModal)
+ * managed via SessionContext, so this page is no longer needed.
+ */
+export default function PreferencesRedirect() {
   const router = useRouter();
-  const { session, isLoading, updateSession } = useSession();
-
-  // Route protection
   useEffect(() => {
-    if (!isLoading && !session) {
-      router.replace("/login");
-    }
-  }, [session, isLoading, router]);
-
-  // Preferences are derived directly from the session profile — no local state
-  // is needed (PreferencesModal owns its own draft state internally).
-  const preferences: RecommendationPreferences | null = useMemo(
-    () => (session ? preferencesFromProfile(session.profile) : null),
-    [session]
-  );
-
-  const handleUpdate = (prefs: RecommendationPreferences) => {
-    // (1) Optimistically reflect the new prefs in the stored session so the
-    //     dashboard remount (hard-nav below) reads them INSTANTLY. This is the
-    //     source of truth for the UI — we deliberately DON'T block navigation on
-    //     the network (awaiting it caused an indefinite "Applying…" hang when the
-    //     request was slow or the endpoint was unavailable). The dashboard also
-    //     sends prefs in the recommendations request body, so results reflect the
-    //     change regardless of whether the profile write has landed yet.
-    if (session) {
-      updateSession({
-        ...session,
-        profile: {
-          ...session.profile,
-          preferred_languages: prefs.languages,
-          preferred_genres: prefs.genres,
-          genre_picks: prefs.genres,
-          include_classics: prefs.include_classics,
-          age_group: prefs.age_group,
-          region: prefs.region,
-        },
-      });
-      // Tell SessionContext to keep this just-set profile and not let the
-      // post-reload background re-validation (apiAuthRefresh) overwrite it with
-      // a briefly-stale server copy before the PUT below lands.
-      try {
-        localStorage.setItem("cinematch_profile_optimistic_until", String(Date.now() + 15000));
-      } catch { /* ignore */ }
-    }
-
-    // (2) Drop the local recs cache for this user so the dashboard refetches
-    //     against the new prefs instead of restoring the old stacks.
-    try {
-      const uid = session?.user_id;
-      if (uid) localStorage.removeItem(`cinematch_recs_cache_${uid}`);
-    } catch { /* ignore */ }
-
-    // (3) Persist server-side (Mongo profile + per-user cache-version bump) in
-    //     the BACKGROUND — fire-and-forget. Adopt the authoritative session it
-    //     returns, but never make the UI wait on it.
-    const sid = session?.session_id;
-    if (sid) {
-      apiUpdatePreferences(sid, {
-        languages: prefs.languages,
-        genres: prefs.genres,
-        semantic_index: prefs.semantic_index,
-        age_group: prefs.age_group,
-        region: prefs.region,
-        include_classics: prefs.include_classics,
-      })
-        .then((freshSession) => updateSession(freshSession))
-        .catch((err) => console.error("Failed to update preferences on server:", err));
-    }
-  };
-
-  if (isLoading || !session || !preferences) return null;
-  const goToDashboard = () => {
+    // Use window.location for a hard redirect so the service worker
+    // doesn't serve a cached copy of the old preferences page.
     if (typeof window !== "undefined") {
-      window.location.assign("/dashboard");
+      window.location.replace("/dashboard");
     } else {
       router.replace("/dashboard");
     }
-  };
-
-  return (
-    <PreferencesModal
-      preferences={preferences}
-      onUpdate={handleUpdate}
-      onClose={goToDashboard}
-      mode="recommendations"
-    />
-  );
+  }, [router]);
+  return null;
 }

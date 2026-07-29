@@ -44,10 +44,9 @@ const CATEGORIES: CategoryDef[] = [
   { id: "upcoming", label: "Upcoming", subtitle: "Coming soon." },
 ];
 
-type TabId = "all" | ExploreCategory | "discover";
+type TabId = ExploreCategory | "discover";
 
 const TAB_OPTIONS: Array<{ id: TabId; label: string }> = [
-  { id: "all", label: "All" },
   { id: "trending_day", label: "Trending" },
   { id: "popular", label: "Popular" },
   { id: "top_rated", label: "Top Rated" },
@@ -79,6 +78,57 @@ export default function ExplorePage() {
   );
 }
 
+/* ─── Filter pill select ─── */
+function PillSelect({
+  value,
+  onChange,
+  options,
+  active,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: Array<{ value: string; label: string }>;
+  active?: boolean;
+}) {
+  const isActive = active ?? (value !== "" && value !== options[0]?.value);
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      style={{
+        appearance: "none",
+        WebkitAppearance: "none",
+        background: isActive
+          ? "linear-gradient(135deg, rgba(139,92,246,0.25), rgba(59,130,246,0.18))"
+          : "rgba(255,255,255,0.05)",
+        border: isActive
+          ? "1px solid rgba(139,92,246,0.45)"
+          : "1px solid rgba(255,255,255,0.10)",
+        borderRadius: "20px",
+        color: isActive ? "#e0d4fc" : "rgba(255,255,255,0.65)",
+        padding: "6px 28px 6px 12px",
+        fontSize: "12.5px",
+        fontWeight: 500,
+        cursor: "pointer",
+        outline: "none",
+        transition: "all 0.18s ease",
+        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.5)' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`,
+        backgroundRepeat: "no-repeat",
+        backgroundPosition: "right 10px center",
+        backgroundSize: "10px",
+        minWidth: 0,
+        whiteSpace: "nowrap" as const,
+      }}
+    >
+      {options.map((o) => (
+        <option key={o.value} value={o.value} style={{ background: "#161820", color: "#fff" }}>
+          {o.label}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 function ExplorePageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -96,14 +146,14 @@ function ExplorePageInner() {
 
   const initialTab: TabId = (() => {
     const t = searchParams?.get("tab") || "";
-    const known: TabId[] = ["all", "trending_day", "popular", "top_rated", "now_playing", "upcoming", "discover"];
-    return (known as string[]).includes(t) ? (t as TabId) : "all";
+    const known: TabId[] = ["trending_day", "popular", "top_rated", "now_playing", "upcoming", "discover"];
+    return (known as string[]).includes(t) ? (t as TabId) : "trending_day";
   })();
   const [tab, setTabState] = useState<TabId>(initialTab);
 
   const setTab = (next: TabId) => {
     setTabState(next);
-    const url = next === "all" ? "/explore" : `/explore?tab=${encodeURIComponent(next)}`;
+    const url = next === "trending_day" ? "/explore" : `/explore?tab=${encodeURIComponent(next)}`;
     window.history.replaceState(null, "", url);
   };
 
@@ -117,9 +167,6 @@ function ExplorePageInner() {
     apiGenres().then(setGenresList).catch(() => { });
   }, []);
 
-  const [rails, setRails] = useState<Record<string, ExploreMovie[]>>({});
-  const [railLoading, setRailLoading] = useState(false);
-
   const [grid, setGrid] = useState<ExploreMovie[]>([]);
   const [gridPage, setGridPage] = useState(1);
   const [gridTotalPages, setGridTotalPages] = useState(1);
@@ -130,34 +177,9 @@ function ExplorePageInner() {
 
   const region = session?.profile?.region || undefined;
 
-  // Load all rails in parallel for "All" view
-  useEffect(() => {
-    if (tab !== "all") return;
-    let cancelled = false;
-    setRailLoading(true);
-    const lang = selectedLanguage || undefined;
-    const genre = selectedGenre || undefined;
-    const sort = sortByFilter !== "popularity.desc" ? sortByFilter : undefined;
-
-    Promise.all(
-      CATEGORIES.map((c) =>
-        apiExplore(c.id, 1, region, lang, genre, sort)
-          .then((r) => [c.id, r.results] as [string, ExploreMovie[]])
-          .catch(() => [c.id, [] as ExploreMovie[]] as [string, ExploreMovie[]])
-      )
-    ).then((entries) => {
-      if (cancelled) return;
-      const next: Record<string, ExploreMovie[]> = {};
-      for (const [k, v] of entries) next[k] = v;
-      setRails(next);
-      setRailLoading(false);
-    });
-    return () => { cancelled = true; };
-  }, [tab, region, selectedLanguage, selectedGenre, sortByFilter]);
-
   // Load paginated grid for a specific category
   useEffect(() => {
-    if (tab === "all" || tab === "discover") return;
+    if (tab === "discover") return;
     let cancelled = false;
     setGrid([]);
     setGridPage(1);
@@ -187,7 +209,7 @@ function ExplorePageInner() {
   }, [tab, region, selectedLanguage, selectedGenre, sortByFilter]);
 
   const loadMore = useCallback(async () => {
-    if (tab === "all" || tab === "discover" || gridLoading || gridPage >= gridTotalPages) return;
+    if (tab === "discover" || gridLoading || gridPage >= gridTotalPages) return;
     setGridLoading(true);
     const lang = selectedLanguage || undefined;
     const genre = selectedGenre || undefined;
@@ -231,6 +253,7 @@ function ExplorePageInner() {
   );
 
   const hasActiveFilters = Boolean(selectedLanguage || selectedGenre || sortByFilter !== "popularity.desc");
+  const isDiscover = tab === "discover";
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--color-bg)", display: "flex", flexDirection: "column" }}>
@@ -242,25 +265,26 @@ function ExplorePageInner() {
           ) : null
         }
       >
-        {/* Row 1: Category Tabs */}
-        <div style={{ display: "flex", gap: "var(--s-2)", overflowX: "auto", scrollbarWidth: "none", paddingBottom: "10px" }}>
+        {/* Category Tabs */}
+        <div style={{ display: "flex", gap: "6px", overflowX: "auto", scrollbarWidth: "none", paddingBottom: "8px" }}>
           {TAB_OPTIONS.map((t) => {
-            const active = tab === t.id;
+            const isActive = tab === t.id;
             return (
               <button
                 key={t.id}
                 onClick={() => setTab(t.id)}
                 style={{
-                  padding: "7px 14px",
+                  padding: "7px 16px",
                   borderRadius: "999px",
-                  border: active ? "1px solid rgba(255,255,255,0.32)" : "1px solid rgba(255,255,255,0.10)",
-                  background: active ? "rgba(255,255,255,0.14)" : "rgba(28,30,36,0.66)",
-                  color: active ? "var(--color-text-primary)" : "var(--color-text-secondary)",
+                  border: isActive ? "1px solid rgba(255,255,255,0.32)" : "1px solid rgba(255,255,255,0.08)",
+                  background: isActive ? "rgba(255,255,255,0.14)" : "transparent",
+                  color: isActive ? "#fff" : "rgba(255,255,255,0.55)",
                   fontSize: "13px",
-                  fontWeight: 500,
+                  fontWeight: isActive ? 600 : 450,
                   whiteSpace: "nowrap",
                   cursor: "pointer",
-                  transition: "all 0.15s ease",
+                  transition: "all 0.18s ease",
+                  letterSpacing: "-0.01em",
                 }}
               >
                 {t.label}
@@ -269,148 +293,84 @@ function ExplorePageInner() {
           })}
         </div>
 
-        {/* Row 2: Explore Filter Bar */}
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            alignItems: "center",
-            gap: "10px",
-            paddingTop: "6px",
-            borderTop: "1px solid rgba(255,255,255,0.06)",
-          }}
-        >
-          {/* Language Selector */}
-          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-            <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.5)", fontWeight: 500 }}>Language:</span>
-            <select
+        {/* Filter Bar — hidden on Discover (Discover has its own rich filter panel) */}
+        {!isDiscover && (
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              alignItems: "center",
+              gap: "8px",
+              paddingTop: "8px",
+              borderTop: "1px solid rgba(255,255,255,0.05)",
+            }}
+          >
+            <PillSelect
               value={selectedLanguage}
-              onChange={(e) => setSelectedLanguage(e.target.value)}
-              style={{
-                background: selectedLanguage ? "rgba(255, 255, 255, 0.16)" : "rgba(255, 255, 255, 0.08)",
-                border: selectedLanguage ? "1px solid rgba(255, 255, 255, 0.3)" : "1px solid rgba(255, 255, 255, 0.14)",
-                borderRadius: "10px",
-                color: "#ffffff",
-                padding: "5px 10px",
-                fontSize: "12px",
-                fontWeight: 500,
-                cursor: "pointer",
-                outline: "none",
-              }}
-            >
-              <option value="" style={{ background: "#161820", color: "#fff" }}>All Languages</option>
-              {LANGUAGE_OPTIONS.filter((c) => c !== "").map((c) => (
-                <option key={c} value={c} style={{ background: "#161820", color: "#fff" }}>
-                  {LANGUAGE_LABELS[c] || languageLabel(c)}
-                </option>
-              ))}
-            </select>
-          </div>
+              onChange={(v) => setSelectedLanguage(v)}
+              options={[
+                { value: "", label: "🌐  All Languages" },
+                ...LANGUAGE_OPTIONS.filter((c) => c !== "").map((c) => ({
+                  value: c,
+                  label: LANGUAGE_LABELS[c] || languageLabel(c),
+                })),
+              ]}
+            />
 
-          {/* Genre Selector */}
-          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-            <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.5)", fontWeight: 500 }}>Genre:</span>
-            <select
+            <PillSelect
               value={selectedGenre}
-              onChange={(e) => setSelectedGenre(e.target.value)}
-              style={{
-                background: selectedGenre ? "rgba(255, 255, 255, 0.16)" : "rgba(255, 255, 255, 0.08)",
-                border: selectedGenre ? "1px solid rgba(255, 255, 255, 0.3)" : "1px solid rgba(255, 255, 255, 0.14)",
-                borderRadius: "10px",
-                color: "#ffffff",
-                padding: "5px 10px",
-                fontSize: "12px",
-                fontWeight: 500,
-                cursor: "pointer",
-                outline: "none",
-              }}
-            >
-              <option value="" style={{ background: "#161820", color: "#fff" }}>All Genres</option>
-              {genresList.map((g) => (
-                <option key={g.id} value={String(g.id)} style={{ background: "#161820", color: "#fff" }}>
-                  {g.name}
-                </option>
-              ))}
-            </select>
-          </div>
+              onChange={(v) => setSelectedGenre(v)}
+              options={[
+                { value: "", label: "🎭  All Genres" },
+                ...genresList.map((g) => ({ value: String(g.id), label: g.name })),
+              ]}
+            />
 
-          {/* Sort Selector */}
-          {tab !== "all" && tab !== "discover" && (
-            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-              <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.5)", fontWeight: 500 }}>Sort:</span>
-              <select
-                value={sortByFilter}
-                onChange={(e) => setSortByFilter(e.target.value as DiscoverSort)}
+            <PillSelect
+              value={sortByFilter}
+              onChange={(v) => setSortByFilter(v as DiscoverSort)}
+              active={sortByFilter !== "popularity.desc"}
+              options={SORT_OPTIONS.map((s) => ({ value: s.value, label: s.label }))}
+            />
+
+            {hasActiveFilters && (
+              <button
+                onClick={() => {
+                  setSelectedLanguage("");
+                  setSelectedGenre("");
+                  setSortByFilter("popularity.desc");
+                }}
                 style={{
-                  background: sortByFilter !== "popularity.desc" ? "rgba(255, 255, 255, 0.16)" : "rgba(255, 255, 255, 0.08)",
-                  border: sortByFilter !== "popularity.desc" ? "1px solid rgba(255, 255, 255, 0.3)" : "1px solid rgba(255, 255, 255, 0.14)",
-                  borderRadius: "10px",
-                  color: "#ffffff",
-                  padding: "5px 10px",
+                  background: "rgba(239, 68, 68, 0.10)",
+                  border: "1px solid rgba(239, 68, 68, 0.25)",
+                  color: "#f87171",
+                  borderRadius: "20px",
+                  padding: "6px 14px",
                   fontSize: "12px",
                   fontWeight: 500,
                   cursor: "pointer",
-                  outline: "none",
+                  transition: "all 0.15s ease",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "4px",
                 }}
               >
-                {SORT_OPTIONS.map((s) => (
-                  <option key={s.value} value={s.value} style={{ background: "#161820", color: "#fff" }}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {/* Reset Filters button */}
-          {hasActiveFilters && (
-            <button
-              onClick={() => {
-                setSelectedLanguage("");
-                setSelectedGenre("");
-                setSortByFilter("popularity.desc");
-              }}
-              style={{
-                background: "rgba(239, 68, 68, 0.14)",
-                border: "1px solid rgba(239, 68, 68, 0.3)",
-                color: "#f87171",
-                borderRadius: "10px",
-                padding: "5px 12px",
-                fontSize: "12px",
-                fontWeight: 500,
-                cursor: "pointer",
-                transition: "all 0.15s ease",
-              }}
-            >
-              Reset Filters
-            </button>
-          )}
-        </div>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+                Reset
+              </button>
+            )}
+          </div>
+        )}
       </PageHeader>
 
       {/* Content */}
       <div className="app-container" style={{ flex: 1, width: "100%", padding: "var(--s-5) 24px var(--s-bottom-clearance)" }}>
-        {tab === "all" ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
-            {CATEGORIES.map((cat) => (
-              <Rail
-                key={cat.id}
-                category={cat}
-                movies={rails[cat.id] || []}
-                loading={railLoading && !rails[cat.id]}
-                onSeeAll={() => setTab(cat.id)}
-                onSelect={(m) => setActive(toDetailMovie(m))}
-                onAction={handleAction}
-              />
-            ))}
-          </div>
-        ) : tab === "discover" ? (
+        {isDiscover ? (
           <Discover
             region={region}
             onSelect={(m) => setActive(toDetailMovie(m))}
-            initialLanguage={selectedLanguage}
-            initialGenre={selectedGenre}
-            initialSort={sortByFilter}
           />
         ) : (
           <Grid
@@ -433,88 +393,6 @@ function ExplorePageInner() {
         userRegion={session?.profile?.region ?? null}
       />
     </div>
-  );
-}
-
-/* ─── Rail ─── */
-function Rail({
-  category,
-  movies,
-  loading,
-  onSeeAll,
-  onSelect,
-  onAction,
-}: {
-  category: CategoryDef;
-  movies: ExploreMovie[];
-  loading: boolean;
-  onSeeAll: () => void;
-  onSelect: (m: ExploreMovie) => void;
-  onAction: (movie: any, action: any) => void;
-}) {
-  return (
-    <section style={{ overflow: "visible" }}>
-      <div style={{ padding: "0 20px 10px", display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
-        <div>
-          <h2 style={{ fontSize: "18px", fontWeight: 600, color: "var(--color-text-primary)", margin: 0, letterSpacing: "-0.02em" }}>
-            {category.label}
-          </h2>
-          <p style={{ fontSize: "12px", color: "var(--color-text-muted)", margin: "2px 0 0", fontWeight: 400 }}>
-            {category.subtitle}
-          </p>
-        </div>
-        <button
-          onClick={onSeeAll}
-          style={{
-            background: "rgba(255,255,255,0.06)",
-            border: "1px solid rgba(255,255,255,0.12)",
-            color: "var(--color-text-primary)",
-            fontSize: "12px",
-            fontWeight: 600,
-            cursor: "pointer",
-            padding: "6px 14px",
-            borderRadius: "999px",
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "5px",
-            transition: "all 0.18s ease",
-          }}
-        >
-          <span>See all</span>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="9 18 15 12 9 6" />
-          </svg>
-        </button>
-      </div>
-
-      {loading ? (
-        <SkeletonRail count={6} />
-      ) : movies.length === 0 ? (
-        <EmptyState title="Nothing here yet" description="Check back soon — TMDB updates this list often." />
-      ) : (
-        <div
-          className="hide-scrollbar"
-          style={{
-            display: "flex",
-            gap: "14px",
-            overflowX: "auto",
-            padding: "4px 20px 16px",
-            scrollSnapType: "x mandatory",
-            scrollbarWidth: "none",
-          }}
-        >
-          {movies.slice(0, 18).map((m) => (
-            <PosterCard
-              key={m.tmdb_id}
-              movie={m as any}
-              disabled={false}
-              onAction={onAction}
-              onClick={() => onSelect(m)}
-            />
-          ))}
-        </div>
-      )}
-    </section>
   );
 }
 
@@ -604,32 +482,16 @@ const CURRENT_YEAR = new Date().getFullYear();
 function Discover({
   region,
   onSelect,
-  initialLanguage = "",
-  initialGenre = "",
-  initialSort = "popularity.desc",
 }: {
   region?: string;
   onSelect: (m: ExploreMovie) => void;
-  initialLanguage?: string;
-  initialGenre?: string;
-  initialSort?: DiscoverSort;
 }) {
   const [genres, setGenres] = useState<TmdbGenre[]>([]);
   const [filters, setFilters] = useState<DiscoverFilters>({
-    sort_by: initialSort,
-    with_genres: initialGenre ? [Number(initialGenre)] : [],
-    with_original_language: initialLanguage || undefined,
+    sort_by: "popularity.desc",
+    with_genres: [],
     region,
   });
-
-  useEffect(() => {
-    setFilters((f) => ({
-      ...f,
-      with_original_language: initialLanguage || undefined,
-      with_genres: initialGenre ? [Number(initialGenre)] : f.with_genres,
-      sort_by: initialSort || f.sort_by,
-    }));
-  }, [initialLanguage, initialGenre, initialSort]);
 
   const [results, setResults] = useState<ExploreMovie[]>([]);
   const [page, setPage] = useState(1);
@@ -692,37 +554,56 @@ function Discover({
 
   const reset = () => setFilters({ sort_by: "popularity.desc", with_genres: [], region });
 
+  const hasFilters = Boolean(
+    filters.with_original_language ||
+    (filters.with_genres && filters.with_genres.length > 0) ||
+    filters.sort_by !== "popularity.desc" ||
+    filters.year_from ||
+    filters.year_to
+  );
+
   return (
-    <div style={{ padding: "0 clamp(20px, 4vw, 40px)" }}>
+    <div>
+      {/* ── Discover Filter Panel ── */}
       <div
         style={{
-          background: "rgba(20, 22, 28, 0.62)",
-          border: "1px solid rgba(255,255,255,0.10)",
+          background: "linear-gradient(135deg, rgba(20,22,30,0.75), rgba(30,28,40,0.55))",
+          border: "1px solid rgba(255,255,255,0.08)",
           borderRadius: "16px",
-          padding: "16px",
-          marginBottom: "20px",
-          display: "flex",
-          flexDirection: "column",
-          gap: "14px",
+          padding: "20px",
+          marginBottom: "24px",
+          backdropFilter: "blur(12px)",
         }}
       >
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "10px" }}>
+        {/* Top row: dropdowns */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
+            gap: "12px",
+            marginBottom: "16px",
+          }}
+        >
           <FilterField label="Sort by">
-            <SelectInput
+            <PillSelect
               value={filters.sort_by || "popularity.desc"}
               onChange={(v) => setFilters((f) => ({ ...f, sort_by: v as DiscoverSort }))}
+              active={filters.sort_by !== "popularity.desc"}
               options={SORT_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
             />
           </FilterField>
 
           <FilterField label="Language">
-            <SelectInput
+            <PillSelect
               value={filters.with_original_language || ""}
               onChange={(v) => setFilters((f) => ({ ...f, with_original_language: v || undefined }))}
-              options={LANGUAGE_OPTIONS.map((c) => ({
-                value: c,
-                label: c === "" ? "Any" : (LANGUAGE_LABELS[c] || languageLabel(c)),
-              }))}
+              options={[
+                { value: "", label: "Any Language" },
+                ...LANGUAGE_OPTIONS.filter((c) => c !== "").map((c) => ({
+                  value: c,
+                  label: LANGUAGE_LABELS[c] || languageLabel(c),
+                })),
+              ]}
             />
           </FilterField>
 
@@ -747,13 +628,14 @@ function Discover({
           </FilterField>
         </div>
 
+        {/* Genre chips */}
         <div>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
-            <span style={{ fontSize: "11px", fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            <span style={{ fontSize: "11px", fontWeight: 600, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
               Genres
             </span>
             {Boolean(filters.with_genres?.length) && (
-              <span style={{ fontSize: "11px", color: "var(--color-text-secondary)" }}>
+              <span style={{ fontSize: "11px", color: "rgba(139,92,246,0.8)", fontWeight: 500 }}>
                 {filters.with_genres!.length} selected
               </span>
             )}
@@ -761,21 +643,25 @@ function Discover({
 
           <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
             {genres.map((g) => {
-              const active = (filters.with_genres || []).includes(g.id);
+              const isActive = (filters.with_genres || []).includes(g.id);
               return (
                 <button
                   key={g.id}
                   onClick={() => toggleGenre(g.id)}
                   style={{
-                    padding: "4px 10px",
+                    padding: "5px 12px",
                     borderRadius: "999px",
-                    border: active ? "1px solid rgba(255,255,255,0.3)" : "1px solid rgba(255,255,255,0.08)",
-                    background: active ? "rgba(255,255,255,0.16)" : "rgba(255,255,255,0.03)",
-                    color: active ? "var(--color-text-primary)" : "var(--color-text-secondary)",
+                    border: isActive
+                      ? "1px solid rgba(139,92,246,0.45)"
+                      : "1px solid rgba(255,255,255,0.08)",
+                    background: isActive
+                      ? "linear-gradient(135deg, rgba(139,92,246,0.22), rgba(59,130,246,0.14))"
+                      : "rgba(255,255,255,0.03)",
+                    color: isActive ? "#e0d4fc" : "rgba(255,255,255,0.5)",
                     fontSize: "12px",
-                    fontWeight: active ? 600 : 400,
+                    fontWeight: isActive ? 600 : 400,
                     cursor: "pointer",
-                    transition: "all 0.15s ease",
+                    transition: "all 0.18s ease",
                   }}
                 >
                   {g.name}
@@ -785,23 +671,36 @@ function Discover({
           </div>
         </div>
 
-        <div style={{ display: "flex", justifyContent: "flex-end" }}>
-          <button
-            onClick={reset}
-            style={{
-              background: "transparent",
-              border: "none",
-              color: "var(--color-text-muted)",
-              fontSize: "12px",
-              cursor: "pointer",
-              textDecoration: "underline",
-            }}
-          >
-            Reset discover filters
-          </button>
-        </div>
+        {/* Reset */}
+        {hasFilters && (
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "12px" }}>
+            <button
+              onClick={reset}
+              style={{
+                background: "rgba(239, 68, 68, 0.10)",
+                border: "1px solid rgba(239, 68, 68, 0.25)",
+                color: "#f87171",
+                borderRadius: "20px",
+                padding: "5px 14px",
+                fontSize: "12px",
+                fontWeight: 500,
+                cursor: "pointer",
+                transition: "all 0.15s ease",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "4px",
+              }}
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+              Reset filters
+            </button>
+          </div>
+        )}
       </div>
 
+      {/* ── Results Grid ── */}
       {results.length === 0 && !loading ? (
         <EmptyState title="No matching movies" description="Try broadening your Discover filters." />
       ) : (
@@ -851,47 +750,16 @@ function Discover({
   );
 }
 
+/* ─── Shared sub-components ─── */
+
 function FilterField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-      <label style={{ fontSize: "11px", fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+      <label style={{ fontSize: "11px", fontWeight: 600, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
         {label}
       </label>
       {children}
     </div>
-  );
-}
-
-function SelectInput({
-  value,
-  onChange,
-  options,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  options: Array<{ value: string; label: string }>;
-}) {
-  return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      style={{
-        background: "rgba(255,255,255,0.06)",
-        border: "1px solid rgba(255,255,255,0.12)",
-        borderRadius: "8px",
-        color: "var(--color-text-primary)",
-        padding: "6px 10px",
-        fontSize: "12px",
-        outline: "none",
-        cursor: "pointer",
-      }}
-    >
-      {options.map((o) => (
-        <option key={o.value} value={o.value} style={{ background: "#161820", color: "#fff" }}>
-          {o.label}
-        </option>
-      ))}
-    </select>
   );
 }
 
@@ -920,15 +788,19 @@ function NumberInput({
         onChange(Number.isNaN(v) ? undefined : v);
       }}
       style={{
-        background: "rgba(255,255,255,0.06)",
-        border: "1px solid rgba(255,255,255,0.12)",
-        borderRadius: "8px",
-        color: "var(--color-text-primary)",
-        padding: "6px 10px",
-        fontSize: "12px",
+        appearance: "none",
+        WebkitAppearance: "none",
+        background: "rgba(255,255,255,0.05)",
+        border: "1px solid rgba(255,255,255,0.10)",
+        borderRadius: "20px",
+        color: "rgba(255,255,255,0.65)",
+        padding: "6px 12px",
+        fontSize: "12.5px",
+        fontWeight: 500,
         outline: "none",
         width: "100%",
         boxSizing: "border-box",
+        transition: "all 0.18s ease",
       }}
     />
   );

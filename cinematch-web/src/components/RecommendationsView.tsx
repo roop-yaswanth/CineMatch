@@ -19,6 +19,7 @@ import HeroFeature from "@/components/dashboard/HeroFeature";
 import CompactRail from "@/components/dashboard/CompactRail";
 import AppFooter from "@/components/AppFooter";
 import { toast } from "@/components/ui/Toast";
+import { useSession } from "@/context/SessionContext";
 import type { DetailMovie } from "@/components/modals/MovieDetailModal";
 
 import MobileMenu, { DesktopNavTabs } from "@/components/MobileMenu";
@@ -245,9 +246,8 @@ export default function RecommendationsView({
   const [showUpdateToast] = useState(false);
   const [activeStack, setActiveStack] = useState<StackId | null>(null);
   // Derived once from the session profile at mount. Preference changes happen
-  // on the /preferences page, which persists the new profile and hard-navigates
-  // back here — so this component remounts and re-derives rather than mutating
-  // in place.
+  // via the overlay modal (PreferencesModal), which persists the new profile —
+  // so this component remounts and re-derives rather than mutating in place.
   const [preferences] = useState<RecommendationPreferences>(
     () => preferencesFromProfile(session.profile)
   );
@@ -266,7 +266,8 @@ export default function RecommendationsView({
   // Route-based navigation for sub-pages
   const openYourLikes = () => router.push("/your-likes");
   const openWatchlist = () => router.push("/your-likes?filter=watchlist");
-  const openPrefs = () => router.push("/preferences");
+  const { openPreferences } = useSession();
+  const openPrefs = () => openPreferences();
 
 
   const [isUpdating, setIsUpdating] = useState(false);
@@ -669,14 +670,11 @@ export default function RecommendationsView({
     [activeMovie, generate, onSessionUpdate, preferences, session.session_id, silentRefresh]
   );
 
-  // Preference updates are now applied at the source: the /preferences page
-  // persists the new profile (server + cached session) and then hard-navigates
-  // to /dashboard. This component remounts with `preferences` already derived
-  // from the new `session.profile`, and the initial-load effect above fires a
-  // single generate() against it. That replaces the old three-channel
-  // sessionStorage-stash / custom-event / visibilitychange relay, which fired a
-  // SECOND generate() (often after an initial one with the OLD prefs) — the
-  // "old recs paint, then update 2-3s later" flash.
+  // Preference updates are now applied via the overlay PreferencesModal, which
+  // persists the new profile (server + cached session). This component re-derives
+  // `preferences` from `session.profile` at mount, and the initial-load effect
+  // above fires a single generate() against it. That replaces the old
+  // sessionStorage-stash / custom-event / visibilitychange relay.
 
   return (
     <div
