@@ -49,13 +49,51 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ results: [], total_pages: 0, page: 1 });
   }
 
+  const lang = req.nextUrl.searchParams.get("with_original_language") || "";
+  const genres = req.nextUrl.searchParams.get("with_genres") || "";
+  const customSort = req.nextUrl.searchParams.get("sort_by") || "";
+
   const iso = REGION_TO_ISO[region];
 
-  // For "upcoming", use /discover with release_date filter so we only get
-  // movies that are actually still upcoming (TMDB's /movie/upcoming includes
-  // some recently-released titles).
   let url: string;
-  if (category === "upcoming") {
+
+  // If language, genre, or custom sort filter is active, use /discover/movie for server-side TMDB filtering across full catalog.
+  if (lang || genres || customSort) {
+    const discoverParams = new URLSearchParams({
+      language: "en-US",
+      page,
+      include_adult: "false",
+      include_video: "false",
+    });
+
+    if (lang && /^[a-z]{2}$/.test(lang)) {
+      discoverParams.set("with_original_language", lang);
+    }
+    if (genres && /^[0-9]+(,[0-9]+)*$/.test(genres)) {
+      discoverParams.set("with_genres", genres);
+    }
+
+    let finalSort = customSort || "popularity.desc";
+    if (!customSort) {
+      if (category === "top_rated") finalSort = "vote_average.desc";
+      else if (category === "now_playing" || category === "upcoming") finalSort = "primary_release_date.desc";
+    }
+    discoverParams.set("sort_by", finalSort);
+
+    if (category === "now_playing") {
+      const today = new Date();
+      const past = new Date(today.getTime() - 90 * 24 * 60 * 60 * 1000);
+      discoverParams.set("primary_release_date.gte", past.toISOString().slice(0, 10));
+      discoverParams.set("primary_release_date.lte", today.toISOString().slice(0, 10));
+    } else if (category === "upcoming") {
+      const today = new Date().toISOString().slice(0, 10);
+      discoverParams.set("primary_release_date.gte", today);
+    }
+
+    if (iso) discoverParams.set("region", iso);
+
+    url = `https://api.themoviedb.org/3/discover/movie?${discoverParams.toString()}`;
+  } else if (category === "upcoming") {
     const today = new Date().toISOString().slice(0, 10);
     const upcomingParams = new URLSearchParams({
       language: "en-US",
@@ -69,6 +107,7 @@ export async function GET(req: NextRequest) {
     if (iso) upcomingParams.set("region", iso);
     url = `https://api.themoviedb.org/3/discover/movie?${upcomingParams.toString()}`;
   } else {
+    const path = CATEGORY_PATHS[category] || "/movie/popular";
     const params = new URLSearchParams({ language: "en-US", page });
     if (iso && (category === "now_playing" || category === "popular")) {
       params.set("region", iso);

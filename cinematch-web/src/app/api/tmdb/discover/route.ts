@@ -77,8 +77,6 @@ export async function GET(req: NextRequest) {
   const minVoteCount = sp.get("vote_count_gte");
   if (minVoteCount && /^[0-9]{1,7}$/.test(minVoteCount)) {
     params.set("vote_count.gte", minVoteCount);
-  } else if (sort.startsWith("vote_average")) {
-    params.set("vote_count.gte", "300"); // sane default
   }
 
   const region = sp.get("region") || "";

@@ -778,10 +778,16 @@ export async function apiGenres(): Promise<TmdbGenre[]> {
 export async function apiExplore(
   category: ExploreCategory,
   page: number = 1,
-  region?: string
+  region?: string,
+  with_original_language?: string,
+  with_genres?: string,
+  sort_by?: string
 ): Promise<ExploreResponse> {
   const params = new URLSearchParams({ category, page: String(page) });
   if (region) params.set("region", region);
+  if (with_original_language) params.set("with_original_language", with_original_language);
+  if (with_genres) params.set("with_genres", with_genres);
+  if (sort_by) params.set("sort_by", sort_by);
   const res = await fetch(`/api/tmdb/explore?${params.toString()}`);
   if (!res.ok) throw new Error(`Explore fetch failed: ${res.status}`);
   return res.json();
