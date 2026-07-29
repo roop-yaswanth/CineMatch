@@ -1137,7 +1137,7 @@ function StackDetailView({
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))",
-          gap: "18px",
+          gap: "40px 20px",
           padding: "24px clamp(20px, 4vw, 40px) 80px",
         }}
       >
