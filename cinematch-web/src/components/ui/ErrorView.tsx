@@ -9,6 +9,7 @@
  * navigation to an error code.
  */
 
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -22,6 +23,8 @@ interface Props {
   description?: string;
   /** Optional secondary action — e.g. "Try again" on a 500 page. */
   action?: { label: string; onClick: () => void };
+  /** Show 3-minute server restart countdown timer. Default true for 500. */
+  showTimer?: boolean;
 }
 
 const DEFAULT_COPY: Record<number, { title: string; description: string }> = {
@@ -31,19 +34,33 @@ const DEFAULT_COPY: Record<number, { title: string; description: string }> = {
       "We couldn't find the page you're looking for. It may have been moved or deleted.",
   },
   500: {
-    title: "Something went wrong",
+    title: "Server is waking up",
     description:
-      "An unexpected error broke this page. Try again, or head back to the dashboard.",
+      "The server enters sleep mode due to limited Hugging Face free space. Signing in automatically triggers a server restart which takes about 3 minutes. Please retry after 3 minutes.",
   },
 };
 
-export default function ErrorView({ code, title, description, action }: Props) {
+export default function ErrorView({ code, title, description, action, showTimer = code === 500 }: Props) {
   const fallback = DEFAULT_COPY[code] ?? {
     title: `Error ${code}`,
     description: "Something didn't work as expected.",
   };
   const headline = title ?? fallback.title;
   const subhead = description ?? fallback.description;
+
+  const [timeLeft, setTimeLeft] = useState(180); // 3 minutes = 180 seconds
+
+  useEffect(() => {
+    if (!showTimer) return;
+    const interval = setInterval(() => {
+      setTimeLeft((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [showTimer]);
+
+  const minutes = Math.floor(timeLeft / 60);
+  const seconds = timeLeft % 60;
+  const formattedTime = `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`;
 
   return (
     <div
@@ -104,9 +121,9 @@ export default function ErrorView({ code, title, description, action }: Props) {
             fontWeight: 600,
           }}
         >
-          Error {code}
+          HTTP API Error {code}
         </div>
-        <h1 className="h-page" style={{ textAlign: "center" }}>
+        <h1 className="h-page" style={{ textAlign: "center", margin: 0 }}>
           {headline}
         </h1>
         <p
@@ -120,14 +137,49 @@ export default function ErrorView({ code, title, description, action }: Props) {
           {subhead}
         </p>
 
+        {showTimer && (
+          <div
+            style={{
+              padding: "10px 18px",
+              borderRadius: "12px",
+              background: "rgba(255, 255, 255, 0.05)",
+              border: "1px solid rgba(255, 255, 255, 0.12)",
+              fontSize: "13px",
+              color: "var(--color-text-primary)",
+              fontWeight: 500,
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              marginTop: "4px",
+            }}
+          >
+            <span>⏱️</span>
+            {timeLeft > 0 ? (
+              <span>Automatic restart in progress — retry in <strong>{formattedTime}</strong></span>
+            ) : (
+              <span style={{ color: "#4caf50" }}>Server ready! You can retry now.</span>
+            )}
+          </div>
+        )}
+
         <div style={{ display: "flex", gap: 10, marginTop: 8, flexWrap: "wrap", justifyContent: "center" }}>
-          {action && (
+          {action ? (
             <button type="button" className="btn btn-secondary" onClick={action.onClick}>
               {action.label}
             </button>
+          ) : (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => {
+                if (typeof window !== "undefined") window.location.href = "/login";
+              }}
+            >
+              Retry Login
+            </button>
           )}
-          <Link href="/dashboard" className="btn btn-primary">
-            Go to dashboard
+          <Link href="/login" className="btn btn-primary">
+            Back to Login
           </Link>
         </div>
       </motion.div>

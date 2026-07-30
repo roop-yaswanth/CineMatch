@@ -139,6 +139,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           persistSession(next);
         } catch (err) {
           const msg = err instanceof Error ? err.message : "";
+          if (
+            (err && typeof err === "object" && "isServerSleeping" in err) ||
+            msg.includes("500") ||
+            msg.includes("ServerSleeping") ||
+            msg.includes("exceeded") ||
+            msg.includes("SERVER_SLEEPING")
+          ) {
+            if (typeof window !== "undefined") {
+              window.location.href = "/500";
+            }
+            return;
+          }
           if (msg.includes("401")) {
             clearStoredSession();
             setSession(null);

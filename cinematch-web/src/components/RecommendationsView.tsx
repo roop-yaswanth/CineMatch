@@ -240,7 +240,7 @@ export default function RecommendationsView({
 
   const [stacks, setStacks] = useState<Stack[]>(() => cachedRef.current?.stacks ?? []);
   const [movies, setMovies] = useState<Recommendation[]>(() => cachedRef.current?.movies ?? []);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(!hadCache);
   const [initialLoad, setInitialLoad] = useState(!hadCache);
 
   const [showUpdateToast] = useState(false);
@@ -562,6 +562,18 @@ export default function RecommendationsView({
         }
       } catch (err) {
         console.error(err);
+        const msg = err instanceof Error ? err.message : "";
+        if (
+          (err && typeof err === "object" && "isServerSleeping" in err) ||
+          msg.includes("500") ||
+          msg.includes("ServerSleeping") ||
+          msg.includes("exceeded") ||
+          msg.includes("SERVER_SLEEPING")
+        ) {
+          if (typeof window !== "undefined") {
+            window.location.href = "/500";
+          }
+        }
       } finally {
         setLoading(false);
         setIsUpdating(false);

@@ -51,8 +51,21 @@ export default function GoogleSignInButton({
         const session = await apiGoogleLogin(credential);
         onLogin(session);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Sign-in failed. Please try again.");
         setLoading(false);
+        const msg = err instanceof Error ? err.message : "";
+        if (
+          (err && typeof err === "object" && "isServerSleeping" in err) ||
+          msg.includes("500") ||
+          msg.includes("ServerSleeping") ||
+          msg.includes("exceeded") ||
+          msg.includes("SERVER_SLEEPING")
+        ) {
+          if (typeof window !== "undefined") {
+            window.location.href = "/500";
+          }
+          return;
+        }
+        setError(msg || "Sign-in failed. Please try again.");
       }
     },
     [onLogin]

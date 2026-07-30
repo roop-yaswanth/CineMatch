@@ -2,54 +2,85 @@
  * ──────────────────────────────────────────────────────────── */
 
 const API_BASE = "";
-// 60s — HuggingFace free-tier Spaces can cold-start in 30-60s
-const REQUEST_TIMEOUT_MS = 60_000;
-// 1 retry (total 2 attempts) — with 60s timeout, 2 retries = 180s worst case
-const MAX_RETRIES = 1;
+// 6s threshold — HuggingFace free-tier Spaces hibernate when inactive.
+// If response time exceeds 5-7s, we abort early to prevent showing a broken/stuck dashboard.
+const REQUEST_TIMEOUT_MS = 6_000;
+const MAX_RETRIES = 0; // Don't hang user in retries when server is sleeping
+
+export class ServerSleepingError extends Error {
+  isServerSleeping = true;
+  constructor(message = "Server is waking up from sleep mode. Please retry after 3 minutes.") {
+    super(message);
+    this.name = "ServerSleepingError";
+  }
+}
+
+export interface RequestOptions extends RequestInit {
+  retries?: number;
+  retryDelay?: number;
+  timeout?: number;
+}
 
 async function request<T>(
   path: string,
-  options?: RequestInit
+  options?: RequestOptions
 ): Promise<T> {
   const url = `${API_BASE}${path}`;
+  const maxRetries = options?.retries ?? MAX_RETRIES;
+  const timeoutMs = options?.timeout ?? REQUEST_TIMEOUT_MS;
 
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
+      const { retries, retryDelay, timeout, ...fetchOptions } = options ?? {};
       const res = await fetch(url, {
         headers: { "Content-Type": "application/json" },
-        ...options,
+        ...fetchOptions,
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
 
-      // Retry on transient server errors
-      if ((res.status === 502 || res.status === 503 || res.status === 504) && attempt < MAX_RETRIES) {
-        await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
-        continue;
+      if (res.status === 500 || res.status === 502 || res.status === 503 || res.status === 504) {
+        if (attempt < maxRetries) {
+          await new Promise((r) => setTimeout(r, options?.retryDelay ?? 2000));
+          continue;
+        }
+        throw new ServerSleepingError();
       }
 
       if (!res.ok) {
         const text = await res.text();
+        if (text.includes("SERVER_SLEEPING") || text.includes("Upstream unavailable")) {
+          if (attempt < maxRetries) {
+            await new Promise((r) => setTimeout(r, options?.retryDelay ?? 2000));
+            continue;
+          }
+          throw new ServerSleepingError();
+        }
         throw new Error(`API ${res.status}: ${text}`);
       }
       return res.json();
     } catch (err) {
       clearTimeout(timeoutId);
+      
+      if (attempt < maxRetries) {
+        await new Promise((r) => setTimeout(r, options?.retryDelay ?? 2000));
+        continue;
+      }
+      
+      if (err instanceof ServerSleepingError) {
+        throw err;
+      }
       if (err instanceof DOMException && err.name === "AbortError") {
-        if (attempt < MAX_RETRIES) {
-          await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
-          continue;
-        }
-        throw new Error("Request timed out. Please try again.");
+        throw new ServerSleepingError("Server response time exceeded timeout while waking from sleep mode.");
       }
       throw err;
     }
   }
 
-  throw new Error("Request failed after retries.");
+  throw new ServerSleepingError();
 }
 
 /* ─── Types ─────────────────────────────────────────────────── */
@@ -335,6 +366,8 @@ export async function apiBuildSlate(
   return request<OnboardingState>("/api/onboarding/slate", {
     method: "POST",
     body: JSON.stringify({ session_id: sessionId, ...preferences }),
+    retries: 2,
+    timeout: 20000,
   });
 }
 
@@ -398,6 +431,8 @@ export async function apiGenerateRecommendations(
   return request<RecommendationPage>("/api/recommendations", {
     method: "POST",
     body: JSON.stringify({ session_id: sessionId, ...preferences }),
+    retries: 2,
+    timeout: 20000,
   });
 }
 
@@ -417,6 +452,8 @@ export async function apiMultiRecommendations(
   return request<MultiBucketResponse>("/api/recommendations/multi", {
     method: "POST",
     body: JSON.stringify({ session_id: sessionId, ...preferences }),
+    retries: 2,
+    timeout: 20000,
   });
 }
 
@@ -552,6 +589,8 @@ export async function apiUpdatePreferences(
   return request<UserSession>("/api/preferences", {
     method: "PUT",
     body: JSON.stringify({ session_id: sessionId, ...preferences }),
+    retries: 2,
+    timeout: 20000,
   });
 }
 

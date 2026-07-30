@@ -2,6 +2,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState, useRef } from "react";
 
 import { createPortal } from "react-dom";
+import { useSession } from "@/context/SessionContext";
 import { posterUrl, languageLabel, apiSimilarMovies, apiCredits, apiImdbTitle, type Recommendation, type CastMember, type CrewMember, type ImdbTitle } from "@/lib/api";
 import { PersonDetailOverlay } from "./PersonDetailOverlay";
 import WatchProvidersPanel, { REGION_TO_COUNTRY } from "@/components/WatchProvidersPanel";
@@ -58,6 +59,8 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
   const [activePersonId, setActivePersonId] = useState<number | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [imdbLive, setImdbLive] = useState<ImdbTitle | null>(null);
+  const { session } = useSession();
+  const [filterSimilarByLang, setFilterSimilarByLang] = useState(false);
   const similarRowRef = useRef<HTMLDivElement>(null);
   const castRowRef = useRef<HTMLDivElement>(null);
 
@@ -216,6 +219,14 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
   };
 
   if (!movie) return null;
+
+  const preferredLanguages = session?.profile?.preferred_languages || [];
+  const filteredSimilar = similar.filter((m) => {
+    if (!filterSimilarByLang) return true;
+    if (preferredLanguages.length === 0) return true;
+    if (!m.original_language) return true;
+    return preferredLanguages.includes(m.original_language);
+  });
 
   const poster = posterUrl(movie.poster_path, "w500");
   // On mobile we use the wider backdrop(saves vertical space).
@@ -1211,17 +1222,37 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                 zIndex: 1,
               }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
-                  <h4 style={{
-                    margin: 0,
-                    fontSize: "12px",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.08em",
-                    color: "var(--color-text-muted)",
-                    fontWeight: 600,
-                  }}>
-                    More like this
-                  </h4>
-                  {!similarLoading && similar.length > 0 && (
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                    <h4 style={{
+                      margin: 0,
+                      fontSize: "12px",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.08em",
+                      color: "var(--color-text-muted)",
+                      fontWeight: 600,
+                    }}>
+                      More like this
+                    </h4>
+                    {preferredLanguages.length > 0 && (
+                      <label style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        fontSize: "11px",
+                        color: "var(--color-text-secondary)",
+                        cursor: "pointer"
+                      }}>
+                        <input 
+                          type="checkbox" 
+                          checked={filterSimilarByLang}
+                          onChange={(e) => setFilterSimilarByLang(e.target.checked)}
+                          style={{ margin: 0, accentColor: "var(--color-primary)" }}
+                        />
+                        Selected languages only
+                      </label>
+                    )}
+                  </div>
+                  {!similarLoading && filteredSimilar.length > 0 && (
                     <div style={{ display: "flex", gap: "6px" }}>
                       <button
                         onClick={() => {
@@ -1280,7 +1311,12 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                 )}
 
                 {/* Similar movies row */}
-                {!similarLoading && similar.length > 0 && (
+                {!similarLoading && similar.length > 0 && filteredSimilar.length === 0 && (
+                  <div style={{ fontSize: "13px", color: "var(--color-text-muted)", padding: "12px 0", fontStyle: "italic" }}>
+                    No similar movies found in your selected languages.
+                  </div>
+                )}
+                {!similarLoading && filteredSimilar.length > 0 && (
                   <div
                     ref={similarRowRef}
                     style={{
@@ -1292,7 +1328,7 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                       scrollbarWidth: "none",
                     }}
                   >
-                    {similar.map((m) => (
+                    {filteredSimilar.map((m) => (
                       <SimilarCard
                         key={m.tmdb_id ?? m.id}
                         movie={m}
@@ -1436,12 +1472,15 @@ export function TrailerOverlay({
             - referrerpolicy avoids leaking our path to YouTube. */}
         {/^[A-Za-z0-9_-]{11}$/.test(videoKey) && (
           <iframe
-            src={`https://www.youtube-nocookie.com/embed/${videoKey}?autoplay=1&playsinline=1&rel=0&modestbranding=1&enablejsapi=1&fs=1`}
+            width="100%"
+            height="100%"
+            src={`https://www.youtube-nocookie.com/embed/${videoKey}?autoplay=1&playsinline=1&rel=0&modestbranding=1&enablejsapi=1`}
             title={`${title} trailer`}
-            allow="fullscreen; accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-            allowFullScreen={true}
+            frameBorder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowFullScreen
             referrerPolicy="strict-origin-when-cross-origin"
-            style={{ width: "100%", height: "100%", border: "none", display: "block" }}
+            style={{ border: "none", display: "block" }}
           />
         )}
       </div>
