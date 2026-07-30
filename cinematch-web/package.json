@@ -29,6 +29,7 @@
     "typescript": "^5"
   },
   "overrides": {
-    "postcss": ">=8.5.10"
+    "postcss": ">=8.5.10",
+    "@napi-rs/wasm-runtime": "1.1.4"
   }
 }

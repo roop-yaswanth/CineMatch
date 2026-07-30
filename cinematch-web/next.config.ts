@@ -80,21 +80,21 @@ const nextConfig: NextConfig = {
             value: [
               "accelerometer=()",
               "ambient-light-sensor=()",
-              "autoplay=(self)",
+              "autoplay=(self \"https://www.youtube-nocookie.com\" \"https://www.youtube.com\")",
               "battery=()",
               "browsing-topics=()",
               "camera=()",
               "display-capture=()",
               "document-domain=()",
-              "encrypted-media=()",
-              "fullscreen=(self)",
+              "encrypted-media=(self \"https://www.youtube-nocookie.com\" \"https://www.youtube.com\")",
+              "fullscreen=(self \"https://www.youtube-nocookie.com\" \"https://www.youtube.com\")",
               "geolocation=()",
               "gyroscope=()",
               "magnetometer=()",
               "microphone=()",
               "midi=()",
               "payment=()",
-              "picture-in-picture=()",
+              "picture-in-picture=(self \"https://www.youtube-nocookie.com\" \"https://www.youtube.com\")",
               "publickey-credentials-get=()",
               "screen-wake-lock=()",
               "sync-xhr=()",
@@ -103,11 +103,10 @@ const nextConfig: NextConfig = {
             ].join(", "),
           },
           { key: "X-DNS-Prefetch-Control", value: "on" },
-          // same-origin-allow-popups (not the stricter same-origin) so Google
-          // Identity Services' sign-in flow isn't broken by COOP severing the
-          // opener relationship. Still blocks arbitrary cross-origin openers.
-          { key: "Cross-Origin-Opener-Policy", value: "same-origin-allow-popups" },
-          { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
+          // unsafe-none required by Google Identity Services (GSI) so postMessage
+          // calls between Google Sign-In popups/iframes and the page are not blocked by COOP.
+          { key: "Cross-Origin-Opener-Policy", value: "unsafe-none" },
+          { key: "Cross-Origin-Resource-Policy", value: "cross-origin" },
         ],
       },
     ];

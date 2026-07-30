@@ -112,20 +112,24 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
   useEffect(() => {
     const id = movie?.tmdb_id ?? movie?.id;
     if (!isOpen || !id) {
-      setTimeout(() => setSimilar([]), 0); // Async state update to avoid cascading re-renders
+      setSimilar([]);
+      setSimilarLoading(false);
       return;
     }
 
-    // Defer the setSimilarLoading to escape the synchronous commit phase
-    setTimeout(() => {
-      setSimilarLoading(true);
-      setSimilar([]);
-    }, 0);
+    // Reset the language filter when the movie changes so users see all
+    // results by default and don't get a confusingly empty section.
+    setFilterSimilarByLang(false);
+    setSimilarLoading(true);
+    setSimilar([]);
 
+    let cancelled = false;
     apiSimilarMovies(id, sessionId ?? null, 20)
-      .then(setSimilar)
-      .catch(() => setSimilar([]))
-      .finally(() => setSimilarLoading(false));
+      .then((results) => { if (!cancelled) setSimilar(results); })
+      .catch(() => { if (!cancelled) setSimilar([]); })
+      .finally(() => { if (!cancelled) setSimilarLoading(false); });
+
+    return () => { cancelled = true; };
   }, [movie?.id, movie?.tmdb_id, isOpen, sessionId]);
 
   // Fetch cast & crew whenever the movie changes.
