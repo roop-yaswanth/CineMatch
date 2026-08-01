@@ -44,10 +44,24 @@ function readCachedSession(): UserSession | null {
   }
 }
 
+// Lightweight signed-in hint for middleware.ts. Carries no secrets (real auth
+// stays in localStorage + bearer token) — it only lets the server redirect
+// logged-out visitors away from app routes before any page JS loads.
+function setAuthHintCookie(on: boolean) {
+  try {
+    if (on) {
+      document.cookie = `cm_auth=1; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax${location.protocol === "https:" ? "; Secure" : ""}`;
+    } else {
+      document.cookie = "cm_auth=; path=/; max-age=0; SameSite=Lax";
+    }
+  } catch { /* ignore */ }
+}
+
 function persistSession(s: UserSession) {
   try {
     localStorage.setItem(STORAGE_KEY, s.identifier);
     localStorage.setItem(SESSION_CACHE_KEY, JSON.stringify(s));
+    setAuthHintCookie(true);
     markActivity();
   } catch { /* storage full */ }
 }
@@ -57,6 +71,7 @@ function clearStoredSession() {
   localStorage.removeItem(SESSION_CACHE_KEY);
   localStorage.removeItem(ACTIVITY_KEY);
   localStorage.removeItem(PROFILE_OPTIMISTIC_KEY);
+  setAuthHintCookie(false);
 }
 
 function profileOptimisticActive(): boolean {
@@ -126,6 +141,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
     if (cached) {
       markActivity();
+      // Users logged in before the middleware hint existed need the cookie
+      // refreshed here, or the server gate would bounce them to /login.
+      setAuthHintCookie(true);
       setSession(cached);
       setIsLoading(false);
 

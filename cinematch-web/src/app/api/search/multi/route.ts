@@ -228,6 +228,32 @@ async function searchTmdb(kind: "movie" | "tv" | "person", q: string, langCode?:
   }
 }
 
+/**
+ * Query↔title relevance in [0, ~4.5]. Exact and prefix matches dominate;
+ * token overlap catches word-order variants; a small popularity term breaks
+ * ties. Used to rank ALL sources on equal footing — a junk fuzzy match from
+ * the library CSV must never outrank an exact TMDB movie/TV hit.
+ */
+function relevanceScore(query: string, title: string, votes = 0, extra = 0): number {
+  const q = query.toLowerCase().trim();
+  const t = (title || "").toLowerCase().trim();
+  if (!q || !t) return 0;
+  let score = 0;
+  if (t === q) score = 3;
+  else if (t.startsWith(q) || q.startsWith(t)) score = 2.2;
+  else if (t.includes(q)) score = 1.6;
+  else {
+    const qTokens = new Set(q.split(/\s+/));
+    const tTokens = new Set(t.split(/\s+/));
+    let hits = 0;
+    for (const tok of qTokens) if (tTokens.has(tok)) hits++;
+    score = qTokens.size ? (hits / qTokens.size) * 1.4 : 0;
+  }
+  // log-scaled vote count tie-break, capped at 0.5
+  score += Math.min(0.5, Math.log1p(votes) / Math.log1p(500000) * 0.5);
+  return score + extra;
+}
+
 export async function GET(req: NextRequest) {
   const rl = limiter.check(clientIp(req));
   if (!rl.allowed) {
@@ -281,19 +307,20 @@ export async function GET(req: NextRequest) {
     ...fallback,
   ];
 
-  // If a language was detected, boost same-language results to the top.
-  // Results that DON'T match the target language are demoted to the end.
-  if (langCode) {
-    const matching = mergedMovies.filter((m) => m.original_language === langCode);
-    const others = mergedMovies.filter((m) => m.original_language !== langCode);
-    mergedMovies = [...matching, ...others];
-  }
-  // Year boost: float ±1 year matches to the very top within language group
-  if (year) {
-    const exact = mergedMovies.filter((m) => m.year && Math.abs(m.year - year) <= 1);
-    const other = mergedMovies.filter((m) => !m.year || Math.abs(m.year - year) > 1);
-    mergedMovies = [...exact, ...other];
-  }
+  // Unified relevance ranking across sources. Library entries get a small
+  // tie-break bonus (they carry richer metadata + IMDB ratings), and the
+  // detected language / year hints act as score boosts rather than hard
+  // reorderings so a strong title match still wins.
+  const movieScore = (m: MergedMovieItem): number =>
+    relevanceScore(
+      q,
+      m.title,
+      m.imdb_votes ?? 0,
+      (m.source === "db" ? 0.25 : 0)
+        + (langCode && m.original_language === langCode ? 1.2 : 0)
+        + (year && m.year && Math.abs(m.year - year) <= 1 ? 1.0 : 0)
+    );
+  mergedMovies.sort((a, b) => movieScore(b) - movieScore(a));
 
   // Merge IMDb-only results: append titles not already present by imdb_id or by title+year match.
   // IMDb results only have title/year/image — no TMDB metadata — so they open to imdb_url.
@@ -341,6 +368,7 @@ export async function GET(req: NextRequest) {
       overview: t.overview,
       genres: gn,
       vote_average: t.vote_average,
+      vote_count: t.vote_count,
     };
   });
 
@@ -358,8 +386,32 @@ export async function GET(req: NextRequest) {
     })),
   }));
 
+  // Mixed "top results": movies, TV, and people compete on the same
+  // relevance scale. This is what lets a TV-only title (absent from the
+  // movie CSV) lead the page instead of drowning under fuzzy CSV matches.
+  const top = [
+    ...mergedMovies.slice(0, 8).map((m) => ({
+      media_type: "movie" as const,
+      score: movieScore(m),
+      item: m as unknown as Record<string, unknown>,
+    })),
+    ...tv.slice(0, 6).map((t) => ({
+      media_type: "tv" as const,
+      score: relevanceScore(q, t.name, t.vote_count ?? 0),
+      item: t as Record<string, unknown>,
+    })),
+    ...people.slice(0, 3).map((p) => ({
+      media_type: "person" as const,
+      score: relevanceScore(rawQ, p.name, (p.popularity ?? 0) * 1000),
+      item: p as Record<string, unknown>,
+    })),
+  ]
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 8)
+    .map(({ media_type, item }) => ({ media_type, ...item }));
+
   return NextResponse.json(
-    { movies: mergedMovies, tv, people },
+    { movies: mergedMovies, tv, people, top },
     { headers: tmdbCacheHeaders(600) }
   );
 }

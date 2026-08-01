@@ -570,8 +570,10 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                   )}
 
                   {/* Mobile: title + rating overlaid at the poster bottom.
-                      Key info is visible without scrolling down. */}
-                  {isMobile && !showWatchProviders && (
+                      Key info is visible without scrolling down. Stays mounted
+                      while Where-to-Watch is open — the panel expands below
+                      the hero, it never covers this overlay. */}
+                  {isMobile && (
                     <div
                       style={{
                         position: "absolute",

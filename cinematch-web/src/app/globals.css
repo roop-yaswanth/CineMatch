@@ -11,19 +11,13 @@
     var(--font-inter), -apple-system, "SF Pro Display", "SF Pro Text",
     BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
 
-  /* ─── Base Canvas ────────────────────────────── */
-
-  /* --color-bg: #1f1f1f; */       /* EXPERIMENT: changed to black */
-  /* --color-bg-raised: #1f1f1f; */
-  --color-bg: #000000;
-  --color-bg-raised: #000000;
-
-
-  --tint-gold: 212, 175, 55;
-
-  --tint-bronze: 197, 148, 75;
-
-  --tint-charcoal: 50, 42, 28;
+  /* ─── Base Canvas ────────────────────────────────────────────
+     Near-black with a cool cast instead of flat #000: raised
+     surfaces get a visible elevation step, and Safari's chrome
+     (theme-color in layout.tsx matches --color-bg) melts into
+     the page on iOS. */
+  --color-bg: #050507;
+  --color-bg-raised: #0c0c11;
 
   /* ─── Surfaces ───────────────────────────────── */
 
@@ -50,8 +44,16 @@
   --color-text-secondary: #b8b8bf;
   --color-text-muted: #7c7c85;
   --color-text-faint: #55555c;
-  --color-accent: #ffffff;
+
+  /* ─── Brand accent ───────────────────────────────────────────
+     Periwinkle/indigo — the one signature color on the near-black
+     canvas. Use for active states, focus, links, match badges.
+     Rating semantics (green/blue/red) stay untouched. */
+  --color-accent: #a5b4fc;
+  --color-accent-strong: #818cf8;
+  --rgb-accent: 165, 180, 252;
   --color-accent-warm: #ffb84d;
+  --gradient-brand: linear-gradient(135deg, #ffffff 0%, #d8dcff 45%, #a5b4fc 100%);
 
   /* ─── Interactive / System Tints (Apple SF Symbols palette) ─── */
   --color-blue: #0a84ff;
@@ -76,23 +78,11 @@
   --rgb-dislike: 255, 69, 58;
   --rgb-skip: 142, 142, 147;
 
-  /* ─── Spacing Scale ──────────────────────────────────────────
-     Use these variables instead of hardcoded pixel values for
-     padding/margin/gap. The scale is geometric (4 → 8 → 12 → 16 → 24
-     → 32 → 48 → 64) which keeps a consistent visual rhythm without
-     forcing rigid 4-or-8-only adherence. The named aliases on the
-     right map to common UI roles so a header can ask for `--s-header`
-     instead of memorizing whether that's `--s-3` or `--s-4`. */
-  --s-1: 4px;
-  --s-2: 8px;
-  --s-3: 12px;
-  --s-4: 16px;
-  --s-5: 24px;
-  --s-6: 32px;
-  --s-7: 48px;
-  --s-8: 64px;
-
-  /* Role aliases — change once here to retune the whole app. */
+  /* ─── Spacing role aliases ───────────────────────────────────
+     The numeric --s-N scale lives further down (4-px base). These
+     map common UI roles so a header can ask for `--s-header-y`
+     instead of memorizing whether that's `--s-3` or `--s-4`.
+     Change once here to retune the whole app. */
   --s-header-y: 12px;     /* sticky header vertical padding */
   --s-header-x: 20px;     /* sticky header horizontal padding */
   --s-section-gap: 32px;  /* gap between rails on dashboard / explore */
@@ -191,7 +181,7 @@
   --hl-strong: 1px solid rgba(255, 255, 255, 0.18);
 
   /* ─── Focus ring (a single visible style for keyboard users) ─── */
-  --focus-ring: 0 0 0 2px rgba(110, 168, 254, 0.55);
+  --focus-ring: 0 0 0 2px rgba(var(--rgb-accent), 0.6);
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -310,7 +300,7 @@
   color: var(--color-text-primary);
 }
 .h-page--brand {
-  background: linear-gradient(180deg, #fff 0%, #a0a0a0 100%);
+  background: var(--gradient-brand);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -452,23 +442,22 @@ html {
   text-rendering: optimizeLegibility;
   font-feature-settings: "cv11", "ss01", "ss03";
   letter-spacing: -0.011em;
-  zoom: 1;
-}
-
-@media (max-width: 640px) {
-  html {
-    zoom: 1;
-  }
+  /* Same canvas as body so iOS rubber-band overscroll never flashes a
+     different color above/below the page. */
+  background: var(--color-bg);
 }
 
 body {
-  background: #000000;
+  background: var(--color-bg);
   color: var(--color-text-primary);
   min-height: 100dvh;
   overflow-x: hidden;
   overscroll-behavior: none; /* Prevent iOS bounce/rubber-banding to top pill */
   position: relative;
-  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  /* No top inset here: sticky headers pin to the viewport top when scrolled,
+     so they own their env(safe-area-inset-top) padding themselves. Padding
+     the body too would double-shift the initial layout in standalone mode. */
+  padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
 /* ─── Ambient Light ─────────────── */
@@ -478,11 +467,12 @@ body::before {
   inset: 0;
   pointer-events: none;
   z-index: 0;
-  /* Amplified spotlight bleeding from the top center for a pronounced glossy sheen */
+  /* Soft spotlight from the top center. Kept subtle: a strong sheen makes the
+     page's top edge visibly lighter than Safari's theme-color chrome, which
+     reads as a seam ("the top bar is still there"). */
   background:
-    radial-gradient(140% 120% at 50% -15%, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.06) 45%, transparent 85%),
-    /* Stronger hairline gloss along the very top screen edge */
-    linear-gradient(180deg, rgba(255, 255, 255, 0.15) 0%, transparent 12%);
+    radial-gradient(140% 120% at 50% -15%, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0.03) 45%, transparent 85%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, transparent 12%);
   mix-blend-mode: screen;
 }
 

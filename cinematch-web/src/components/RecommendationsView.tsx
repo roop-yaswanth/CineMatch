@@ -1042,11 +1042,6 @@ export default function RecommendationsView({
           }}
           onMovieSelect={(m) => setActiveMovie(m)}
         />
-        {/* <BottomNav 
-        onYourLikes={openYourLikes}
-        onPreferences={openPrefs}
-        onRefresh={() => void generate(preferences)}
-      /> */}
       </div>
     </div>
   );

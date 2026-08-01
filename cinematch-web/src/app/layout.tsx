@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Suspense } from "react";
 import { Inter } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
@@ -26,7 +26,7 @@ export const metadata: Metadata = {
   // Page-level metadata can override `default`; the template appends the
   // brand so tabs and shares always identify the site.
   title: {
-    default: "CineMatch — Cross-cultural movie recommendations",
+    default: "CineMatch",
     template: "%s · CineMatch",
   },
   description:
@@ -51,7 +51,7 @@ export const metadata: Metadata = {
     apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
   },
   openGraph: {
-    title: "CineMatch — Cross-cultural movie recommendations",
+    title: "CineMatch : Cross-cultural movie recommendations",
     description:
       "Find hidden gems from Korean, Japanese, Telugu, Spanish & more — curated by your taste.",
     type: "website",
@@ -61,7 +61,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "CineMatch — Cross-cultural movie recommendations",
+    title: "CineMatch : Cross-cultural movie recommendations",
     description:
       "Find hidden gems from Korean, Japanese, Telugu, Spanish & more — curated by your taste.",
   },
@@ -85,15 +85,21 @@ export const metadata: Metadata = {
   },
 };
 
+// Next's typed viewport API instead of hand-rolled <meta> tags. viewport-fit
+// lets the canvas extend under the iOS notch/home bar; themeColor tints
+// Safari's chrome so top/bottom bars melt into the page background.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#050507",
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={`${inter.variable}`} suppressHydrationWarning>
-      <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-        <meta name="theme-color" content="#000000" />
-      </head>
       <body className="bg-[var(--color-bg)] text-[var(--color-text-primary)] antialiased">
         {/* Organization + WebApplication structured data so search engines
             can render rich cards and connect this domain to the brand. */}

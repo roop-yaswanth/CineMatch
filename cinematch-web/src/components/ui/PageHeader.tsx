@@ -40,6 +40,9 @@ export default function PageHeader({
         position: sticky ? "sticky" : "relative",
         top: 0,
         zIndex: 40,
+        // Keep the header row below the iOS notch/status bar when the PWA
+        // runs standalone with a translucent status bar. 0 in normal Safari.
+        paddingTop: "env(safe-area-inset-top, 0px)",
       }}
     >
       <div

@@ -67,13 +67,13 @@ export default function RouteTransition({ children }: { children: React.ReactNod
           style={{
             height: "100%",
             width: `${progress}%`,
-            background: "linear-gradient(90deg, #6ea8fe, #a78bfa, #f472b6)",
+            background: "linear-gradient(90deg, var(--color-accent-strong), var(--color-accent), #f0abfc)",
             opacity: progress === 0 ? 0 : 1,
             transition:
               progress === 0
                 ? "opacity 200ms ease 80ms"
                 : "width 220ms cubic-bezier(0.4, 0, 0.2, 1), opacity 80ms ease",
-            boxShadow: "0 0 8px rgba(110, 168, 254, 0.5)",
+            boxShadow: "0 0 8px rgba(var(--rgb-accent), 0.5)",
           }}
         />
       </div>

@@ -525,10 +525,17 @@ export interface MultiSearchPerson {
   popularity?: number;
   known_for: Array<{ id: number; title: string; media_type?: string; poster_path?: string }>;
 }
+/** Mixed best-match row: movies, TV, and people ranked on one relevance scale. */
+export type MultiSearchTopItem =
+  | ({ media_type: "movie" } & MultiSearchMovie)
+  | ({ media_type: "tv" } & MultiSearchTv)
+  | ({ media_type: "person" } & MultiSearchPerson);
+
 export interface MultiSearchResponse {
   movies: MultiSearchMovie[];
   tv: MultiSearchTv[];
   people: MultiSearchPerson[];
+  top?: MultiSearchTopItem[];
 }
 
 // Tiny LRU keyed by query string. Multi-search is heavy (5 parallel TMDB calls

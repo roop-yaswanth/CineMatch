@@ -23,6 +23,7 @@ import {
   type MultiSearchMovie,
   type MultiSearchPerson,
   type MultiSearchResponse,
+  type MultiSearchTopItem,
   type MultiSearchTv,
 } from "@/lib/api";
 import { getRecentSearches, rememberRecentSearch, clearRecentSearches } from "@/lib/recent-searches";
@@ -135,9 +136,6 @@ function SearchPage() {
     !!debounced && (!resultRecord || resultRecord.forQuery !== debounced);
 
   useEffect(() => { inputRef.current?.focus(); }, []);
-
-  const dbMovies = results.movies.filter((m) => m.source === "db");
-  const hasDb = dbMovies.length > 0;
 
   const openMovie = useCallback((m: MultiSearchMovie) => {
     setActive({
@@ -317,22 +315,25 @@ function SearchPage() {
             }}
           >
             {(() => {
-              const tmdbMovies = results.movies.filter((m) => m.source === "tmdb");
-              const hasTmdb = tmdbMovies.length > 0;
+              // The route ranks every source on one relevance scale — render
+              // movies as a single ranked grid instead of Library/TMDB silos,
+              // and lead with the mixed best-match row so a TV-only title
+              // (absent from the movie library) still tops the page.
+              const topItems = results.top ?? [];
               const hasTv = results.tv.length > 0;
               const hasPeople = results.people.length > 0;
 
               return (
                 <>
-                  {hasDb && (
-                    <Section title="Movies (Library)">
-                      <MovieGrid movies={dbMovies} onSelect={openMovie} query={debounced} />
+                  {topItems.length > 0 && (
+                    <Section title="Top Results">
+                      <TopResultsRow items={topItems} onSelectMovie={openMovie} query={debounced} />
                     </Section>
                   )}
 
-                  {hasTmdb && (
-                    <Section title={hasDb ? "Movies (TMDB)" : "Movies"}>
-                      <MovieGrid movies={tmdbMovies} onSelect={openMovie} query={debounced} />
+                  {results.movies.length > 0 && (
+                    <Section title="Movies">
+                      <MovieGrid movies={results.movies} onSelect={openMovie} query={debounced} />
                     </Section>
                   )}
 
@@ -396,22 +397,110 @@ function Section({ title, children }: { title: string | null; children: React.Re
   );
 }
 
-function ShowMore({ label, onClick }: { label: string; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
+/* ─── Top results — mixed movies/TV/people on one relevance scale ─── */
+function TopResultsRow({
+  items,
+  onSelectMovie,
+  query,
+}: {
+  items: MultiSearchTopItem[];
+  onSelectMovie: (m: MultiSearchMovie) => void;
+  query: string;
+}) {
+  const cardBase: React.CSSProperties = {
+    flex: "0 0 auto",
+    width: 132,
+    display: "flex",
+    flexDirection: "column",
+    textAlign: "left",
+    textDecoration: "none",
+    color: "inherit",
+    background: "none",
+    border: "none",
+    padding: 0,
+    cursor: "pointer",
+    outline: "none",
+  };
+  const posterBase: React.CSSProperties = {
+    position: "relative",
+    width: "100%",
+    aspectRatio: "2 / 3",
+    borderRadius: "var(--radius-poster)",
+    overflow: "hidden",
+    background: "var(--color-surface)",
+  };
+  const chip = (label: string) => (
+    <span
       style={{
-        marginTop: "14px",
-        background: "none",
-        border: "none",
-        color: "var(--color-text-secondary)",
-        fontSize: "13px",
-        fontWeight: 500,
-        cursor: "pointer",
+        position: "absolute",
+        top: 6,
+        left: 6,
+        padding: "2px 7px",
+        borderRadius: 5,
+        fontSize: 9,
+        fontWeight: 700,
+        letterSpacing: "0.05em",
+        textTransform: "uppercase",
+        background: "rgba(5,5,7,0.72)",
+        color: "var(--color-accent)",
+        border: "1px solid rgba(var(--rgb-accent), 0.35)",
+        backdropFilter: "blur(6px)",
+        WebkitBackdropFilter: "blur(6px)",
       }}
     >
-      {label} →
-    </button>
+      {label}
+    </span>
+  );
+  const meta = (title: string, sub: string) => (
+    <div style={{ padding: "8px 2px 0" }}>
+      <div style={{ fontSize: 13, fontWeight: 500, color: "var(--color-text-primary)", lineHeight: 1.25, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+        <HighlightedText text={title} query={query} />
+      </div>
+      {sub && <div style={{ marginTop: 3, fontSize: 11, color: "var(--color-text-muted)" }}>{sub}</div>}
+    </div>
+  );
+
+  return (
+    <div className="hide-scrollbar" style={{ display: "flex", gap: 14, overflowX: "auto", paddingBottom: 4, WebkitOverflowScrolling: "touch" }}>
+      {items.map((it) => {
+        if (it.media_type === "movie") {
+          return (
+            <motion.button key={`top-m-${it.tmdb_id}`} whileTap={{ scale: 0.97 }} onClick={() => onSelectMovie(it)} style={cardBase}>
+              <div style={posterBase}>
+                {it.poster_path && <img src={posterUrl(it.poster_path, "w342")} alt={it.title} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />}
+                {chip("Movie")}
+              </div>
+              {meta(it.title, [it.year, it.original_language ? languageLabel(it.original_language) : ""].filter(Boolean).join(" · "))}
+            </motion.button>
+          );
+        }
+        if (it.media_type === "tv") {
+          return (
+            <a key={`top-t-${it.tmdb_id}`} href={`https://www.themoviedb.org/tv/${it.tmdb_id}`} target="_blank" rel="noopener noreferrer" style={cardBase}>
+              <div style={posterBase}>
+                {it.poster_path && <img src={posterUrl(it.poster_path, "w342")} alt={it.name} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />}
+                {chip("TV")}
+              </div>
+              {meta(it.name, [it.year, it.original_language ? languageLabel(it.original_language) : ""].filter(Boolean).join(" · "))}
+            </a>
+          );
+        }
+        return (
+          <Link key={`top-p-${it.tmdb_id}`} href={`/person/${it.tmdb_id}`} style={cardBase}>
+            <div style={{ ...posterBase, aspectRatio: "1 / 1", borderRadius: "50%", width: 108, margin: "12px auto" }}>
+              {it.profile_path ? (
+                <img src={posterUrl(it.profile_path, "w185")} alt={it.name} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+              ) : (
+                <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-text-muted)", fontSize: 28 }}>
+                  {it.name?.[0] || "?"}
+                </div>
+              )}
+            </div>
+            <div style={{ textAlign: "center" }}>{meta(it.name, it.known_for_department || "")}</div>
+          </Link>
+        );
+      })}
+    </div>
   );
 }
 
@@ -491,7 +580,15 @@ function MovieGrid({ movies, onSelect, query }: { movies: MultiSearchMovie[]; on
                 <HighlightedText text={m.title} query={query} />
               </div>
               <div style={{ marginTop: "3px", fontSize: "11px", color: "var(--color-text-muted)" }}>
-                {m.year || ""}{m.year && m.original_language ? " · " : ""}{m.original_language ? languageLabel(m.original_language) : ""}
+                {[
+                  m.year,
+                  m.original_language ? languageLabel(m.original_language) : "",
+                ].filter(Boolean).join(" · ")}
+                {(m.imdb_rating || m.vote_average) ? (
+                  <span style={{ color: "var(--color-accent-warm)", fontWeight: 600 }}>
+                    {" "}· ⭐ {(m.imdb_rating ?? m.vote_average)!.toFixed(1)}
+                  </span>
+                ) : null}
               </div>
             </div>
           </>
