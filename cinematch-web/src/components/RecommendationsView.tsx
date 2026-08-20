@@ -17,6 +17,7 @@ import dynamic from "next/dynamic";
 import BackButton from "@/components/ui/BackButton";
 import HeroFeature from "@/components/dashboard/HeroFeature";
 import CompactRail from "@/components/dashboard/CompactRail";
+import { PosterInfo } from "@/components/MovieCard";
 import AppFooter from "@/components/AppFooter";
 import { toast } from "@/components/ui/Toast";
 import { useSession } from "@/context/SessionContext";
@@ -1003,11 +1004,14 @@ export default function RecommendationsView({
                 }}
               >
                 <motion.span
-                  animate={{ y: [0, -3, 0] }}
-                  transition={{ repeat: Infinity, duration: 0.9, ease: "easeInOut" }}
-                  style={{ fontSize: "18px", display: "inline-flex" }}
+                  aria-hidden
+                  animate={{ rotate: 360 }}
+                  transition={{ repeat: Infinity, duration: 0.9, ease: "linear" }}
+                  style={{ display: "inline-flex", width: 14, height: 14 }}
                 >
-                  🍿
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{ color: "var(--color-text-secondary)" }}>
+                    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                  </svg>
                 </motion.span>
                 <span
                   style={{
@@ -1574,7 +1578,7 @@ export function PosterCard({
               <img src={useHorizontal ? backdrop : poster} alt={movie.title} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 20%" }} />
               <div style={{ position: "absolute", bottom: -2, left: 0, right: 0, height: "65%", background: "linear-gradient(to top, #18191c 0%, rgba(24,25,28,0.95) 20%, rgba(24,25,28,0.6) 50%, rgba(24,25,28,0) 100%)", pointerEvents: "none" }} />
               {imdb && (
-                <div style={{ position: "absolute", top: "12px", right: "12px", padding: "4px 8px", borderRadius: "8px", background: "rgba(0,0,0,0.7)", fontSize: "11px", fontWeight: 700, color: "#e8c84a", display: "flex", alignItems: "center", gap: "4px", boxShadow: "0 4px 12px rgba(0,0,0,0.4)" }}>
+                <div style={{ position: "absolute", top: "12px", right: "12px", padding: "4px 8px", borderRadius: "8px", background: "rgba(0,0,0,0.7)", fontSize: "11px", fontWeight: 700, color: "var(--color-rating)", display: "flex", alignItems: "center", gap: "4px", boxShadow: "0 4px 12px rgba(0,0,0,0.4)" }}>
                   <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>
                   {imdb}
                 </div>
@@ -1653,62 +1657,10 @@ export function PosterCard({
         >
           <img src={poster} alt={movie.title} loading={priority ? "eager" : "lazy"} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
         </div>
-        <div onClick={(e) => { e.stopPropagation(); if (onClick) onClick(); }} style={{ padding: "10px 8px 12px", cursor: "pointer" }}>
-          <p
-            style={{
-              fontSize: "12px",
-              fontWeight: 600,
-              color: "var(--color-text-primary)",
-              margin: 0,
-              lineHeight: 1.3,
-              // Reserve two lines so the metadata row lines up across every card
-              // in the rail whether the title wraps to one line or two — this is
-              // what fixes the ragged look where short titles sat higher.
-              minHeight: "2.6em",
-              display: "-webkit-box",
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: "vertical",
-              overflow: "hidden",
-            }}
-          >
-            {movie.title}
-          </p>
-          {/* One tidy metadata row — matches the compact rail cards: "year · lang"
-              muted on the left, a single gold rating chip pushed to the right. */}
-          <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "5px", minHeight: "18px" }}>
-            {(movie.year || lang) && (
-              <span
-                style={{
-                  fontSize: "10.5px",
-                  color: "var(--color-text-muted)",
-                  lineHeight: 1.2,
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  minWidth: 0,
-                }}
-              >
-                {[movie.year, lang].filter(Boolean).join(" · ")}
-              </span>
-            )}
-            {imdb && (
-              <span
-                style={{
-                  marginLeft: "auto",
-                  flexShrink: 0,
-                  padding: "2px 6px",
-                  borderRadius: "6px",
-                  background: "rgba(232,200,74,0.15)",
-                  color: "#e8c84a",
-                  fontSize: "10px",
-                  fontWeight: 700,
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {movie.imdb_rating ? `IMDb ${imdb}` : `★ ${imdb}`}
-              </span>
-            )}
-          </div>
+        <div onClick={(e) => { e.stopPropagation(); if (onClick) onClick(); }} style={{ padding: "0 6px 12px", cursor: "pointer" }}>
+          {/* The single global under-poster treatment — same title + meta
+              block the explore grid and compact rails render. */}
+          <PosterInfo movie={movie} />
         </div>
       </div>
       {portalElement}

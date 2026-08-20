@@ -75,7 +75,7 @@ export default function PersonPage() {
   }, [data]);
 
   if (isLoading || !session) {
-    return <div style={{ minHeight: "100vh", background: "var(--color-bg)" }} />;
+    return <div style={{ minHeight: "100dvh", background: "var(--color-bg)" }} />;
   }
 
   const openMovie = (c: PersonCredit) => {
@@ -95,7 +95,7 @@ export default function PersonPage() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--color-bg)", display: "flex", flexDirection: "column" }}>
+    <div style={{ minHeight: "100dvh", background: "var(--color-bg)", display: "flex", flexDirection: "column" }}>
       {/* Header — shared <PageHeader>. Title truncates with ellipsis when
           a person's name is too long for the centered slot. */}
       <PageHeader

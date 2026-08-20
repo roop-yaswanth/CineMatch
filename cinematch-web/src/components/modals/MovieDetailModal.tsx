@@ -250,7 +250,7 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
   const overview = movie.overview || "No overview available.";
   const runtime = movie.runtime ? `${Math.floor(movie.runtime / 60)}h ${movie.runtime % 60}m` : null;
   const matchPct = movie.score !== undefined && movie.score >= 0.70 ? Math.round(movie.score * 100) : null;
-  const matchColor = movie.score !== undefined && movie.score >= 0.85 ? "#22c55e" : "#eab308";
+  const matchColor = movie.score !== undefined && movie.score >= 0.85 ? "var(--color-success)" : "var(--color-yellow)";
   const guessedCountry = userRegion ? (REGION_TO_COUNTRY[userRegion] ?? "US") : "US";
   const watchButtonStyle = {
     position: "absolute" as const,
@@ -631,10 +631,10 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                           <span style={{
                             display: "inline-flex", alignItems: "center", gap: "4px",
                             fontSize: "12px", fontWeight: 700,
-                            color: "#fbbf24",
+                            color: "var(--color-rating)",
                             textShadow: "0 1px 4px rgba(0,0,0,0.7)",
                           }}>
-                            ⭐ {imdb}
+                            ★ {imdb}
                           </span>
                         )}
                         {runtime && (
@@ -1000,8 +1000,8 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                         <AnimatePresence mode="wait">
                           {successAction === "watchlist" ? (
                             <motion.div key="check" initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.5, opacity: 0 }} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                              <span style={{ color: "#22c55e", fontWeight: 700 }}>Added</span>
+                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--color-success)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                              <span style={{ color: "var(--color-success)", fontWeight: 700 }}>Added</span>
                             </motion.div>
                           ) : (
                             <motion.div key="icon" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -1557,7 +1557,7 @@ function SimilarCard({ movie, onClick }: { movie: Recommendation; onClick: () =>
             padding: "2px 5px",
             fontSize: "9px",
             fontWeight: 700,
-            color: "#fbbf24",
+            color: "var(--color-rating)",
           }}>
             {movie.imdb_rating.toFixed(1)}
           </div>

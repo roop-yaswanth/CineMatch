@@ -625,34 +625,13 @@ function MovieCard({ item, idx, onClick }: { item: HistoryItem; idx: number; onC
         </div>
       </div>
 
-      {/* Info */}
+      {/* Info — same global title/meta treatment as every other surface */}
       <div style={{ padding: "12px" }}>
-        <p
-          style={{
-            fontSize: "12px",
-            fontWeight: 600,
-            color: "var(--color-text-primary)",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            display: "-webkit-box",
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: "vertical",
-            lineHeight: 1.3,
-            margin: 0,
-            minHeight: "36px",
-          }}
-        >
+        <p className="poster-info-title">
           {item.title}
         </p>
         {item.year && (
-          <p
-            style={{
-              fontSize: "12px",
-              color: "var(--color-text-muted)",
-              marginTop: "6px",
-              margin: 0,
-            }}
-          >
+          <p className="poster-info-meta-text" style={{ marginTop: "5px" }}>
             {item.year}
           </p>
         )}

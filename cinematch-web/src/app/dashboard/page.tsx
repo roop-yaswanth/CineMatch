@@ -87,7 +87,7 @@ export default function DashboardPage() {
 
 
   if (isLoading || !session) {
-    return <div style={{ minHeight: "100vh", background: "var(--color-bg)" }} />;
+    return <div style={{ minHeight: "100dvh", background: "var(--color-bg)" }} />;
   }
 
   return (

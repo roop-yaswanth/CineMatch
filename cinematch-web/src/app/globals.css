@@ -72,6 +72,11 @@
   --color-dislike: #ff453a;
   --color-skip: #8e8e93;
 
+  /* Gold used for IMDb/TMDB score chips — one value everywhere so the
+     rating readout looks identical on cards, search results, and modals. */
+  --color-rating: #e8c84a;
+  --rgb-rating: 232, 200, 74;
+
   /* Color tints for rating glow/fill (rgba-ready) */
   --rgb-like: 48, 209, 88;
   --rgb-okay: 10, 132, 255;
@@ -185,16 +190,11 @@
 }
 
 /* ═══════════════════════════════════════════════════════════
-   Glass tiers — three canonical surfaces. Other .glass-*
-   classes below alias one of these so we have one place to
-   tune the material if the look changes.
+   Glass tiers — canonical surfaces. The .glass-* classes below
+   alias these tiers so there is one place to tune the material
+   if the look changes. (.glass-subtle is defined once, further
+   down with the other chrome materials.)
    ═══════════════════════════════════════════════════════════ */
-.glass-subtle {
-  background: rgba(28, 30, 36, 0.58);
-  -webkit-backdrop-filter: blur(20px) saturate(1.4);
-  backdrop-filter: blur(20px) saturate(1.4);
-  border: var(--hl-medium);
-}
 .glass-medium {
   background: rgba(20, 22, 28, 0.72);
   -webkit-backdrop-filter: blur(40px) saturate(1.6);
@@ -940,6 +940,63 @@ textarea,
   --rating-border: rgba(var(--rgb-skip), 0.4);
   --rating-shadow: rgba(var(--rgb-skip), 0.3);
   color: var(--color-text-secondary);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Poster info block — the single global treatment for the
+   title + metadata shown under (or over) a poster. Used by
+   MovieCard, the dashboard PosterCard, and the search grids so
+   every surface renders identical typography.
+   ═══════════════════════════════════════════════════════════ */
+.poster-info-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.35;
+  color: var(--color-text-primary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  /* Reserve two lines so the metadata row lines up across every
+     card in a row whether a title wraps to one line or two. */
+  min-height: 2.7em;
+}
+.poster-info-meta {
+  margin-top: 5px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 18px;
+}
+.poster-info-meta-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10.5px;
+  font-weight: 500;
+  line-height: 1.2;
+  color: var(--color-text-muted);
+}
+
+/* Gold score chip (IMDb preferred, TMDB ★ fallback). */
+.rating-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;
+  flex-shrink: 0;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: rgba(var(--rgb-rating), 0.14);
+  color: var(--color-rating);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.4;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
 }
 
 /* ═══════════════════════════════════════════════════════════

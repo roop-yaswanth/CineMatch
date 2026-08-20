@@ -188,13 +188,13 @@ function SearchPage() {
   );
 
   if (isLoading || !session) {
-    return <div style={{ minHeight: "100vh", background: "var(--color-bg)" }} />;
+    return <div style={{ minHeight: "100dvh", background: "var(--color-bg)" }} />;
   }
 
   const totalCount = results.movies.length + results.tv.length + results.people.length;
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--color-bg)", display: "flex", flexDirection: "column" }}>
+    <div style={{ minHeight: "100dvh", background: "var(--color-bg)", display: "flex", flexDirection: "column" }}>
       {/* Header — shared <PageHeader> for layout consistency. */}
       <PageHeader
         title="Search"
@@ -572,21 +572,21 @@ function MovieGrid({ movies, onSelect, query }: { movies: MultiSearchMovie[]; on
                 <img src={posterUrl(m.poster_path, "w342")} alt={m.title} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
               ) : null}
               {isImdb && (
-                <div style={{ position: "absolute", top: "6px", right: "6px", background: "rgba(245,197,24,0.92)", color: "#000", fontSize: "9px", fontWeight: 700, padding: "2px 6px", borderRadius: "4px", letterSpacing: "0.04em" }}>IMDb</div>
+                <div style={{ position: "absolute", top: "6px", right: "6px", background: "rgba(var(--rgb-rating),0.92)", color: "#000", fontSize: "9px", fontWeight: 700, padding: "2px 6px", borderRadius: "4px", letterSpacing: "0.04em" }}>IMDb</div>
               )}
             </div>
             <div style={{ padding: "8px 2px 0" }}>
-              <div style={{ fontSize: "13px", fontWeight: 500, color: "var(--color-text-primary)", lineHeight: 1.25, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+              <div className="poster-info-title">
                 <HighlightedText text={m.title} query={query} />
               </div>
-              <div style={{ marginTop: "3px", fontSize: "11px", color: "var(--color-text-muted)" }}>
+              <div className="poster-info-meta-text" style={{ marginTop: "3px" }}>
                 {[
                   m.year,
                   m.original_language ? languageLabel(m.original_language) : "",
                 ].filter(Boolean).join(" · ")}
                 {(m.imdb_rating || m.vote_average) ? (
-                  <span style={{ color: "var(--color-accent-warm)", fontWeight: 600 }}>
-                    {" "}· ⭐ {(m.imdb_rating ?? m.vote_average)!.toFixed(1)}
+                  <span style={{ color: "var(--color-rating)", fontWeight: 700 }}>
+                    {" "}· ★ {(m.imdb_rating ?? m.vote_average)!.toFixed(1)}
                   </span>
                 ) : null}
               </div>
@@ -638,10 +638,10 @@ function TvGrid({ items, query }: { items: MultiSearchTv[]; query: string }) {
             <div style={{ position: "absolute", top: "6px", right: "6px", background: "rgba(0,0,0,0.7)", color: "#fff", fontSize: "9px", padding: "2px 6px", borderRadius: "4px", letterSpacing: "0.04em" }}>TV</div>
           </div>
           <div style={{ padding: "8px 2px 0" }}>
-            <div style={{ fontSize: "13px", fontWeight: 500, color: "var(--color-text-primary)", lineHeight: 1.25, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+            <div className="poster-info-title">
               <HighlightedText text={t.name} query={query} />
             </div>
-            <div style={{ marginTop: "3px", fontSize: "11px", color: "var(--color-text-muted)" }}>
+            <div className="poster-info-meta-text" style={{ marginTop: "3px" }}>
               {t.year || ""}{t.year && t.original_language ? " · " : ""}{t.original_language ? languageLabel(t.original_language) : ""}
             </div>
           </div>

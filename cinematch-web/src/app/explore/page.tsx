@@ -99,13 +99,13 @@ function PillSelect({
         appearance: "none",
         WebkitAppearance: "none",
         background: isActive
-          ? "linear-gradient(135deg, rgba(139,92,246,0.25), rgba(59,130,246,0.18))"
+          ? "rgba(var(--rgb-accent), 0.16)"
           : "rgba(255,255,255,0.05)",
         border: isActive
-          ? "1px solid rgba(139,92,246,0.45)"
+          ? "1px solid rgba(var(--rgb-accent), 0.45)"
           : "1px solid rgba(255,255,255,0.10)",
         borderRadius: "20px",
-        color: isActive ? "#e0d4fc" : "rgba(255,255,255,0.65)",
+        color: isActive ? "var(--color-accent)" : "rgba(255,255,255,0.65)",
         padding: "6px 28px 6px 12px",
         fontSize: "12.5px",
         fontWeight: 500,
@@ -230,7 +230,7 @@ function ExplorePageInner() {
   }, [tab, gridPage, gridTotalPages, gridLoading, region, selectedLanguage, selectedGenre, sortByFilter]);
 
   if (isLoading || !session) {
-    return <div style={{ minHeight: "100vh", background: "var(--color-bg)" }} />;
+    return <div style={{ minHeight: "100dvh", background: "var(--color-bg)" }} />;
   }
 
   const handleAction = useCallback(
@@ -256,7 +256,7 @@ function ExplorePageInner() {
   const isDiscover = tab === "discover";
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--color-bg)", display: "flex", flexDirection: "column" }}>
+    <div style={{ minHeight: "100dvh", background: "var(--color-bg)", display: "flex", flexDirection: "column" }}>
       <PageHeader
         title="Explore"
         rightSlot={
@@ -344,9 +344,9 @@ function ExplorePageInner() {
                   setSortByFilter("popularity.desc");
                 }}
                 style={{
-                  background: "rgba(239, 68, 68, 0.10)",
-                  border: "1px solid rgba(239, 68, 68, 0.25)",
-                  color: "#f87171",
+                  background: "rgba(var(--rgb-dislike), 0.10)",
+                  border: "1px solid rgba(var(--rgb-dislike), 0.28)",
+                  color: "var(--color-danger)",
                   borderRadius: "20px",
                   padding: "6px 14px",
                   fontSize: "12px",
@@ -638,7 +638,7 @@ function Discover({
               Genres
             </span>
             {Boolean(filters.with_genres?.length) && (
-              <span style={{ fontSize: "11px", color: "rgba(139,92,246,0.8)", fontWeight: 500 }}>
+              <span style={{ fontSize: "11px", color: "var(--color-accent-strong)", fontWeight: 500 }}>
                 {filters.with_genres!.length} selected
               </span>
             )}
@@ -655,12 +655,12 @@ function Discover({
                     padding: "5px 12px",
                     borderRadius: "999px",
                     border: isActive
-                      ? "1px solid rgba(139,92,246,0.45)"
+                      ? "1px solid rgba(var(--rgb-accent), 0.45)"
                       : "1px solid rgba(255,255,255,0.08)",
                     background: isActive
-                      ? "linear-gradient(135deg, rgba(139,92,246,0.22), rgba(59,130,246,0.14))"
+                      ? "rgba(var(--rgb-accent), 0.16)"
                       : "rgba(255,255,255,0.03)",
-                    color: isActive ? "#e0d4fc" : "rgba(255,255,255,0.5)",
+                    color: isActive ? "var(--color-accent)" : "rgba(255,255,255,0.5)",
                     fontSize: "12px",
                     fontWeight: isActive ? 600 : 400,
                     cursor: "pointer",
@@ -680,9 +680,9 @@ function Discover({
             <button
               onClick={reset}
               style={{
-                background: "rgba(239, 68, 68, 0.10)",
-                border: "1px solid rgba(239, 68, 68, 0.25)",
-                color: "#f87171",
+                background: "rgba(var(--rgb-dislike), 0.10)",
+                border: "1px solid rgba(var(--rgb-dislike), 0.28)",
+                color: "var(--color-danger)",
                 borderRadius: "20px",
                 padding: "5px 14px",
                 fontSize: "12px",

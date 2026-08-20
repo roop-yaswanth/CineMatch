@@ -153,11 +153,14 @@ export default function ErrorView({ code, title, description, action, showTimer 
               marginTop: "4px",
             }}
           >
-            <span>⏱️</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
+            </svg>
             {timeLeft > 0 ? (
               <span>Automatic restart in progress — retry in <strong>{formattedTime}</strong></span>
             ) : (
-              <span style={{ color: "#4caf50" }}>Server ready! You can retry now.</span>
+              <span style={{ color: "var(--color-success)" }}>Server ready! You can retry now.</span>
             )}
           </div>
         )}

@@ -522,8 +522,8 @@ export default function MobileMenu({
           transform: scale(0.98);
         }
         .menu-btn-danger:hover {
-          background: rgba(239, 68, 68, 0.12) !important;
-          color: #f87171 !important;
+          background: rgba(var(--rgb-dislike), 0.12) !important;
+          color: var(--color-danger) !important;
         }
         .menu-btn-icon {
           width: 26px;
@@ -544,14 +544,14 @@ export default function MobileMenu({
           color: #ffffff;
         }
         .menu-btn-icon-danger {
-          background: rgba(239, 68, 68, 0.1) !important;
-          border: 1px solid rgba(239, 68, 68, 0.2) !important;
-          color: #ef4444 !important;
+          background: rgba(var(--rgb-dislike), 0.1) !important;
+          border: 1px solid rgba(var(--rgb-dislike), 0.2) !important;
+          color: var(--color-danger) !important;
         }
         .menu-btn-danger:hover .menu-btn-icon-danger {
-          background: rgba(239, 68, 68, 0.22) !important;
-          border-color: rgba(239, 68, 68, 0.4) !important;
-          color: #f87171 !important;
+          background: rgba(var(--rgb-dislike), 0.22) !important;
+          border-color: rgba(var(--rgb-dislike), 0.4) !important;
+          color: var(--color-danger) !important;
         }
         .menu-divider {
           height: 1px;
