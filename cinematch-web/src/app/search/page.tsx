@@ -114,7 +114,7 @@ function SearchPage() {
         rememberRecentSearch(debounced);
         setRecents(getRecentSearches());
       })
-      .catch(() => {});
+      .catch(() => { });
     return () => { cancelled = true; };
   }, [debounced]);
 
@@ -130,8 +130,8 @@ function SearchPage() {
     !debounced
       ? { movies: [], tv: [], people: [] }
       : resultRecord
-      ? resultRecord.data
-      : { movies: [], tv: [], people: [] };
+        ? resultRecord.data
+        : { movies: [], tv: [], people: [] };
   const loading =
     !!debounced && (!resultRecord || resultRecord.forQuery !== debounced);
 
@@ -198,17 +198,13 @@ function SearchPage() {
       {/* Header — shared <PageHeader> for layout consistency. */}
       <PageHeader
         title="Search"
+        hideBackButton
         rightSlot={
           session ? <MobileMenu onLogout={() => { logout(); router.replace("/login"); }} /> : null
         }
       >
         {/* Search input */}
         <div style={{ padding: "0 var(--s-header-x) var(--s-3)" }}>
-          {/* Inner wrapper hugs the input exactly (no padding) so the absolutely
-              positioned icons center on the INPUT via top:50% — not on the padded
-              outer container, which would push them ~6px low. Horizontal offsets
-              are measured from the input edge here (they previously included the
-              outer 20px --s-header-x padding). */}
           <div style={{ position: "relative" }}>
             <input
               ref={inputRef}
@@ -219,74 +215,74 @@ function SearchPage() {
               className="app-search-input"
             />
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)" }}>
-            <circle cx="11" cy="11" r="8" />
-            <line x1="21" y1="21" x2="16.65" y2="16.65" />
-          </svg>
-          {/* Inline loading spinner — sits in place of the clear button while
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            {/* Inline loading spinner — sits in place of the clear button while
               a fetch is in flight, so users always have a visible signal that
               search is working. Backend latency on cold paths can hit ~1s.
               Matches the search icon's 18×18 size and is vertically centered the
               same way (top:50% + translateY) so the two never look mismatched. */}
-          {loading && (
-            <div
-              aria-hidden
-              style={{
-                position: "absolute",
-                right: "14px",
-                top: 0,
-                bottom: 0,
-                margin: "auto 0",
-                width: 18,
-                height: 18,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                pointerEvents: "none",
-              }}
-            >
+            {loading && (
               <div
+                aria-hidden
                 style={{
+                  position: "absolute",
+                  right: "14px",
+                  top: 0,
+                  bottom: 0,
+                  margin: "auto 0",
                   width: 18,
                   height: 18,
-                  border: "2px solid rgba(255,255,255,0.18)",
-                  borderTopColor: "rgba(255,255,255,0.85)",
-                  borderRadius: "50%",
-                  animation: "spin 0.7s linear infinite",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  pointerEvents: "none",
                 }}
-              />
-            </div>
-          )}
-          {query && !loading && (
-            <button
-              onClick={() => setQuery("")}
-              aria-label="Clear"
-              // 40 px touch target — was `padding: 4px` which gave a
-              // ~16×16 hit area, well below the iOS 44 px guideline. The
-              // visual icon stays 16×16; the surrounding box just becomes
-              // easier to tap.
-              style={{
-                position: "absolute",
-                right: "4px",
-                top: "50%",
-                transform: "translateY(-50%)",
-                width: "40px",
-                height: "40px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                background: "none",
-                border: "none",
-                borderRadius: "999px",
-                cursor: "pointer",
-                color: "var(--color-text-muted)",
-                padding: 0,
-              }}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </button>
-          )}
+              >
+                <div
+                  style={{
+                    width: 18,
+                    height: 18,
+                    border: "2px solid rgba(255,255,255,0.18)",
+                    borderTopColor: "rgba(255,255,255,0.85)",
+                    borderRadius: "50%",
+                    animation: "spin 0.7s linear infinite",
+                  }}
+                />
+              </div>
+            )}
+            {query && !loading && (
+              <button
+                onClick={() => setQuery("")}
+                aria-label="Clear"
+                // 40 px touch target — was `padding: 4px` which gave a
+                // ~16×16 hit area, well below the iOS 44 px guideline. The
+                // visual icon stays 16×16; the surrounding box just becomes
+                // easier to tap.
+                style={{
+                  position: "absolute",
+                  right: "4px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  width: "40px",
+                  height: "40px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  background: "none",
+                  border: "none",
+                  borderRadius: "999px",
+                  cursor: "pointer",
+                  color: "var(--color-text-muted)",
+                  padding: 0,
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            )}
           </div>
         </div>
 
@@ -540,15 +536,12 @@ function RecentSearchesPanel({
           <button
             key={r}
             onClick={() => onPick(r)}
+            className="glass-pill"
             style={{
               padding: "8px 14px",
-              borderRadius: 999,
-              border: "1px solid rgba(255,255,255,0.10)",
-              background: "rgba(28,30,36,0.66)",
-              color: "var(--color-text-primary)",
               fontSize: 13,
               cursor: "pointer",
-              transition: "background 160ms ease",
+              color: "var(--color-text-primary)",
             }}
           >
             {r}

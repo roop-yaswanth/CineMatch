@@ -133,7 +133,9 @@ export default function RootLayout({
           }}
         />
         <SessionProvider>
-          <RouteTransition>{children}</RouteTransition>
+          <Suspense fallback={null}>
+            <RouteTransition>{children}</RouteTransition>
+          </Suspense>
           <AppFooter />
           {/* AppBottomNav uses useSearchParams; wrap it in Suspense so the
               rest of the layout still prerenders statically. */}

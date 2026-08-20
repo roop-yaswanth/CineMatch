@@ -99,19 +99,19 @@ function PillSelect({
         appearance: "none",
         WebkitAppearance: "none",
         background: isActive
-          ? "rgba(var(--rgb-accent), 0.16)"
-          : "rgba(255,255,255,0.05)",
+          ? "rgba(var(--rgb-accent), 0.14)"
+          : "var(--glass-chrome)",
         border: isActive
           ? "1px solid rgba(var(--rgb-accent), 0.45)"
-          : "1px solid rgba(255,255,255,0.10)",
-        borderRadius: "20px",
-        color: isActive ? "var(--color-accent)" : "rgba(255,255,255,0.65)",
-        padding: "6px 28px 6px 12px",
+          : "1px solid var(--hairline)",
+        borderRadius: "var(--radius-pill)",
+        color: isActive ? "var(--color-accent)" : "var(--color-text-secondary)",
+        padding: "7px 28px 7px 14px",
         fontSize: "12.5px",
-        fontWeight: 500,
+        fontWeight: isActive ? 600 : 500,
         cursor: "pointer",
         outline: "none",
-        transition: "all 0.18s ease",
+        transition: "all var(--dur-base) var(--ease-out)",
         backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.5)' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`,
         backgroundRepeat: "no-repeat",
         backgroundPosition: "right 10px center",
@@ -181,9 +181,11 @@ function ExplorePageInner() {
   useEffect(() => {
     if (tab === "discover") return;
     let cancelled = false;
+    /* eslint-disable react-hooks/set-state-in-effect */
     setGrid([]);
     setGridPage(1);
     setGridTotalPages(1);
+    /* eslint-enable react-hooks/set-state-in-effect */
     seenIds.current = new Set();
     setGridLoading(true);
 
@@ -229,15 +231,11 @@ function ExplorePageInner() {
     finally { setGridLoading(false); }
   }, [tab, gridPage, gridTotalPages, gridLoading, region, selectedLanguage, selectedGenre, sortByFilter]);
 
-  if (isLoading || !session) {
-    return <div style={{ minHeight: "100dvh", background: "var(--color-bg)" }} />;
-  }
-
   const handleAction = useCallback(
-    async (m: any, action: "like" | "okay" | "dislike" | "watchlist" | "skip") => {
+    async (m: { id?: number; tmdb_id?: number; title: string }, action: "like" | "okay" | "dislike" | "watchlist" | "skip") => {
       if (!session) return;
       try {
-        await apiRecommendationAction(session.session_id, m.id || m.tmdb_id, action);
+        await apiRecommendationAction(session.session_id, (m.id || m.tmdb_id)!, action);
         if (action === "watchlist") {
           toast({ message: `Added "${m.title}" to your watchlist`, tone: "success" });
         } else if (action === "like") {
@@ -252,6 +250,10 @@ function ExplorePageInner() {
     [session]
   );
 
+  if (isLoading || !session) {
+    return <div style={{ minHeight: "100dvh", background: "var(--color-bg)" }} />;
+  }
+
   const hasActiveFilters = Boolean(selectedLanguage || selectedGenre || sortByFilter !== "popularity.desc");
   const isDiscover = tab === "discover";
 
@@ -259,32 +261,41 @@ function ExplorePageInner() {
     <div style={{ minHeight: "100dvh", background: "var(--color-bg)", display: "flex", flexDirection: "column" }}>
       <PageHeader
         title="Explore"
+        hideBackButton
         rightSlot={
           session ? (
             <MobileMenu onLogout={() => { logout(); router.replace("/login"); }} />
           ) : null
         }
-      >
-        {/* Category Tabs */}
-        <div style={{ display: "flex", gap: "6px", overflowX: "auto", scrollbarWidth: "none", paddingBottom: "8px", paddingLeft: "var(--s-header-x)", paddingRight: "var(--s-header-x)" }}>
+      />
+
+      {/* Category Tabs & Filter Bar at top of page body */}
+      <div style={{ width: "100%", background: "var(--color-bg)", borderBottom: "1px solid rgba(255, 255, 255, 0.06)", paddingTop: "6px" }}>
+        {/* Category Tabs — Sleek horizontal scroll strip */}
+        <div
+          style={{
+            display: "flex",
+            gap: "8px",
+            overflowX: "auto",
+            scrollbarWidth: "none",
+            padding: "4px var(--s-header-x) 10px",
+            alignItems: "center",
+          }}
+        >
           {TAB_OPTIONS.map((t) => {
             const isActive = tab === t.id;
             return (
               <button
                 key={t.id}
                 onClick={() => setTab(t.id)}
+                className={`tab-pill ${isActive ? "glass-pill-active active" : "glass-pill"}`}
                 style={{
                   padding: "7px 16px",
                   borderRadius: "999px",
-                  border: isActive ? "1px solid rgba(255,255,255,0.32)" : "1px solid rgba(255,255,255,0.08)",
-                  background: isActive ? "rgba(255,255,255,0.14)" : "transparent",
-                  color: isActive ? "#fff" : "rgba(255,255,255,0.55)",
                   fontSize: "13px",
-                  fontWeight: isActive ? 600 : 450,
+                  fontWeight: isActive ? 600 : 500,
                   whiteSpace: "nowrap",
-                  cursor: "pointer",
-                  transition: "all 0.18s ease",
-                  letterSpacing: "-0.01em",
+                  flexShrink: 0,
                 }}
               >
                 {t.label}
@@ -293,19 +304,17 @@ function ExplorePageInner() {
           })}
         </div>
 
-        {/* Filter Bar — hidden on Discover (Discover has its own rich filter panel) */}
+        {/* Filter Bar — Sleek compact single horizontal scroll strip */}
         {!isDiscover && (
           <div
             style={{
               display: "flex",
-              flexWrap: "wrap",
               alignItems: "center",
-              gap: "10px",
-              paddingTop: "10px",
-              paddingBottom: "16px",
-              paddingLeft: "var(--s-header-x)",
-              paddingRight: "var(--s-header-x)",
-              borderTop: "1px solid rgba(255,255,255,0.06)",
+              gap: "8px",
+              overflowX: "auto",
+              scrollbarWidth: "none",
+              padding: "8px var(--s-header-x) 12px",
+              borderTop: "1px solid rgba(255, 255, 255, 0.06)",
             }}
           >
             <PillSelect
@@ -344,15 +353,16 @@ function ExplorePageInner() {
                   setSortByFilter("popularity.desc");
                 }}
                 style={{
-                  background: "rgba(var(--rgb-dislike), 0.10)",
-                  border: "1px solid rgba(var(--rgb-dislike), 0.28)",
-                  color: "var(--color-danger)",
-                  borderRadius: "20px",
+                  background: "rgba(239, 68, 68, 0.12)",
+                  border: "1px solid rgba(239, 68, 68, 0.3)",
+                  color: "#ef4444",
+                  borderRadius: "999px",
                   padding: "6px 14px",
                   fontSize: "12px",
                   fontWeight: 500,
                   cursor: "pointer",
-                  transition: "all 0.15s ease",
+                  whiteSpace: "nowrap",
+                  flexShrink: 0,
                   display: "inline-flex",
                   alignItems: "center",
                   gap: "4px",
@@ -366,7 +376,7 @@ function ExplorePageInner() {
             )}
           </div>
         )}
-      </PageHeader>
+      </div>
 
       {/* Content */}
       <div className="app-container" style={{ flex: 1, width: "100%", padding: "32px 24px var(--s-bottom-clearance)" }}>
@@ -420,11 +430,11 @@ function Grid({
   return (
     <div>
       <div style={{ marginBottom: "24px" }}>
-        <h2 style={{ fontSize: "22px", fontWeight: 700, color: "var(--color-text-primary)", margin: 0 }}>
+        <h2 className="h-section" style={{ fontSize: "20px", fontWeight: 700 }}>
           {cat?.label || "Explore"}
         </h2>
         {cat?.subtitle && (
-          <p style={{ fontSize: "13px", color: "var(--color-text-muted)", margin: "4px 0 0" }}>
+          <p className="t-meta" style={{ margin: "4px 0 0" }}>
             {cat.subtitle}
           </p>
         )}
@@ -458,16 +468,7 @@ function Grid({
             <div style={{ textAlign: "center", marginTop: "32px" }}>
               <button
                 onClick={onLoadMore}
-                style={{
-                  padding: "10px 24px",
-                  borderRadius: "999px",
-                  background: "rgba(255,255,255,0.08)",
-                  border: "1px solid rgba(255,255,255,0.16)",
-                  color: "var(--color-text-primary)",
-                  fontSize: "13px",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
+                className="btn btn-secondary"
               >
                 Load More
               </button>
@@ -508,9 +509,11 @@ function Discover({
 
   useEffect(() => {
     let cancelled = false;
+    /* eslint-disable react-hooks/set-state-in-effect */
     setResults([]);
     setPage(1);
     setTotalPages(1);
+    /* eslint-enable react-hooks/set-state-in-effect */
     seen.current = new Set();
     setLoading(true);
     apiDiscover({ ...filters, page: 1 })
@@ -569,13 +572,10 @@ function Discover({
     <div>
       {/* ── Discover Filter Panel ── */}
       <div
+        className="glass-card"
         style={{
-          background: "linear-gradient(135deg, rgba(20,22,30,0.75), rgba(30,28,40,0.55))",
-          border: "1px solid rgba(255,255,255,0.08)",
-          borderRadius: "16px",
           padding: "20px",
           marginBottom: "24px",
-          backdropFilter: "blur(12px)",
         }}
       >
         {/* Top row: dropdowns */}
@@ -634,7 +634,7 @@ function Discover({
         {/* Genre chips */}
         <div>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
-            <span style={{ fontSize: "11px", fontWeight: 600, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+            <span className="h-eyebrow">
               Genres
             </span>
             {Boolean(filters.with_genres?.length) && (
@@ -652,19 +652,19 @@ function Discover({
                   key={g.id}
                   onClick={() => toggleGenre(g.id)}
                   style={{
-                    padding: "5px 12px",
-                    borderRadius: "999px",
+                    padding: "6px 13px",
+                    borderRadius: "var(--radius-pill)",
                     border: isActive
                       ? "1px solid rgba(var(--rgb-accent), 0.45)"
-                      : "1px solid rgba(255,255,255,0.08)",
+                      : "1px solid var(--hairline)",
                     background: isActive
-                      ? "rgba(var(--rgb-accent), 0.16)"
-                      : "rgba(255,255,255,0.03)",
-                    color: isActive ? "var(--color-accent)" : "rgba(255,255,255,0.5)",
+                      ? "rgba(var(--rgb-accent), 0.14)"
+                      : "var(--glass-chrome)",
+                    color: isActive ? "var(--color-accent)" : "var(--color-text-muted)",
                     fontSize: "12px",
-                    fontWeight: isActive ? 600 : 400,
+                    fontWeight: isActive ? 600 : 500,
                     cursor: "pointer",
-                    transition: "all 0.18s ease",
+                    transition: "all var(--dur-base) var(--ease-out)",
                   }}
                 >
                   {g.name}
@@ -732,16 +732,7 @@ function Discover({
             <div style={{ textAlign: "center", marginTop: "32px" }}>
               <button
                 onClick={loadMore}
-                style={{
-                  padding: "10px 24px",
-                  borderRadius: "999px",
-                  background: "rgba(255,255,255,0.08)",
-                  border: "1px solid rgba(255,255,255,0.16)",
-                  color: "var(--color-text-primary)",
-                  fontSize: "13px",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
+                className="btn btn-secondary"
               >
                 Load More
               </button>
@@ -758,7 +749,7 @@ function Discover({
 function FilterField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
-      <label style={{ fontSize: "11px", fontWeight: 600, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+      <label className="h-eyebrow">
         {label}
       </label>
       {children}
@@ -793,17 +784,17 @@ function NumberInput({
       style={{
         appearance: "none",
         WebkitAppearance: "none",
-        background: "rgba(255,255,255,0.05)",
-        border: "1px solid rgba(255,255,255,0.10)",
-        borderRadius: "20px",
-        color: "rgba(255,255,255,0.65)",
-        padding: "6px 12px",
+        background: "var(--glass-chrome)",
+        border: "1px solid var(--hairline)",
+        borderRadius: "var(--radius-pill)",
+        color: "var(--color-text-secondary)",
+        padding: "7px 14px",
         fontSize: "12.5px",
         fontWeight: 500,
         outline: "none",
         width: "100%",
         boxSizing: "border-box",
-        transition: "all 0.18s ease",
+        transition: "all var(--dur-base) var(--ease-out)",
       }}
     />
   );

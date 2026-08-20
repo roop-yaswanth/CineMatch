@@ -137,7 +137,9 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
   const [languageFilter, setLanguageFilter] = useState<string>("all");
 
   useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect */
     setInteractionFilter(initialFilter);
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [initialFilter]);
   // We don't watch searchParams here since it's passed from parent as initialFilter
 
@@ -145,11 +147,13 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
     // Always refetch on mount to reconcile against the server, but only
     // *show* the loading skeleton when we have nothing to display. With
     // stale items already painted from cache, the refetch is invisible.
+    /* eslint-disable react-hooks/set-state-in-effect */
     if (initialCache?.isFresh) {
       setLoading(false);
       return;
     }
     if (!hasAnyCachedItems) setLoading(true);
+    /* eslint-enable react-hooks/set-state-in-effect */
     apiGetHistory(sessionId)
       .then((data) => {
         setItems(data);
@@ -230,13 +234,13 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
           background: "var(--color-bg)",
         }}
       >
-        {/* Header — shared <PageHeader> component. The heart-shaped icon
-            sits inline with the title text inside the centered slot. */}
+        {/* Header — shared <PageHeader> component with centered title */}
         <PageHeader
           onBack={onClose}
+          hideBackButton={!onClose}
           backAriaLabel="Go back"
           title={
-            <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "var(--s-2)" }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}>
               <span style={{ color: "var(--color-like)", display: "inline-flex" }}>
                 <IconHeart />
               </span>
@@ -248,29 +252,30 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
           }
         />
 
-        {/* Filters */}
-        <div className="likes-filters"
+        {/* Streamlined Filter Bar — Sleek horizontal scroll strip */}
+        <div
+          className="likes-filters"
           style={{
-            padding: "16px 24px",
-            borderBottom: "1px solid var(--color-border-subtle)",
             display: "flex",
-            flexWrap: "wrap",
-            gap: "12px",
             alignItems: "center",
+            gap: "8px",
+            overflowX: "auto",
+            scrollbarWidth: "none",
+            padding: "8px var(--s-header-x) 12px",
+            borderBottom: "1px solid rgba(255, 255, 255, 0.06)",
+            background: "var(--color-bg)",
           }}
         >
-          {/* Interaction filter — dropdown on mobile, pills on desktop */}
+          {/* Interaction filter pills */}
           <div
             className="interaction-pills"
             role="tablist"
             aria-label="Filter by interaction"
             style={{
               display: "flex",
-              gap: 6,
-              overflowX: "auto",
-              scrollbarWidth: "none",
-              msOverflowStyle: "none",
-              maxWidth: "100%",
+              gap: "8px",
+              alignItems: "center",
+              flexShrink: 0,
             }}
           >
             {INTERACTION_FILTERS.map((filter) => {
@@ -282,15 +287,16 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
                   aria-selected={active}
                   onClick={() => setInteractionFilter(filter.value)}
                   style={{
-                    padding: "6px 12px",
-                    borderRadius: 999,
-                    border: active ? "1px solid rgba(255,255,255,0.30)" : "1px solid rgba(255,255,255,0.10)",
-                    background: active ? "rgba(255,255,255,0.12)" : "rgba(28,30,36,0.58)",
-                    color: active ? "var(--color-text-primary)" : "var(--color-text-secondary)",
-                    fontSize: 12,
-                    fontWeight: 500,
+                    padding: "6px 14px",
+                    borderRadius: "999px",
+                    border: active ? "1px solid rgba(255,255,255,0.28)" : "1px solid rgba(255,255,255,0.10)",
+                    background: active ? "rgba(255,255,255,0.14)" : "rgba(28,30,36,0.58)",
+                    color: active ? "#ffffff" : "rgba(255,255,255,0.65)",
+                    fontSize: "12.5px",
+                    fontWeight: active ? 600 : 500,
                     whiteSpace: "nowrap",
                     cursor: "pointer",
+                    flexShrink: 0,
                     transition: "all 160ms ease",
                   }}
                 >
@@ -300,32 +306,33 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
             })}
           </div>
 
-          <div className="interaction-select-mobile" style={{ display: "none" }}>
-            <select
-              value={interactionFilter}
-              onChange={(e) => setInteractionFilter(e.target.value as InteractionFilter)}
-              className="filter-select"
-            >
-              {INTERACTION_FILTERS.map((f) => (
-                <option key={f.value} value={f.value}>
-                  {f.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="likes-filter-sep" style={{ width: "1px", height: "24px", background: "var(--color-border-subtle)" }} />
-
           {/* Genre Filter */}
           {genres.length > 0 && (
             <select
               value={genreFilter}
               onChange={(e) => setGenreFilter(e.target.value)}
-              className="filter-select"
+              style={{
+                appearance: "none",
+                WebkitAppearance: "none",
+                background: genreFilter !== "all" ? "rgba(255, 255, 255, 0.16)" : "rgba(28, 30, 36, 0.58)",
+                border: genreFilter !== "all" ? "1px solid rgba(255, 255, 255, 0.35)" : "1px solid rgba(255, 255, 255, 0.10)",
+                borderRadius: "999px",
+                color: genreFilter !== "all" ? "#ffffff" : "rgba(255, 255, 255, 0.65)",
+                padding: "6px 28px 6px 14px",
+                fontSize: "12.5px",
+                fontWeight: genreFilter !== "all" ? 600 : 500,
+                cursor: "pointer",
+                outline: "none",
+                flexShrink: 0,
+                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.5)' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`,
+                backgroundRepeat: "no-repeat",
+                backgroundPosition: "right 10px center",
+                backgroundSize: "10px",
+              }}
             >
-              <option value="all">All Genres</option>
+              <option value="all" style={{ background: "#161820", color: "#fff" }}>All Genres</option>
               {genres.map((genre) => (
-                <option key={genre} value={genre}>
+                <option key={genre} value={genre} style={{ background: "#161820", color: "#fff" }}>
                   {genre}
                 </option>
               ))}
@@ -337,11 +344,28 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
             <select
               value={languageFilter}
               onChange={(e) => setLanguageFilter(e.target.value)}
-              className="filter-select"
+              style={{
+                appearance: "none",
+                WebkitAppearance: "none",
+                background: languageFilter !== "all" ? "rgba(255, 255, 255, 0.16)" : "rgba(28, 30, 36, 0.58)",
+                border: languageFilter !== "all" ? "1px solid rgba(255, 255, 255, 0.35)" : "1px solid rgba(255, 255, 255, 0.10)",
+                borderRadius: "999px",
+                color: languageFilter !== "all" ? "#ffffff" : "rgba(255, 255, 255, 0.65)",
+                padding: "6px 28px 6px 14px",
+                fontSize: "12.5px",
+                fontWeight: languageFilter !== "all" ? 600 : 500,
+                cursor: "pointer",
+                outline: "none",
+                flexShrink: 0,
+                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.5)' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`,
+                backgroundRepeat: "no-repeat",
+                backgroundPosition: "right 10px center",
+                backgroundSize: "10px",
+              }}
             >
-              <option value="all">All Languages</option>
+              <option value="all" style={{ background: "#161820", color: "#fff" }}>All Languages</option>
               {languages.map((lang) => (
-                <option key={lang} value={lang}>
+                <option key={lang} value={lang} style={{ background: "#161820", color: "#fff" }}>
                   {languageLabel(lang)}
                 </option>
               ))}

@@ -288,13 +288,17 @@ export default function WatchProvidersPanel({ tmdbId, defaultCountry, movieTitle
 
   // Reset search whenever the popover closes
   useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect */
     if (!pickerOpen) setCountryQuery("");
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [pickerOpen]);
 
   useEffect(() => {
     if (!tmdbId) return;
+    /* eslint-disable react-hooks/set-state-in-effect */
     setLoading(true);
     setError(null);
+    /* eslint-enable react-hooks/set-state-in-effect */
     fetch(`/api/tmdb-watch-providers?id=${tmdbId}`)
       .then((r) => r.json())
       .then((d: WatchProvidersResponse) => {
@@ -342,8 +346,16 @@ export default function WatchProvidersPanel({ tmdbId, defaultCountry, movieTitle
 
   if (loading) {
     return (
-      <div style={{ padding: "16px 0", color: "rgba(255,255,255,0.6)", fontSize: "13px" }}>
-        Loading streaming options…
+      <div style={{ display: "flex", flexDirection: "column", gap: "12px", minHeight: "110px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div className="skeleton-shimmer" style={{ width: "90px", height: "14px", borderRadius: "4px" }} />
+          <div className="skeleton-shimmer" style={{ width: "100px", height: "26px", borderRadius: "999px" }} />
+        </div>
+        <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
+          <div className="skeleton-shimmer" style={{ width: "42px", height: "42px", borderRadius: "10px" }} />
+          <div className="skeleton-shimmer" style={{ width: "42px", height: "42px", borderRadius: "10px" }} />
+          <div className="skeleton-shimmer" style={{ width: "42px", height: "42px", borderRadius: "10px" }} />
+        </div>
       </div>
     );
   }

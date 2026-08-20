@@ -272,6 +272,29 @@ export default function RecommendationsView({
 
 
   const [isUpdating, setIsUpdating] = useState(false);
+  const [headerHidden, setHeaderHidden] = useState(false);
+
+  useEffect(() => {
+    let lastY = window.scrollY;
+    let ticking = false;
+    const onScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        const y = window.scrollY;
+        const dy = y - lastY;
+        if (Math.abs(dy) > 6) {
+          if (y < 60) setHeaderHidden(false);
+          else if (dy > 0) setHeaderHidden(true);
+          else setHeaderHidden(false);
+          lastY = y;
+        }
+        ticking = false;
+      });
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
 
   // Action counter for auto-rerun
@@ -728,13 +751,15 @@ export default function RecommendationsView({
 
 
 
-          {/* Header */}
+          {/* Header (Desktop only) */}
           <header
-            className="glass"
+            className="glass dashboard-header"
             style={{
               position: "sticky",
               top: 0,
               zIndex: 40,
+              transform: headerHidden ? "translateY(-105%)" : "translateY(0)",
+              transition: "transform 280ms cubic-bezier(0.4, 0, 0.2, 1)",
             }}
           >
             <div
@@ -774,7 +799,7 @@ export default function RecommendationsView({
 
               {/* Right: search + user account menu */}
               <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "8px" }}>
-                {/* Desktop mini search box — hidden on mobile via CSS */}
+                {/* Desktop mini search box */}
                 <button
                   className="header-search-box"
                   onClick={() => router.push("/search")}
@@ -800,29 +825,7 @@ export default function RecommendationsView({
                   Search…
                 </button>
 
-                {/* Mobile search icon only */}
-                <button
-                  className="header-search-icon"
-                  onClick={() => router.push("/search")}
-                  aria-label="Search"
-                  style={{
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    color: "var(--color-text-primary)",
-                    padding: "6px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="11" cy="11" r="8" />
-                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                  </svg>
-                </button>
-
-                {/* Hamburger menu — right of search */}
+                {/* Account menu */}
                 <MobileMenu
                   onLogout={onLogout}
                   onReset={onBackToOnboarding}
@@ -834,8 +837,10 @@ export default function RecommendationsView({
             </div>
             <style>{`
               @media (max-width: 899px) {
-                .header-title-brand { display: none !important; }
-                .dashboard-header-bar { padding: 8px 16px !important; }
+                .dashboard-header { display: none !important; }
+              }
+              @media (min-width: 900px) {
+                .mobile-floating-hero-menu { display: none !important; }
               }
             `}</style>
           </header>
@@ -845,7 +850,24 @@ export default function RecommendationsView({
 
             {/* Loading skeleton */}
             {loading && movies.length === 0 && (
-              <div style={{ display: "grid", gap: "48px", padding: "24px 20px 0" }}>
+              <div style={{ display: "grid", gap: "48px", padding: "24px 20px 0", position: "relative" }}>
+                <div
+                  className="mobile-floating-hero-menu"
+                  style={{
+                    position: "absolute",
+                    top: "max(14px, calc(env(safe-area-inset-top) + 12px))",
+                    right: "16px",
+                    zIndex: 35,
+                  }}
+                >
+                  <MobileMenu
+                    onLogout={onLogout}
+                    onReset={onBackToOnboarding}
+                    onPreferences={openPrefs}
+                    onYourLikes={openYourLikes}
+                    onWatchlist={openWatchlist}
+                  />
+                </div>
                 {[0, 1, 2].map((i) => (
                   <div key={i}>
                     <div
@@ -881,9 +903,8 @@ export default function RecommendationsView({
                             className="skeleton-shimmer"
                             style={{
                               height: "8px",
-                              width: "50%",
-                              borderRadius: "4px",
-                              opacity: 0.6
+                              width: "55%",
+                              borderRadius: "4px"
                             }}
                           />
                         </div>
@@ -903,7 +924,26 @@ export default function RecommendationsView({
                 stacks[0];
               if (!heroStack || heroStack.movies.length === 0) return null;
               return (
-                <div style={{ marginBottom: 8 }}>
+                <div style={{ position: "relative", marginBottom: 8 }}>
+                  {/* Mobile floating glassy menu directly on hero banner */}
+                  <div
+                    className="mobile-floating-hero-menu"
+                    style={{
+                      position: "absolute",
+                      top: "max(14px, calc(env(safe-area-inset-top) + 12px))",
+                      right: "16px",
+                      zIndex: 35,
+                    }}
+                  >
+                    <MobileMenu
+                      onLogout={onLogout}
+                      onReset={onBackToOnboarding}
+                      onPreferences={openPrefs}
+                      onYourLikes={openYourLikes}
+                      onWatchlist={openWatchlist}
+                    />
+                  </div>
+
                   <HeroFeature
                     movies={heroStack.movies}
                     onOpenDetail={(m) => setActiveMovie(toDetailMovie(m))}

@@ -4,7 +4,7 @@
  * One canonical sticky page header.
  */
 
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import BackButton from "@/components/ui/BackButton";
 import { DesktopNavTabs } from "@/components/MobileMenu";
 
@@ -14,6 +14,8 @@ interface Props {
   backHref?: string;
   /** Override BackButton's onClick (e.g. close a modal). */
   onBack?: () => void;
+  /** Hide back button for primary top-level tabs. */
+  hideBackButton?: boolean;
   /** Element rendered in the right column (default: invisible spacer). */
   rightSlot?: ReactNode;
   /** Optional content below the header row (tabs, filters, etc.). */
@@ -28,6 +30,7 @@ export default function PageHeader({
   title,
   backHref,
   onBack,
+  hideBackButton = false,
   rightSlot,
   children,
   sticky = true,
@@ -35,7 +38,7 @@ export default function PageHeader({
 }: Props) {
   return (
     <header
-      className="glass"
+      className="glass page-header-root"
       style={{
         position: sticky ? "sticky" : "relative",
         top: 0,
@@ -46,26 +49,45 @@ export default function PageHeader({
       }}
     >
       <div
+        className="page-header-top-row"
         style={{
           width: "100%",
-          padding: "var(--s-header-y) var(--s-header-x)",
+          padding: "10px 16px",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
           position: "relative",
+          minHeight: "48px",
         }}
       >
-        {/* Left Column: Back button */}
         <div style={{ display: "flex", alignItems: "center", minWidth: "44px", zIndex: 10 }}>
-          <BackButton href={backHref} onClick={onBack} ariaLabel={backAriaLabel} />
+          {!hideBackButton ? (
+            <BackButton href={backHref} onClick={onBack} ariaLabel={backAriaLabel} />
+          ) : (
+            <div style={{ width: "44px" }} />
+          )}
         </div>
 
-        {/* Center Column: Desktop Navigation Tabs (>=900px) OR Mobile Title (<900px) */}
         <div className="page-header-center">
           <div className="desktop-header-tabs">
             <DesktopNavTabs />
           </div>
-          <h1 className="h-page mobile-header-title" style={{ margin: 0, textAlign: "center" }}>
+          <h1
+            className="mobile-header-title"
+            style={{
+              margin: 0,
+              fontSize: "22px",
+              fontWeight: 800,
+              letterSpacing: "-0.035em",
+              color: "#ffffff",
+              textAlign: "center",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "6px",
+              whiteSpace: "nowrap",
+            }}
+          >
             {title}
           </h1>
         </div>
@@ -81,11 +103,15 @@ export default function PageHeader({
           }}
           aria-hidden={!rightSlot}
         >
-          {rightSlot}
+          {rightSlot ?? <div style={{ width: "44px" }} />}
         </div>
       </div>
 
-      {children}
+      {children && (
+        <div className="page-header-children-wrapper">
+          {children}
+        </div>
+      )}
 
       <style>{`
         .page-header-center {
@@ -96,11 +122,17 @@ export default function PageHeader({
           align-items: center;
           justify-content: center;
           pointer-events: auto;
+          max-width: calc(100% - 100px);
         }
 
         @media (min-width: 900px) {
           .desktop-header-tabs { display: flex !important; }
           .mobile-header-title { display: none !important; }
+          .page-header-children-wrapper {
+            max-height: none !important;
+            opacity: 1 !important;
+            pointer-events: auto !important;
+          }
         }
 
         @media (max-width: 899px) {

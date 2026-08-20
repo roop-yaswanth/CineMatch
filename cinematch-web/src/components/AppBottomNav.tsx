@@ -26,38 +26,38 @@ interface NavItem {
   href: string;
   label: string;
   /** stable key for the layout animation */
-  id: "home" | "explore" | "watchlist" | "likes";
+  id: "home" | "explore" | "watchlist" | "likes" | "search";
   Icon: React.FC<{ active: boolean }>;
 }
 
 const IconHome: React.FC<{ active: boolean }> = ({ active }) => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-    <polyline points="9 22 9 12 15 12 15 22" stroke={active ? "var(--color-bg, #0a0a0f)" : "currentColor"} fill="none" />
+    <polyline points="9 22 9 12 15 12 15 22" stroke={active ? "#0e1016" : "currentColor"} fill="none" />
   </svg>
 );
 
 const IconCompass: React.FC<{ active: boolean }> = ({ active }) => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="12" cy="12" r="10" />
-    <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" stroke={active ? "var(--color-bg, #0a0a0f)" : "currentColor"} fill={active ? "var(--color-bg, #0a0a0f)" : "none"} />
+    <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" fill={active ? "currentColor" : "none"} />
   </svg>
 );
 
 const IconBookmark: React.FC<{ active: boolean }> = ({ active }) => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
   </svg>
 );
 
 const IconHeart: React.FC<{ active: boolean }> = ({ active }) => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+  <svg width="20" height="20" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
   </svg>
 );
 
-const IconSearch = () => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+const IconSearch: React.FC<{ active: boolean }> = ({ active }) => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? "2.5" : "2"} strokeLinecap="round" strokeLinejoin="round">
     <circle cx="11" cy="11" r="8" />
     <line x1="21" y1="21" x2="16.65" y2="16.65" />
   </svg>
@@ -68,6 +68,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "explore", href: "/explore", label: "Explore", Icon: IconCompass },
   { id: "watchlist", href: "/your-likes?filter=watchlist", label: "Watchlist", Icon: IconBookmark },
   { id: "likes", href: "/your-likes", label: "Likes", Icon: IconHeart },
+  { id: "search", href: "/search", label: "Search", Icon: IconSearch },
 ];
 
 const HIDDEN_ROUTES: Array<(p: string) => boolean> = [
@@ -76,13 +77,12 @@ const HIDDEN_ROUTES: Array<(p: string) => boolean> = [
 ];
 
 /**
- * Determine which nav id is active. usePathname alone isn't enough because
- * Watchlist vs Likes share the /your-likes path and only differ by the
- * `?filter=watchlist` search param.
+ * Determine which nav id is active.
  */
 function activeIdFor(pathname: string, filterParam: string | null): NavItem["id"] | null {
   if (pathname === "/dashboard" || pathname === "/") return "home";
   if (pathname.startsWith("/explore")) return "explore";
+  if (pathname.startsWith("/search")) return "search";
   if (pathname.startsWith("/your-likes")) {
     return filterParam === "watchlist" ? "watchlist" : "likes";
   }
@@ -95,30 +95,25 @@ export default function AppBottomNav() {
   const filterParam = searchParams?.get("filter") ?? null;
   const { session } = useSession();
   const [hidden, setHidden] = useState(false);
+  const [optimisticId, setOptimisticId] = useState<NavItem["id"] | null>(null);
 
-  // Render nothing until after the first client commit. The server render
-  // (and the SW-cached HTML) has no session, so the nav is omitted there;
-  // on the client `useSession` may have already rehydrated from
-  // localStorage by the time React hydrates, leading to a "client added a
-  // <div> the server didn't render" mismatch on /dashboard. Gating on a
-  // mounted flag forces both renders to agree (null, then the real nav
-  // appears on the next client render).
   const [mounted, setMounted] = useState(false);
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => { setMounted(true); }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
-  // The bottom nav previously sequenced the active pill through every
-  // intermediate item on multi-step jumps ("flowing bubble" effect). It
-  // depended on `displayedActiveId` for both reading and writing inside
-  // the same effect, which caused the effect to re-run on every render
-  // and (on /your-likes ↔ ?filter=watchlist switches in particular) made
-  // the pill visibly lag — sometimes the tap looked unresponsive.
-  //
-  // The framer-motion `layoutId` already animates magic-moves between
-  // any two positions perfectly. Drop the manual sequencing and just
-  // mirror the real activeId.
   const activeId = activeIdFor(pathname, filterParam);
-  const displayedActiveId = activeId;
-  const searchActive = pathname.startsWith("/search");
+
+  // Reconcile optimistic active tab once actual route matches
+  useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect */
+    if (optimisticId && activeId === optimisticId) {
+      setOptimisticId(null);
+    }
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [activeId, optimisticId]);
+
+  const displayedActiveId = optimisticId ?? activeId;
 
   useEffect(() => {
     let lastY = window.scrollY;
@@ -158,11 +153,7 @@ export default function AppBottomNav() {
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
-        gap: "10px",
-        // Lift the bar well above the iOS home indicator. The safe-area
-        // inset alone (~34px on iPhones with rounded corners) puts the pill
-        // flush against the swipe-up zone, where edge taps are eaten by the
-        padding: "0 16px calc(28px + env(safe-area-inset-bottom))",
+        padding: "0 12px calc(24px + env(safe-area-inset-bottom))",
         pointerEvents: hidden ? "none" : "auto",
         transform: hidden ? "translateY(140%)" : "translateY(0)",
         transition: "transform 280ms cubic-bezier(0.4, 0, 0.2, 1)",
@@ -170,22 +161,31 @@ export default function AppBottomNav() {
     >
       <nav
         aria-label="Primary navigation"
-        className="liquid-glass"
         style={{
           display: "flex",
           alignItems: "center",
           gap: "2px",
-          padding: "6px",
+          padding: "4px 6px",
           borderRadius: "999px",
+          background: "rgba(14, 16, 22, 0.90)",
+          backdropFilter: "blur(28px) saturate(1.4)",
+          WebkitBackdropFilter: "blur(28px) saturate(1.4)",
+          border: "1px solid rgba(255, 255, 255, 0.14)",
+          boxShadow: "0 16px 36px rgba(0, 0, 0, 0.7), 0 2px 8px rgba(0, 0, 0, 0.4), 0 1px 0 rgba(255, 255, 255, 0.15) inset",
         }}
       >
         {NAV_ITEMS.map((item) => {
-          const active = activeId === item.id;
+          const active = displayedActiveId === item.id;
           return (
             <Link
               key={item.id}
               href={item.href}
               prefetch
+              onClick={() => {
+                if (displayedActiveId !== item.id) {
+                  setOptimisticId(item.id);
+                }
+              }}
               aria-current={active ? "page" : undefined}
               aria-label={item.label}
               style={{
@@ -195,32 +195,28 @@ export default function AppBottomNav() {
                 alignItems: "center",
                 justifyContent: "center",
                 gap: "2px",
-                minWidth: "60px",
-                minHeight: "48px",
-                padding: "6px 10px",
+                minWidth: "56px",
+                minHeight: "46px",
+                padding: "6px 8px",
                 borderRadius: "999px",
                 textDecoration: "none",
-                color: active ? "var(--color-text-primary)" : "var(--color-text-muted)",
-                transition: "color 220ms ease",
+                color: active ? "#ffffff" : "rgba(255, 255, 255, 0.65)",
+                transition: "color 180ms ease",
                 cursor: "pointer",
               }}
             >
-              {/* Sliding active indicator — a single shared element that
-                  magic-moves between items. We render it whenever the
-                  displayedActiveId matches this item; for multi-step
-                  jumps the parent sequences displayedActiveId through
-                  intermediates to create a flowing motion. */}
+              {/* Sliding active indicator */}
               {displayedActiveId === item.id && (
                 <motion.div
                   layoutId="bottom-nav-active-pill"
-                  transition={displayedActiveId === activeId ? { type: "spring", stiffness: 500, damping: 38, mass: 0.7 } : { type: "tween", duration: 0.14, ease: "easeOut" }}
+                  transition={{ type: "spring", stiffness: 420, damping: 32, mass: 0.8 }}
                   style={{
                     position: "absolute",
                     inset: 0,
                     borderRadius: "999px",
-                    background:
-                      "linear-gradient(180deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.06) 100%)",
-                    boxShadow: "0 1px 0 rgba(255,255,255,0.10) inset",
+                    background: "linear-gradient(180deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0.08) 100%)",
+                    border: "1px solid rgba(255, 255, 255, 0.2)",
+                    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.35)",
                     zIndex: 0,
                   }}
                 />
@@ -234,8 +230,9 @@ export default function AppBottomNav() {
                   zIndex: 1,
                   fontSize: "10px",
                   fontWeight: active ? 600 : 500,
-                  letterSpacing: "-0.005em",
+                  letterSpacing: "-0.01em",
                   lineHeight: 1,
+                  color: active ? "#ffffff" : "rgba(255, 255, 255, 0.65)",
                 }}
               >
                 {item.label}
@@ -244,32 +241,6 @@ export default function AppBottomNav() {
           );
         })}
       </nav>
-
-      {/* Floating search bubble */}
-      <Link
-        href="/search"
-        prefetch
-        aria-label="Search"
-        className="liquid-glass"
-        style={{
-          width: "56px",
-          height: "56px",
-          borderRadius: "999px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          color: searchActive ? "var(--color-text-primary)" : "var(--color-text-muted)",
-          // Active state brightens the glass; otherwise the .liquid-glass
-          // material (gradient + blur + rim) provides the surface.
-          background: searchActive ? "rgba(255,255,255,0.18)" : undefined,
-          textDecoration: "none",
-          transition: "background 220ms ease, color 220ms ease",
-        }}
-      >
-        <span style={{ position: "relative", zIndex: 1, display: "flex" }}>
-          <IconSearch />
-        </span>
-      </Link>
 
       <style>{`
         @media (min-width: 900px) {

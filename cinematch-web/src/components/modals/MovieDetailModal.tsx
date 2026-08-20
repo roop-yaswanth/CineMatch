@@ -72,7 +72,7 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
     return () => window.removeEventListener("resize", check);
   }, []);
 
-  // Prevent body scroll when open; reset trailer on close
+  // Prevent body scroll when open; reset trailer & watch providers on close
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
@@ -94,31 +94,28 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
     };
   }, [isOpen]);
 
-  // Keep a stable ref to onClose so the history effect never re-runs just
-  // because the parent re-created the callback (e.g. after onMovieSelect).
+  // Keep a stable ref to onClose
   const onCloseRef = useRef(onClose);
   useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
 
-  // PWA back-gesture: push a fake history entry when the modal opens so that
-  // a back-swipe / back-button closes this modal instead of navigating away.
-  // Uses the centralized backStack so nested modals don't conflict.
+  // PWA back-gesture
   useEffect(() => {
     if (!isOpen) return;
     const cleanup = pushBackHandler(() => onCloseRef.current());
-    return cleanup; // called when isOpen flips false (via UI close, not back gesture)
+    return cleanup;
   }, [isOpen]);
 
   // Fetch similar movies whenever the movie changes
   useEffect(() => {
     const id = movie?.tmdb_id ?? movie?.id;
     if (!isOpen || !id) {
+      /* eslint-disable react-hooks/set-state-in-effect */
       setSimilar([]);
       setSimilarLoading(false);
+      /* eslint-enable react-hooks/set-state-in-effect */
       return;
     }
 
-    // Reset the language filter when the movie changes so users see all
-    // results by default and don't get a confusingly empty section.
     setFilterSimilarByLang(false);
     setSimilarLoading(true);
     setSimilar([]);
@@ -133,9 +130,6 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
   }, [movie?.id, movie?.tmdb_id, isOpen, sessionId]);
 
   // Fetch cast & crew whenever the movie changes.
-  // The synchronous setState resets are intentional: when the user opens a
-  // different movie, we want stale credits cleared on the next paint, not on
-  // a deferred microtask.
   useEffect(() => {
     const id = movie?.tmdb_id ?? movie?.id;
     if (!isOpen || !id) {
@@ -164,8 +158,6 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
   }, [movie?.id, movie?.tmdb_id, isOpen]);
 
   // Fetch live IMDB rating on open.
-  // Best-effort and non-blocking: the CSV/TMDB rating renders immediately and
-  // is only replaced if a live value arrives. Backend maps tmdb_id → imdb_id via the catalog.
   useEffect(() => {
     const id = movie?.tmdb_id ?? movie?.id;
     if (!isOpen || (!id && !movie?.imdb_id)) {
@@ -191,14 +183,11 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
   };
 
   const handleWatchTrailer = (langKey?: string) => {
-    // Specific language button clicked — open that language's trailer directly
     if (langKey) { setShowTrailerPlayer(true); setSelectedTrailerLang(langKey); return; }
-    // Already fetched and found — open player (first/primary language)
     if (trailerFetched && !trailerLoading) {
       if (trailerKey) { setShowTrailerPlayer(true); }
       return;
     }
-    // First click — lazy fetch
     const id = movie?.tmdb_id ?? movie?.id;
     if (!id) return;
     setTrailerLoading(true);
@@ -208,14 +197,11 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
         const langs = d.languages ?? [];
         setTrailerLanguages(langs);
         setTrailerFetched(true);
-        // Prefer original language of the movie, fall back to first available
         const origLang = movie?.original_language;
         const preferred = langs.find((l) => l.lang === origLang) ?? langs[0];
         const key = preferred?.key ?? d.key ?? null;
         setTrailerKey(key);
         setSelectedTrailerLang(key);
-        // Auto-open player only for single-language movies.
-        // For multilingual: just show the language pills — user picks first.
         if (key && langs.length <= 1) setShowTrailerPlayer(true);
       })
       .catch(() => setTrailerFetched(true))
@@ -232,17 +218,14 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
     return preferredLanguages.includes(m.original_language);
   });
 
-  const poster = posterUrl(movie.poster_path, "w500");
-  // On mobile we use the wider backdrop(saves vertical space).
-  // Fall back to the portrait poster if backdrop_path is missing.
-  const mobileHero = movie.backdrop_path
+  const poster = posterUrl(movie.poster_path, "w780");
+  const bgImage = movie.backdrop_path
     ? `https://image.tmdb.org/t/p/w1280${movie.backdrop_path}`
     : poster;
+
   const lang = movie.original_language ? languageLabel(movie.original_language) : "";
   const year = movie.year || "";
   const genres = movie.genres?.join(", ") || movie.primary_genre || "";
-  // Prefer the live IMDB rating when it has loaded; otherwise the instant
-  // CSV rating, then TMDB's vote_average.
   const imdb = imdbLive?.rating != null
     ? imdbLive.rating.toFixed(1)
     : movie.imdb_rating ? movie.imdb_rating.toFixed(1)
@@ -252,145 +235,555 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
   const matchPct = movie.score !== undefined && movie.score >= 0.70 ? Math.round(movie.score * 100) : null;
   const matchColor = movie.score !== undefined && movie.score >= 0.85 ? "var(--color-success)" : "var(--color-yellow)";
   const guessedCountry = userRegion ? (REGION_TO_COUNTRY[userRegion] ?? "US") : "US";
-  const watchButtonStyle = {
-    position: "absolute" as const,
-    bottom: isMobile ? "14px" : "16px",
-    left: isMobile ? "12px" : "16px",
-    right: isMobile ? "12px" : "16px",
-    padding: "12px 16px",
-    borderRadius: "12px",
-    fontSize: "13px",
-    fontWeight: 700,
-    color: "#fff",
-    cursor: "pointer",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "10px",
-    background: "linear-gradient(130deg, rgba(255,255,255,0.24) 0%, rgba(255,255,255,0.10) 30%, rgba(255,255,255,0.18) 52%, rgba(255,255,255,0.07) 100%), rgba(255,255,255,0.03)",
-    border: "1px solid rgba(255, 255, 255, 0.34)",
-    backdropFilter: "blur(20px) saturate(1.55)",
-    WebkitBackdropFilter: "blur(20px) saturate(1.55)",
-    boxShadow: "0 8px 24px rgba(0, 0, 0, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.42), inset 0 -10px 16px rgba(255, 255, 255, 0.04)",
-    zIndex: 10,
-    textShadow: "0 2px 4px rgba(0, 0, 0, 0.3)",
-    transition: "all 0.3s ease",
-  };
+  const hasTmdb = (movie.tmdb_id ?? movie.id) > 0;
 
-  // Watch Trailer node — extracted so it can sit at a fixed spot above the
-  // overview (consistent placement = muscle memory) instead of after it.
-  const trailerNode = (() => {
-    const notFound = trailerFetched && !trailerLoading && !trailerKey;
-    const isMultiLang = trailerLanguages.length > 1;
+  const whereToWatchIcon = (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect width="20" height="14" x="2" y="3" rx="3" />
+      <path d="M8 21h8" />
+      <path d="M12 17v4" />
+    </svg>
+  );
 
-    if (trailerLoading) {
-      return (
-        <div style={{
-          display: "flex", alignItems: "center", justifyContent: "center",
-          gap: "10px", padding: "12px 18px", borderRadius: "12px",
-          background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
-          color: "var(--color-text-muted)", fontSize: "13px",
-        }}>
-          <div style={{
-            width: "14px", height: "14px", borderRadius: "50%",
-            border: "2px solid rgba(255,255,255,0.15)",
-            borderTopColor: "rgba(255,255,255,0.6)",
-            animation: "spin 0.8s linear infinite", flexShrink: 0,
-          }} />
-          <style>{"@keyframes spin{to{transform:rotate(360deg)}}"}</style>
-          <span>Finding trailer...</span>
-        </div>
-      );
-    }
+  /* ── Metadata & Title ── */
 
-    if (notFound) {
-      return (
-        <div style={{
-          display: "flex", alignItems: "center", justifyContent: "center",
-          gap: "8px", padding: "12px 18px", borderRadius: "12px",
-          background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)",
-          color: "rgba(255,255,255,0.35)", fontSize: "12px",
-        }}>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
-          </svg>
-          <span>No trailer available</span>
-        </div>
-      );
-    }
+  const metaLine = (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", alignItems: "center", color: "rgba(255, 255, 255, 0.7)", fontSize: "14px", fontWeight: 500 }}>
+      {year && <span>{year}</span>}
+      {year && lang && <span style={{ opacity: 0.4 }}>•</span>}
+      {lang && <span>{lang}</span>}
+      {(year || lang) && runtime && <span style={{ opacity: 0.4 }}>•</span>}
+      {runtime && <span>{runtime}</span>}
+      {(year || lang || runtime) && imdb && <span style={{ opacity: 0.4 }}>•</span>}
+      {imdb && (
+        <span style={{ color: "#facc15", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: "4px" }}>
+          {movie.imdb_rating || imdbLive?.rating != null ? `IMDb ${imdb}` : `★ ${imdb}`}
+        </span>
+      )}
+    </div>
+  );
 
-    if (isMultiLang) {
-      return (
-        <div>
-          <p style={{ margin: "0 0 8px", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.07em", color: "var(--color-text-muted)", opacity: 0.6 }}>
-            Watch Trailer in
-          </p>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-            {trailerLanguages.map((tl) => {
-              const isActive = tl.key === selectedTrailerLang;
-              return (
-                <motion.button
-                  key={tl.lang}
-                  whileHover={{ scale: 1.04 }}
-                  whileTap={{ scale: 0.96 }}
-                  onClick={() => handleWatchTrailer(tl.key)}
-                  style={{
-                    display: "flex", alignItems: "center", gap: "6px",
-                    padding: "9px 16px", borderRadius: "100px",
-                    background: isActive ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.06)",
-                    border: `1px solid ${isActive ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.1)"}`,
-                    color: isActive ? "var(--color-text-primary)" : "var(--color-text-muted)",
-                    fontSize: "13px", fontWeight: isActive ? 600 : 500,
-                    cursor: "pointer", transition: "all 0.18s",
-                  }}
-                >
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" style={{ opacity: isActive ? 1 : 0.7 }}>
-                    <polygon points="5 3 19 12 5 21 5 3" />
-                  </svg>
-                  {tl.label}
-                </motion.button>
-              );
-            })}
-          </div>
-        </div>
-      );
-    }
+  const titleBlock = logoPath ? (
+    <div style={{ marginBottom: "8px", marginTop: "2px" }}>
+      <img
+        src={posterUrl(logoPath, "w500")}
+        alt={movie.title}
+        style={{
+          maxHeight: isMobile ? "52px" : "68px",
+          maxWidth: isMobile ? "220px" : "320px",
+          width: "auto",
+          height: "auto",
+          objectFit: "contain",
+          filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.6))",
+        }}
+        onError={() => setLogoPath(null)}
+      />
+    </div>
+  ) : (
+    <h2 style={{
+      margin: "0 0 6px 0",
+      fontSize: isMobile ? "clamp(22px, 5.5vw, 26px)" : "32px",
+      fontWeight: 700,
+      letterSpacing: "-0.02em",
+      lineHeight: 1.15,
+      color: "#ffffff",
+    }}>
+      {movie.title}
+    </h2>
+  );
 
-    return (
-      <motion.button
-        whileHover={{ scale: 1.02 }}
-        whileTap={{ scale: 0.97 }}
+  const genresRow = genres ? (
+    <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+      {genres.split(",").map((g) => (
+        <span
+          key={g}
+          style={{
+            padding: "4px 12px",
+            borderRadius: "999px",
+            background: "rgba(255, 255, 255, 0.08)",
+            border: "1px solid rgba(255, 255, 255, 0.12)",
+            fontSize: "12px",
+            fontWeight: 500,
+            color: "rgba(255, 255, 255, 0.85)",
+          }}
+        >
+          {g.trim()}
+        </span>
+      ))}
+    </div>
+  ) : null;
+
+  /* ── Watch Trailer Button ── */
+  const notFound = trailerFetched && !trailerLoading && !trailerKey;
+  const isMultiLang = trailerLanguages.length > 1;
+  const trailerNode = trailerLoading ? (
+    <div style={{
+      width: "100%", height: "44px", borderRadius: "999px",
+      background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.15)",
+      display: "flex", alignItems: "center", justifyContent: "center", gap: "10px",
+      color: "#fff", fontSize: "14px", fontWeight: 600,
+    }}>
+      <div style={{
+        width: "14px", height: "14px", borderRadius: "50%",
+        border: "2px solid rgba(255,255,255,0.2)",
+        borderTopColor: "#fff",
+        animation: "spin 0.8s linear infinite",
+      }} />
+      <style>{"@keyframes spin{to{transform:rotate(360deg)}}"}</style>
+      <span>Finding trailer…</span>
+    </div>
+  ) : notFound ? (
+    <div style={{
+      width: "100%", height: "44px", borderRadius: "999px",
+      background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      color: "rgba(255,255,255,0.45)", fontSize: "13px",
+    }}>
+      No trailer available
+    </div>
+  ) : isMultiLang ? (
+    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+      <button
+        type="button"
         onClick={() => handleWatchTrailer()}
         style={{
-          display: "flex", alignItems: "center", justifyContent: "center",
-          gap: "10px", width: "100%", padding: "12px 18px", borderRadius: "12px",
-          background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)",
-          color: "var(--color-text-primary)", cursor: "pointer",
-          fontSize: "14px", fontWeight: 600, letterSpacing: "0.01em",
+          width: "100%", height: "44px", borderRadius: "999px",
+          background: "#ffffff", border: "none",
+          color: "#000000", fontSize: "14px", fontWeight: 700,
+          display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
+          cursor: "pointer", boxShadow: "0 4px 14px rgba(0,0,0,0.3)",
+          transition: "transform 0.12s ease, filter 0.12s ease",
         }}
+        onPointerDown={(e) => { (e.currentTarget as HTMLElement).style.transform = "scale(0.98)"; }}
+        onPointerUp={(e) => { (e.currentTarget as HTMLElement).style.transform = ""; }}
       >
-        <div style={{
-          width: "28px", height: "28px", borderRadius: "50%",
-          background: "rgba(255,255,255,0.12)",
-          display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-        }}>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style={{ marginLeft: "2px" }}>
-            <polygon points="5 3 19 12 5 21 5 3" />
-          </svg>
-        </div>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+          <polygon points="5 3 19 12 5 21 5 3" />
+        </svg>
         <span>Watch Trailer</span>
-      </motion.button>
-    );
-  })();
+      </button>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+        {trailerLanguages.map((tl) => {
+          const isActive = tl.key === selectedTrailerLang;
+          return (
+            <button
+              key={tl.lang}
+              onClick={() => handleWatchTrailer(tl.key)}
+              style={{
+                padding: "4px 10px", borderRadius: "12px",
+                background: isActive ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.06)",
+                border: isActive ? "1px solid rgba(255,255,255,0.35)" : "1px solid rgba(255,255,255,0.1)",
+                color: "#fff", fontSize: "11px", fontWeight: isActive ? 600 : 500, cursor: "pointer",
+              }}
+            >
+              {tl.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  ) : (
+    <button
+      type="button"
+      onClick={() => handleWatchTrailer()}
+      style={{
+        width: "100%", height: "44px", borderRadius: "999px",
+        background: "#ffffff", border: "none",
+        color: "#000000", fontSize: "14px", fontWeight: 700,
+        display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
+        cursor: "pointer", boxShadow: "0 4px 14px rgba(0,0,0,0.3)",
+        transition: "transform 0.12s ease, filter 0.12s ease",
+      }}
+      onPointerDown={(e) => { (e.currentTarget as HTMLElement).style.transform = "scale(0.98)"; }}
+      onPointerUp={(e) => { (e.currentTarget as HTMLElement).style.transform = ""; }}
+    >
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+        <polygon points="5 3 19 12 5 21 5 3" />
+      </svg>
+      <span>Watch Trailer</span>
+    </button>
+  );
 
-  if (typeof document === 'undefined') return null;
+  const overviewNode = (
+    <p style={{ margin: 0, fontSize: "13px", lineHeight: 1.6, color: "rgba(255, 255, 255, 0.78)" }}>
+      {overview}
+    </p>
+  );
+
+  const reasonNode = movie.reason ? (
+    <div style={{
+      padding: "12px 14px", borderRadius: "12px",
+      background: "rgba(255, 255, 255, 0.05)",
+      border: "1px solid rgba(255, 255, 255, 0.08)",
+    }}>
+      <p style={{ margin: "0 0 4px", fontSize: "10px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(255, 255, 255, 0.45)" }}>
+        Why recommended
+      </p>
+      <p style={{ margin: 0, fontSize: "12.5px", fontStyle: "italic", color: "rgba(255, 255, 255, 0.8)" }}>
+        {movie.reason}
+      </p>
+    </div>
+  ) : null;
+
+  const creditsRow = (directors.length > 0 || writers.length > 0) ? (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: "20px 32px", fontSize: "13px" }}>
+      {directors.length > 0 && (
+        <div>
+          <div style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(255, 255, 255, 0.45)", marginBottom: "3px" }}>
+            {directors.length > 1 ? "DIRECTORS" : "DIRECTOR"}
+          </div>
+          <div style={{ color: "#ffffff", fontWeight: 600, fontSize: "13px" }}>
+            {directors.map((d, i) => (
+              <span key={`${d.id}-${i}`}>
+                <button
+                  onClick={() => setActivePersonId(d.id)}
+                  style={{ padding: 0, background: "none", border: "none", cursor: "pointer", color: "inherit", textDecoration: "none", fontSize: "inherit", fontFamily: "inherit", fontWeight: "inherit" }}
+                >
+                  {d.name}
+                </button>
+                {i < directors.length - 1 ? ", " : ""}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+      {writers.length > 0 && (
+        <div>
+          <div style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(255, 255, 255, 0.45)", marginBottom: "3px" }}>
+            {writers.length > 1 ? "WRITERS" : "WRITER"}
+          </div>
+          <div style={{ color: "#ffffff", fontWeight: 600, fontSize: "13px" }}>
+            {(() => {
+              const seen = new Set<number>();
+              const uniq = writers.filter((w) => {
+                if (seen.has(w.id)) return false;
+                seen.add(w.id);
+                return true;
+              }).slice(0, 4);
+              return uniq.map((w, i) => (
+                <span key={`${w.id}-${i}`}>
+                  <button
+                    onClick={() => setActivePersonId(w.id)}
+                    style={{ padding: 0, background: "none", border: "none", cursor: "pointer", color: "inherit", textDecoration: "none", fontSize: "inherit", fontFamily: "inherit", fontWeight: "inherit" }}
+                  >
+                    {w.name}
+                  </button>
+                  {i < uniq.length - 1 ? ", " : ""}
+                </span>
+              ));
+            })()}
+          </div>
+        </div>
+      )}
+    </div>
+  ) : null;
+
+  /* ── Rate this movie buttons ── */
+  const rateCardButton = (
+    action: "like" | "okay" | "dislike",
+    label: string,
+    color: string,
+    icon: React.ReactNode,
+  ) => (
+    <button
+      onClick={() => handleActionClick(action)}
+      aria-label={label}
+      title={label}
+      style={{
+        flex: 1,
+        height: "46px",
+        borderRadius: "14px",
+        background: "rgba(255, 255, 255, 0.08)",
+        border: "1px solid rgba(255, 255, 255, 0.12)",
+        color: color,
+        cursor: "pointer",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        transition: "background 0.15s, transform 0.1s, border-color 0.15s",
+      }}
+      onPointerDown={(e) => { (e.currentTarget as HTMLElement).style.transform = "scale(0.94)"; }}
+      onPointerUp={(e) => { (e.currentTarget as HTMLElement).style.transform = ""; }}
+      onPointerLeave={(e) => { (e.currentTarget as HTMLElement).style.transform = ""; }}
+    >
+      <AnimatePresence mode="wait">
+        {successAction === action ? (
+          <motion.svg key="done" initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.5, opacity: 0 }} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></motion.svg>
+        ) : (
+          <motion.span key="icon" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ display: "flex" }}>
+            {icon}
+          </motion.span>
+        )}
+      </AnimatePresence>
+    </button>
+  );
+
+  const pillAction = (
+    action: "watchlist" | "skip",
+    label: string,
+    doneLabel: string,
+    icon: React.ReactNode,
+    flex: number = 1,
+  ) => (
+    <button
+      onClick={() => handleActionClick(action)}
+      style={{
+        flex,
+        height: "42px",
+        borderRadius: "24px",
+        background: "rgba(255, 255, 255, 0.08)",
+        border: "1px solid rgba(255, 255, 255, 0.12)",
+        color: "#ffffff",
+        fontSize: "13px",
+        fontWeight: 600,
+        cursor: "pointer",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "7px",
+        transition: "background 0.15s, transform 0.1s, border-color 0.15s",
+      }}
+      onPointerDown={(e) => { (e.currentTarget as HTMLElement).style.transform = "scale(0.95)"; }}
+      onPointerUp={(e) => { (e.currentTarget as HTMLElement).style.transform = ""; }}
+      onPointerLeave={(e) => { (e.currentTarget as HTMLElement).style.transform = ""; }}
+    >
+      <AnimatePresence mode="wait">
+        {successAction === action ? (
+          <motion.span key="done" initial={{ scale: 0.7, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.7, opacity: 0 }} style={{ display: "inline-flex", alignItems: "center", gap: "6px", color: "var(--color-success)" }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+            {doneLabel}
+          </motion.span>
+        ) : (
+          <motion.span key="icon" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ display: "inline-flex", alignItems: "center", gap: "7px" }}>
+            {icon}
+            {label}
+          </motion.span>
+        )}
+      </AnimatePresence>
+    </button>
+  );
+
+  const rateSection = onAction ? (
+    <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+      <h4 style={{ margin: "0 0 4px 0", fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(255, 255, 255, 0.5)" }}>
+        RATE THIS MOVIE
+      </h4>
+      <div style={{ display: "flex", gap: "8px" }}>
+        {rateCardButton("like", "Like", "#22c55e",
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" /></svg>)}
+        {rateCardButton("okay", "Okay", "#3b82f6",
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z" /><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" /></svg>)}
+        {rateCardButton("dislike", "Dislike", "#ef4444",
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10z" /><path d="M17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17" /></svg>)}
+      </div>
+      <div style={{ display: "flex", gap: "8px" }}>
+        {pillAction("watchlist", "Add to Watchlist", "Added",
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /></svg>, 1.35)}
+        {pillAction("skip", "Skip", "Skipped",
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 4 15 12 5 20 5 4" fill="currentColor"></polygon><line x1="19" y1="5" x2="19" y2="19"></line></svg>, 1)}
+      </div>
+    </div>
+  ) : null;
+
+  /* ── Cast section ── */
+  const castSection = (creditsLoading || cast.length > 0) ? (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+        <h4 style={{ margin: 0, fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(255, 255, 255, 0.5)" }}>
+          CAST
+        </h4>
+        {!creditsLoading && cast.length > 0 && (
+          <div style={{ display: "flex", gap: "6px" }}>
+            <button
+              onClick={() => {
+                const el = castRowRef.current;
+                if (!el) return;
+                el.scrollBy({ left: -260, behavior: "smooth" });
+              }}
+              aria-label="Scroll cast left"
+              style={{ width: "26px", height: "26px", borderRadius: "50%", border: "1px solid rgba(255,255,255,0.12)", background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.8)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+            </button>
+            <button
+              onClick={() => {
+                const el = castRowRef.current;
+                if (!el) return;
+                el.scrollBy({ left: 260, behavior: "smooth" });
+              }}
+              aria-label="Scroll cast right"
+              style={{ width: "26px", height: "26px", borderRadius: "50%", border: "1px solid rgba(255,255,255,0.12)", background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.8)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+            </button>
+          </div>
+        )}
+      </div>
+      {creditsLoading && cast.length === 0 ? (
+        <div style={{ display: "flex", gap: "16px", overflowX: "hidden" }}>
+          {Array.from({ length: 9 }).map((_, i) => (
+            <div key={i} style={{ width: "68px", flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center" }}>
+              <div className="skeleton-shimmer" style={{ width: "64px", height: "64px", borderRadius: "50%", marginBottom: "8px" }} />
+              <div className="skeleton-shimmer" style={{ height: "10px", width: "80%", borderRadius: "999px", marginBottom: "4px" }} />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div ref={castRowRef} style={{ display: "flex", gap: "16px", overflowX: "auto", scrollbarWidth: "none", msOverflowStyle: "none", paddingBottom: "4px" }}>
+          {cast.map((c) => (
+            <button
+              key={c.id}
+              onClick={() => setActivePersonId(c.id)}
+              style={{
+                width: "68px", minWidth: "68px", maxWidth: "68px",
+                flexShrink: 0,
+                display: "flex", flexDirection: "column", alignItems: "center",
+                textAlign: "center", textDecoration: "none", color: "inherit",
+                background: "none", border: "none", padding: 0, cursor: "pointer", outline: "none", fontFamily: "inherit",
+              }}
+            >
+              <div style={{
+                width: "64px", height: "64px", minWidth: "64px", minHeight: "64px",
+                borderRadius: "50%", overflow: "hidden",
+                background: "rgba(255,255,255,0.08)",
+                border: "1px solid rgba(255,255,255,0.12)",
+                marginBottom: "8px",
+                position: "relative",
+              }}>
+                {c.profile_path ? (
+                  <img
+                    src={posterUrl(c.profile_path, "w185")}
+                    alt={c.name}
+                    style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+                  />
+                ) : (
+                  <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.4)", fontSize: "18px" }}>
+                    {c.name?.[0] || "?"}
+                  </div>
+                )}
+              </div>
+              <div style={{ fontSize: "11px", color: "rgba(255, 255, 255, 0.9)", fontWeight: 500, lineHeight: 1.25, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                {c.name}
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  ) : null;
+
+  /* ── More like this section ── */
+  const similarSection = (similarLoading || similar.length > 0) ? (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <h4 style={{ margin: 0, fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(255, 255, 255, 0.5)" }}>
+            MORE LIKE THIS
+          </h4>
+          {preferredLanguages.length > 0 && (
+            <label style={{
+              display: "flex", alignItems: "center", gap: "6px",
+              fontSize: "11px", color: "rgba(255, 255, 255, 0.6)", cursor: "pointer",
+            }}>
+              <input
+                type="checkbox"
+                checked={filterSimilarByLang}
+                onChange={(e) => setFilterSimilarByLang(e.target.checked)}
+                style={{ margin: 0, accentColor: "var(--color-accent)" }}
+              />
+              Selected languages only
+            </label>
+          )}
+        </div>
+        {!similarLoading && filteredSimilar.length > 0 && (
+          <div style={{ display: "flex", gap: "6px" }}>
+            <button
+              onClick={() => {
+                const el = similarRowRef.current;
+                if (!el) return;
+                el.scrollBy({ left: -320, behavior: "smooth" });
+              }}
+              aria-label="Scroll similar movies left"
+              style={{ width: "26px", height: "26px", borderRadius: "50%", border: "1px solid rgba(255,255,255,0.12)", background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.8)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+            </button>
+            <button
+              onClick={() => {
+                const el = similarRowRef.current;
+                if (!el) return;
+                el.scrollBy({ left: 320, behavior: "smooth" });
+              }}
+              aria-label="Scroll similar movies right"
+              style={{ width: "26px", height: "26px", borderRadius: "50%", border: "1px solid rgba(255,255,255,0.12)", background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.8)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+            </button>
+          </div>
+        )}
+      </div>
+
+      {similarLoading && (
+        <div style={{ display: "flex", gap: "12px", overflowX: "hidden" }}>
+          {Array.from({ length: 9 }).map((_, i) => (
+            <div key={i} style={{ flexShrink: 0, width: "84px" }}>
+              <div className="skeleton-shimmer" style={{ width: "84px", paddingBottom: "126px", borderRadius: "10px" }} />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!similarLoading && similar.length > 0 && filteredSimilar.length === 0 && (
+        <div style={{ fontSize: "13px", color: "rgba(255,255,255,0.5)", padding: "12px 0", fontStyle: "italic" }}>
+          No similar movies found in your selected languages.
+        </div>
+      )}
+      {!similarLoading && filteredSimilar.length > 0 && (
+        <div
+          ref={similarRowRef}
+          style={{ display: "flex", gap: "12px", overflowX: "auto", paddingBottom: "4px", msOverflowStyle: "none", scrollbarWidth: "none" }}
+        >
+          {filteredSimilar.map((m) => (
+            <SimilarCard
+              key={m.tmdb_id ?? m.id}
+              movie={m}
+              onClick={() => {
+                if (onMovieSelect) {
+                  onMovieSelect({
+                    id: m.tmdb_id ?? m.id,
+                    tmdb_id: m.tmdb_id,
+                    title: m.title,
+                    poster_path: m.poster_path,
+                    backdrop_path: m.backdrop_path,
+                    year: m.year,
+                    original_language: m.original_language,
+                    imdb_rating: m.imdb_rating,
+                    vote_average: m.vote_average,
+                    genres: m.genres,
+                    primary_genre: m.primary_genre,
+                    overview: m.overview,
+                    director: m.director,
+                    runtime: m.runtime,
+                    score: m.score,
+                    reason: m.reason,
+                  });
+                }
+              }}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  ) : null;
+
+  if (typeof document === "undefined") return null;
 
   return createPortal(
     <AnimatePresence>
       {isOpen && (
         <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", alignItems: isMobile ? "flex-start" : "center", justifyContent: "center" }}>
 
-          {/* Fullscreen trailer overlay — sits above the modal */}
+          {/* Fullscreen trailer overlay */}
           <AnimatePresence>
             {showTrailerPlayer && selectedTrailerLang && (
               <TrailerOverlay
@@ -400,974 +793,448 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
               />
             )}
           </AnimatePresence>
+
+          {/* Backdrop overlay */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
             style={{
-              position: "absolute",
-              inset: 0,
-              background: "rgba(0, 0, 0, 0.7)",
-              backdropFilter: "blur(12px)",
-              WebkitBackdropFilter: "blur(12px)",
+              position: "absolute", inset: 0,
+              background: "rgba(0, 0, 0, 0.75)",
+              backdropFilter: "blur(14px)",
+              WebkitBackdropFilter: "blur(14px)",
             }}
           />
 
+          {/* Modal Container */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            initial={{ opacity: 0, scale: 0.96, y: 15 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className={isMobile ? "" : "glass-modal"}
+            exit={{ opacity: 0, scale: 0.96, y: 15 }}
+            transition={{ type: "spring", damping: 26, stiffness: 320 }}
             style={{
               position: "relative",
-              width: isMobile ? "100%" : "94vw",
-              maxWidth: isMobile ? "100%" : "980px",
-              maxHeight: isMobile ? "100dvh" : "92vh",
+              width: isMobile ? "100%" : "92vw",
+              maxWidth: isMobile ? "100%" : "1080px",
+              maxHeight: isMobile ? "100dvh" : "90vh",
               height: isMobile ? "100dvh" : "auto",
-              minHeight: isMobile ? undefined : "72vh",
-              background: isMobile ? "var(--color-bg)" : undefined,
-              borderRadius: isMobile ? "0" : undefined,
-              boxShadow: isMobile ? "none" : "0 25px 80px -12px rgba(0, 0, 0, 0.8)",
-              overflowY: "auto",
-              overscrollBehavior: "none",  // prevent iOS bounce revealing top pill
+              background: "#101217",
+              border: isMobile ? "none" : "1px solid rgba(255, 255, 255, 0.12)",
+              borderRadius: isMobile ? "0" : "28px",
+              boxShadow: "0 32px 80px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.08)",
+              overflow: "hidden",
+              color: "#ffffff",
               display: "flex",
               flexDirection: "column",
             }}
           >
-            {/* No sticky header — close X lives on the poster itself (see below) */}
-
-            {/* Content wrapper - no top padding to remove excess space */}
-            <div style={{ display: "flex", flexDirection: "row", flexWrap: "wrap", position: "relative", zIndex: 1 }}>
-              {/* Left Column: Poster + Where-to-Watch */}
+            {/* Ambient blurred backdrop — fixed to modal container so it stays uniform across the entire scroll area */}
+            <div
+              aria-hidden
+              style={{
+                position: "absolute",
+                inset: 0,
+                overflow: "hidden",
+                borderRadius: "inherit",
+                pointerEvents: "none",
+                zIndex: 0,
+              }}
+            >
+              <img
+                src={bgImage}
+                alt=""
+                style={{
+                  position: "absolute",
+                  inset: "-20%",
+                  width: "140%",
+                  height: "140%",
+                  objectFit: "cover",
+                  filter: "blur(60px) brightness(0.24) saturate(1.35)",
+                  transform: "scale(1.15)",
+                }}
+              />
               <div
                 style={{
-                  flex: isMobile ? "1 1 100%" : "1 1 240px",
-                  maxWidth: isMobile ? "100%" : "340px",
-                  margin: "0 auto",
-                  width: "100%",
-                  padding: 0,
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 0,
+                  position: "absolute",
+                  inset: 0,
+                  background: "radial-gradient(ellipse at center, rgba(16,18,24,0.55) 0%, rgba(10,12,16,0.92) 100%)",
                 }}
-              >
-                <div
-                  style={{
-                    position: "relative",
+              />
+            </div>
 
-                    ...(isMobile
-                      ? { aspectRatio: "16/9", width: "100%" }
-                      : { aspectRatio: "2/3", maxHeight: "62vh" }),
-                    background: "var(--color-surface)",
-                    borderRadius: isMobile ? "0" : "12px",
-                    overflow: "hidden",
-                    boxShadow: isMobile ? "none" : "0 12px 32px -8px rgba(0,0,0,0.6)",
-                  }}
-                >
-                  {/* ── Hero image ───────────────────────────────────────────
-                      Mobile : full-width 16:9 backdrop.
-                               Falls back to poster with objectPosition top.
-                      Desktop: blurred bg fill + centred sharp portrait.     */}
+            {/* Close button — top-right */}
+            <button
+              onClick={() => showWatchProviders ? setShowWatchProviders(false) : onClose()}
+              aria-label={showWatchProviders ? "Close watch providers" : "Close"}
+              style={{
+                position: "absolute",
+                top: isMobile ? "calc(env(safe-area-inset-top) + 16px)" : "22px",
+                right: "22px",
+                zIndex: 30,
+                width: "36px",
+                height: "36px",
+                borderRadius: "50%",
+                background: "rgba(255, 255, 255, 0.12)",
+                border: "1px solid rgba(255, 255, 255, 0.16)",
+                backdropFilter: "blur(8px)",
+                WebkitBackdropFilter: "blur(8px)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "#ffffff",
+                cursor: "pointer",
+                transition: "background 150ms ease, transform 120ms ease",
+              }}
+              onPointerDown={(e) => { (e.currentTarget as HTMLElement).style.transform = "scale(0.92)"; }}
+              onPointerUp={(e) => { (e.currentTarget as HTMLElement).style.transform = ""; }}
+              onPointerLeave={(e) => { (e.currentTarget as HTMLElement).style.transform = ""; }}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
 
-                  {isMobile ? (
-                    /* Landscape backdrop — single image, edge-to-edge */
-                    <img
-                      src={mobileHero}
-                      alt={movie.title}
-                      loading="eager"
-                      style={{
-                        position: "absolute", inset: 0, width: "100%", height: "100%",
-                        objectFit: "cover",
-                        objectPosition: movie.backdrop_path ? "center center" : "center top",
-                        zIndex: 0,
-                      }}
-                    />
-                  ) : (
-                    /* Desktop: blurred bg fill */
-                    <img
-                      src={poster}
-                      aria-hidden
-                      style={{
-                        position: "absolute", inset: 0, width: "100%", height: "100%",
-                        objectFit: "cover",
-                        objectPosition: "center center",
-                        filter: "blur(20px) saturate(1.1) brightness(0.45)",
-                        transform: "scale(1.08)",
-                        zIndex: 0,
-                      }}
-                    />
-                  )}
-                  <div
-                    style={{
-                      position: "absolute",
-                      inset: 0,
-                      background: "linear-gradient(180deg, rgba(0,0,0,0.12) 0%, rgba(0,0,0,0.28) 100%)",
-                      zIndex: 1,
-                    }}
-                  />
+            {/* Scrollable Content Viewport */}
+            <div
+              style={{
+                position: "relative",
+                zIndex: 1,
+                width: "100%",
+                maxHeight: isMobile ? "100dvh" : "90vh",
+                overflowY: "auto",
+                overscrollBehavior: "none",
+              }}
+            >
+              {isMobile ? (
 
-                  {/* Top gradient for safe-area and X button contrast (mobile only) */}
-                  {isMobile && (
+                <div style={{ padding: "calc(env(safe-area-inset-top) + 20px) 18px 36px", display: "flex", flexDirection: "column", gap: "16px" }}>
+                  {/* Top 2-Column Header: Poster on Left, Title/Meta/Genres on Right */}
+                  <div style={{ display: "flex", gap: "14px", alignItems: "flex-start" }}>
+                    {/* Left: Clean unclipped Poster */}
                     <div
                       style={{
-                        position: "absolute",
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        height: "90px",
-                        background: "linear-gradient(to bottom, rgba(0,0,0,0.75) 0%, transparent 100%)",
-                        zIndex: 3,
-                        pointerEvents: "none",
+                        width: "115px",
+                        minWidth: "115px",
+                        aspectRatio: "2 / 3",
+                        borderRadius: "14px",
+                        overflow: "hidden",
+                        boxShadow: "0 12px 28px rgba(0, 0, 0, 0.7)",
+                        border: "1px solid rgba(255, 255, 255, 0.15)",
+                        position: "relative",
+                        background: "rgba(255, 255, 255, 0.05)",
+                        flexShrink: 0,
                       }}
-                    />
-                  )}
+                    >
+                      <img
+                        src={poster}
+                        alt={movie.title}
+                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      />
+                    </div>
 
-                  {/* Bottom gradient → bleeds into dark modal content below (mobile only) */}
-                  {isMobile && (
-                    <div
-                      style={{
-                        position: "absolute",
-                        bottom: 0,
-                        left: 0,
-                        right: 0,
-                        height: "55%",
-                        background: "linear-gradient(to top, rgba(12,13,18,1) 0%, rgba(12,13,18,0.65) 45%, transparent 100%)",
-                        zIndex: 3,
-                        pointerEvents: "none",
-                      }}
-                    />
-                  )}
+                    {/* Right: Title, Match %, Meta & Genres */}
+                    <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "6px", paddingRight: "28px" }}>
+                      {matchPct && (
+                        <div>
+                          <span style={{
+                            display: "inline-block",
+                            background: `${matchColor}22`,
+                            border: `1px solid ${matchColor}55`,
+                            color: matchColor,
+                            borderRadius: "var(--radius-pill)",
+                            padding: "2px 8px",
+                            fontSize: "11px",
+                            fontWeight: 700,
+                          }}>
+                            {matchPct}% Match
+                          </span>
+                        </div>
+                      )}
+                      {titleBlock}
+                      {metaLine}
+                      {genresRow && <div style={{ marginTop: "4px" }}>{genresRow}</div>}
+                    </div>
+                  </div>
 
-                  {/* Desktop only: centred sharp portrait on top of blurred bg */}
-                  {!isMobile && (
-                    <div
+                  {/* Primary Action: Trailer Button */}
+                  {trailerNode}
+
+                  {/* Secondary Action: Where to Watch button (under trailer) */}
+                  {hasTmdb && (
+                    <button
+                      type="button"
+                      onClick={() => setShowWatchProviders((s) => !s)}
                       style={{
-                        position: "absolute",
-                        inset: 0,
-                        zIndex: 2,
+                        width: "100%",
+                        height: "42px",
+                        borderRadius: "999px",
+                        background: showWatchProviders ? "rgba(255, 255, 255, 0.15)" : "rgba(255, 255, 255, 0.07)",
+                        border: showWatchProviders ? "1px solid rgba(255, 255, 255, 0.35)" : "1px solid rgba(255, 255, 255, 0.14)",
+                        color: "#ffffff",
+                        fontSize: "13px",
+                        fontWeight: 600,
+                        cursor: "pointer",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
+                        gap: "8px",
+                        transition: "all 0.15s ease",
                       }}
+                      onPointerDown={(e) => { (e.currentTarget as HTMLElement).style.transform = "scale(0.98)"; }}
+                      onPointerUp={(e) => { (e.currentTarget as HTMLElement).style.transform = ""; }}
                     >
+                      {whereToWatchIcon}
+                      <span>{showWatchProviders ? "Hide Where to Watch" : "Where to Watch"}</span>
+                      <svg
+                        width="12"
+                        height="12"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        style={{
+                          transform: showWatchProviders ? "rotate(180deg)" : "rotate(0deg)",
+                          transition: "transform 0.2s ease",
+                        }}
+                      >
+                        <polyline points="6 9 12 15 18 9" />
+                      </svg>
+                    </button>
+                  )}
+
+                  {/* Expandable Where-to-Watch Panel on Mobile */}
+                  <AnimatePresence initial={false}>
+                    {showWatchProviders && hasTmdb && (
+                      <motion.div
+                        key="mobile-watch-panel"
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+                        style={{ overflow: "hidden" }}
+                      >
+                        <div style={{
+                          padding: "14px",
+                          borderRadius: "16px",
+                          background: "rgba(0, 0, 0, 0.65)",
+                          border: "1px solid rgba(255, 255, 255, 0.14)",
+                          minHeight: "110px",
+                        }}>
+                          <WatchProvidersPanel
+                            tmdbId={(movie.tmdb_id ?? movie.id) as number}
+                            defaultCountry={guessedCountry}
+                            movieTitle={movie.title}
+                          />
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {/* Synopsis / Overview */}
+                  {overviewNode}
+
+                  {/* Why Recommended */}
+                  {reasonNode}
+
+                  {/* Rate / Interaction Section */}
+                  {rateSection}
+
+                  {/* Directors & Writers */}
+                  {creditsRow}
+
+                  {/* Cast Carousel */}
+                  {castSection}
+
+                  {/* More Like This Carousel */}
+                  {similarSection}
+                </div>
+              ) : (
+
+                <div style={{ padding: "34px 38px 36px", display: "flex", flexDirection: "column", gap: "26px" }}>
+                  {/* ── Top Half: 2 Columns (Poster + Details) ── */}
+                  <div style={{ display: "flex", gap: "34px", alignItems: "flex-start" }}>
+                    {/* Left Column: Full Unclipped Rounded Poster Card with Where-To-Watch */}
+                    <div style={{ flex: "0 0 290px", width: "290px" }}>
                       <div
                         style={{
-                          position: "relative",
-                          height: "100%",
-                          maxWidth: "100%",
+                          width: "100%",
                           aspectRatio: "2 / 3",
+                          borderRadius: "20px",
+                          overflow: "hidden",
+                          boxShadow: "0 20px 48px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.14)",
+                          position: "relative",
+                          background: "rgba(255,255,255,0.04)",
                         }}
                       >
                         <img
                           src={poster}
                           alt={movie.title}
-                          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "center center" }}
+                          loading="eager"
+                          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
                         />
-                      </div>
-                    </div>
-                  )}
 
-                  {/* Mobile: title + rating overlaid at the poster bottom.
-                      Key info is visible without scrolling down. Stays mounted
-                      while Where-to-Watch is open — the panel expands below
-                      the hero, it never covers this overlay. */}
-                  {isMobile && (
-                    <div
-                      style={{
-                        position: "absolute",
-                        bottom: 0,
-                        left: 0,
-                        right: 0,
-                        padding: "0 14px 16px", // Reduced since Where-to-Watch is now below the hero
-                        zIndex: 4,
-                        pointerEvents: "none",
-                      }}
-                    >
-                      {logoPath ? (
-                        <div style={{ marginBottom: "6px" }}>
-                          <img
-                            src={posterUrl(logoPath, "w500")}
-                            alt={movie.title}
+                        {/* Bottom scrim for Where to Watch button */}
+                        <div style={{
+                          position: "absolute", bottom: 0, left: 0, right: 0, height: "45%",
+                          background: "linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.2) 60%, transparent 100%)",
+                          pointerEvents: "none",
+                        }} />
+                        {hasTmdb && (
+                          <motion.button
+                            onClick={() => setShowWatchProviders((s) => !s)}
+                            whileHover={{ scale: 1.02, y: -1 }}
+                            whileTap={{ scale: 0.98 }}
+                            aria-expanded={showWatchProviders}
                             style={{
-                              maxHeight: "56px",
-                              maxWidth: "220px",
-                              width: "auto",
-                              height: "auto",
-                              objectFit: "contain",
-                              filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.8))",
-                            }}
-                            onError={() => setLogoPath(null)}
-                          />
-                        </div>
-                      ) : (
-                        <h2
-                          style={{
-                            margin: "0 0 4px",
-                            fontSize: "clamp(18px, 5vw, 24px)",
-                            fontWeight: 700,
-                            color: "#fff",
-                            lineHeight: 1.15,
-                            textShadow: "0 2px 8px rgba(0,0,0,0.7)",
-                            letterSpacing: "-0.02em",
-                          }}
-                        >
-                          {movie.title}
-                        </h2>
-                      )}
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                        {movie.year && (
-                          <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.65)", textShadow: "0 1px 4px rgba(0,0,0,0.6)" }}>
-                            {movie.year}
-                          </span>
-                        )}
-                        {lang && (
-                          <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.65)", textShadow: "0 1px 4px rgba(0,0,0,0.6)" }}>
-                            {lang}
-                          </span>
-                        )}
-                        {imdb && (
-                          <span style={{
-                            display: "inline-flex", alignItems: "center", gap: "4px",
-                            fontSize: "12px", fontWeight: 700,
-                            color: "var(--color-rating)",
-                            textShadow: "0 1px 4px rgba(0,0,0,0.7)",
-                          }}>
-                            ★ {imdb}
-                          </span>
-                        )}
-                        {runtime && (
-                          <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.55)", textShadow: "0 1px 4px rgba(0,0,0,0.6)" }}>
-                            {runtime}
-                          </span>
-                        )}
-                      </div>
-                      {genres && (
-                        <div style={{ marginTop: "6px", fontSize: "12px", color: "rgba(255,255,255,0.8)", fontWeight: 500, textShadow: "0 1px 4px rgba(0,0,0,0.8)", letterSpacing: "0.01em" }}>
-                          {genres.split(",").map(g => g.trim()).join(" • ")}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Smart X button — floats top-right of the poster.
-                      Closes WatchProviders overlay if open, otherwise closes the modal. */}
-                  <button
-                    onClick={() => showWatchProviders ? setShowWatchProviders(false) : onClose()}
-                    aria-label={showWatchProviders ? "Close streaming info" : "Close"}
-                    style={{
-                      position: "absolute",
-                      top: isMobile ? "calc(env(safe-area-inset-top) + 12px)" : "12px",
-                      right: "12px",
-                      zIndex: 25,
-                      // 40px touch target — was 32px which falls below the
-                      // iOS / Material 44px guideline and felt fiddly to
-                      // hit one-handed.
-                      width: "40px",
-                      height: "40px",
-                      borderRadius: "50%",
-                      background: "rgba(0,0,0,0.55)",
-                      border: "1px solid rgba(255,255,255,0.18)",
-                      backdropFilter: "blur(8px)",
-                      WebkitBackdropFilter: "blur(8px)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      color: "#fff",
-                      cursor: "pointer",
-                      transition: "background 160ms ease, transform 120ms ease",
-                    }}
-                    onPointerDown={(e) => { (e.currentTarget as HTMLElement).style.transform = "scale(0.92)"; }}
-                    onPointerUp={(e) => { (e.currentTarget as HTMLElement).style.transform = ""; }}
-                    onPointerLeave={(e) => { (e.currentTarget as HTMLElement).style.transform = ""; }}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="18" y1="6" x2="6" y2="18" />
-                      <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
-                  </button>
-
-                  {/* Where to Watch button — desktop only (absolute on portrait poster).
-                      Mobile version lives below the hero as a standalone row. */}
-                  {!isMobile && (movie.tmdb_id ?? movie.id) > 0 && (
-                    <motion.button
-                      onClick={() => setShowWatchProviders((s) => !s)}
-                      whileHover={{ scale: 1.05, y: -1 }}
-                      whileTap={{ scale: 0.95 }}
-                      style={watchButtonStyle}
-                      aria-expanded={showWatchProviders}
-                    >
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                        <rect x="2" y="5" width="20" height="14" rx="3" ry="3" />
-                        <line x1="8" y1="3" x2="6" y2="5" />
-                        <line x1="13" y1="3" x2="11" y2="5" />
-                        <line x1="18" y1="3" x2="16" y2="5" />
-                        <polygon points="10,10 15,12 10,14" fill="currentColor" stroke="none" />
-                      </svg>
-                      <span>{showWatchProviders ? "Hide" : "Where to Watch"}</span>
-                    </motion.button>
-                  )}
-
-                  {/* Watch Providers — desktop: absolute overlay on the portrait poster */}
-                  {!isMobile && showWatchProviders && (movie.tmdb_id ?? movie.id) > 0 && (
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      style={{
-                        position: "absolute",
-                        inset: 0,
-                        background: "linear-gradient(165deg, rgba(16, 18, 24, 0.40) 0%, rgba(12, 14, 20, 0.26) 100%)",
-                        backdropFilter: "blur(14px) saturate(1.35) brightness(1.06)",
-                        WebkitBackdropFilter: "blur(14px) saturate(1.35) brightness(1.06)",
-                        display: "flex",
-                        flexDirection: "column",
-                        padding: "16px",
-                        zIndex: 20,
-                        borderRadius: "12px",
-                        border: "1px solid rgba(255, 255, 255, 0.14)",
-                        overflowY: "auto",
-                      }}
-                    >
-                      <motion.div
-                        initial={{ scale: 0.9, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        transition={{ type: "spring", damping: 20 }}
-                        style={{ width: "100%" }}
-                      >
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
-                          <h3 style={{ margin: 0, fontSize: "14px", fontWeight: 600, color: "#fff" }}>Where to Watch</h3>
-                        </div>
-                        <WatchProvidersPanel
-                          tmdbId={(movie.tmdb_id ?? movie.id) as number}
-                          defaultCountry={guessedCountry}
-                          movieTitle={movie.title}
-                        />
-                      </motion.div>
-                    </motion.div>
-                  )}
-                </div>
-
-                {/* Mobile-only: Where to Watch button sits below the hero, above the panel */}
-                {isMobile && (movie.tmdb_id ?? movie.id) > 0 && (
-                  <button
-                    onClick={() => setShowWatchProviders((s) => !s)}
-                    aria-expanded={showWatchProviders}
-                    style={{
-                      width: "100%",
-                      padding: "13px 16px",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: "10px",
-                      background: showWatchProviders
-                        ? "rgba(255,255,255,0.08)"
-                        : "linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%)",
-                      backdropFilter: "blur(12px)",
-                      WebkitBackdropFilter: "blur(12px)",
-                      border: "none",
-                      borderTop: "1px solid rgba(255,255,255,0.05)",
-                      borderBottom: "1px solid rgba(255,255,255,0.08)",
-                      color: "#fff",
-                      fontSize: "14px",
-                      fontWeight: 600,
-                      cursor: "pointer",
-                      transition: "background 0.2s",
-                      letterSpacing: "-0.01em",
-                    }}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="2" y="5" width="20" height="14" rx="3" ry="3" />
-                      <line x1="8" y1="3" x2="6" y2="5" />
-                      <line x1="13" y1="3" x2="11" y2="5" />
-                      <line x1="18" y1="3" x2="16" y2="5" />
-                      <polygon points="10,10 15,12 10,14" fill="currentColor" stroke="none" />
-                    </svg>
-                    <span>{showWatchProviders ? "Hide" : "Where to Watch"}</span>
-                    <svg
-                      width="13" height="13" viewBox="0 0 24 24" fill="none"
-                      stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-                      style={{ marginLeft: "auto", opacity: 0.5, transform: showWatchProviders ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}
-                    >
-                      <polyline points="6 9 12 15 18 9" />
-                    </svg>
-                  </button>
-                )}
-
-                {/* Watch Providers — mobile: in-flow panel below the button.
-                    Uses opacity+y only (no height animation) — fast, GPU-composited. */}
-                <AnimatePresence initial={false}>
-                  {isMobile && showWatchProviders && (movie.tmdb_id ?? movie.id) > 0 && (
-                    <motion.div
-                      key="mobile-w2w"
-                      initial={{ opacity: 0, y: -6 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -6 }}
-                      transition={{ duration: 0.18, ease: "easeOut" }}
-                    >
-                      <div
-                        style={{
-                          padding: "16px 16px 4px",
-                          background: "rgba(12,13,18,1)",
-                          borderBottom: "1px solid rgba(255,255,255,0.07)",
-                        }}
-                      >
-                        <WatchProvidersPanel
-                          tmdbId={(movie.tmdb_id ?? movie.id) as number}
-                          defaultCountry={guessedCountry}
-                          movieTitle={movie.title}
-                        />
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-
-              {/* Right Column: Details and Actions */}
-              <div
-                style={{
-                  flex: isMobile ? "1 1 100%" : "2 1 340px",
-                  padding: isMobile ? "14px 14px 20px" : "24px 20px",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "14px",
-                  background: movie.backdrop_path ? "transparent" : "var(--color-bg)",
-                }}
-              >
-                <div>
-                  {/* Match score badge */}
-                  {matchPct && (
-                    <div style={{ marginBottom: "12px" }}>
-                      <span style={{
-                        display: "inline-block",
-                        background: `${matchColor}22`,
-                        border: `1px solid ${matchColor}55`,
-                        color: matchColor,
-                        borderRadius: "20px",
-                        padding: "3px 12px",
-                        fontSize: "12px",
-                        fontWeight: 700,
-                        letterSpacing: "0.02em",
-                      }}>
-                        {matchPct}% Match
-                      </span>
-                    </div>
-                  )}
-
-                  {/* On mobile, title and meta are already overlaid on the hero poster */}
-                  {!isMobile && (
-                    <>
-                      {logoPath ? (
-                        <div style={{ marginBottom: "10px", marginTop: "2px" }}>
-                          <img
-                            src={posterUrl(logoPath, "w500")}
-                            alt={movie.title}
-                            style={{
-                              maxHeight: "75px",
-                              maxWidth: "280px",
-                              width: "auto",
-                              height: "auto",
-                              objectFit: "contain",
-                              filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.6))",
-                            }}
-                            onError={() => setLogoPath(null)}
-                          />
-                        </div>
-                      ) : (
-                        <h2 style={{ margin: "0 0 6px 0", fontSize: "26px", fontWeight: 700, color: "var(--color-text-primary)", lineHeight: 1.1 }}>
-                          {movie.title}
-                        </h2>
-                      )}
-
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", alignItems: "center", color: "var(--color-text-muted)", fontSize: "13px" }}>
-                        {year && <span>{year}</span>}
-                        {year && lang && <span style={{ opacity: 0.4 }}>·</span>}
-                        {lang && <span>{lang}</span>}
-                        {(year || lang) && runtime && <span style={{ opacity: 0.4 }}>·</span>}
-                        {runtime && <span>{runtime}</span>}
-                        {(year || lang || runtime) && imdb && <span style={{ opacity: 0.4 }}>·</span>}
-                        {imdb && <span style={{ color: "var(--color-accent-warm)", fontWeight: 600 }}>IMDb {imdb}</span>}
-                      </div>
-                    </>
-                  )}
-
-                  {movie.director && (
-                    <p style={{ marginTop: "8px", fontSize: "13px", color: "var(--color-text-muted)" }}>
-                      <span style={{ opacity: 0.6 }}>Directed by</span>{" "}
-                      <span style={{ color: "var(--color-text-primary)", fontWeight: 500 }}>{movie.director}</span>
-                    </p>
-                  )}
-
-                  {!isMobile && genres && (
-                    <div style={{ marginTop: "12px", display: "flex", gap: "6px", flexWrap: "wrap" }}>
-                      {genres.split(",").map(g => (
-                        <span key={g} style={{
-                          background: "rgba(255,255,255,0.05)",
-                          padding: "4px 10px",
-                          borderRadius: "100px",
-                          fontSize: "12px",
-                          border: "1px solid rgba(255,255,255,0.1)"
-                        }}>
-                          {g.trim()}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Watch Trailer — fixed position above overview for muscle memory */}
-                {trailerNode}
-
-                <div style={{ fontSize: "13px", lineHeight: 1.6, color: "var(--color-text-secondary)" }}>
-                  {overview}
-                </div>
-
-                {/* Why recommended */}
-                {movie.reason && (
-                  <div style={{
-                    background: "rgba(255,255,255,0.04)",
-                    border: "1px solid rgba(255,255,255,0.08)",
-                    borderRadius: "12px",
-                    padding: "14px 16px",
-                  }}>
-                    <p style={{ margin: "0 0 4px", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--color-text-muted)", opacity: 0.7 }}>
-                      Why recommended
-                    </p>
-                    <p style={{ margin: 0, fontSize: "13px", lineHeight: 1.6, color: "var(--color-text-secondary)", fontStyle: "italic" }}>
-                      {movie.reason}
-                    </p>
-                  </div>
-                )}
-
-                {onAction && (
-                  <div style={{ marginTop: "auto", paddingTop: "16px", borderTop: "1px solid var(--color-border-subtle)" }}>
-                    <h4 style={{ margin: "0 0 16px 0", fontSize: "12px", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--color-text-muted)" }}>
-                      Rate this movie
-                    </h4>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "12px" }}>
-                      {/* Like */}
-                      <button className="rating-btn rating-btn--like" onClick={() => handleActionClick("like")} style={{ flex: 1, padding: "12px", fontWeight: 600, height: "48px" }}>
-                        <AnimatePresence mode="wait">
-                          {successAction === "like" ? (
-                            <motion.div key="done" initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.5, opacity: 0 }} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--color-like)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                              <span style={{ color: "var(--color-like)", fontWeight: 700 }}>Liked</span>
-                            </motion.div>
-                          ) : (
-                            <motion.div key="icon" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--color-like)" }}>
-                              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" /></svg>
-                              Like
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                      </button>
-                      {/* Okay */}
-                      <button className="rating-btn rating-btn--okay" onClick={() => handleActionClick("okay")} style={{ flex: 1, padding: "12px", fontWeight: 600, height: "48px" }}>
-                        <AnimatePresence mode="wait">
-                          {successAction === "okay" ? (
-                            <motion.div key="done" initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.5, opacity: 0 }} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--color-okay)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                              <span style={{ color: "var(--color-okay)", fontWeight: 700 }}>Okay</span>
-                            </motion.div>
-                          ) : (
-                            <motion.div key="icon" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--color-okay)" }}>
-                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z" /><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" /></svg>
-                              Okay
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                      </button>
-                      {/* Dislike */}
-                      <button className="rating-btn rating-btn--dislike" onClick={() => handleActionClick("dislike")} style={{ flex: 1, padding: "12px", fontWeight: 600, height: "48px" }}>
-                        <AnimatePresence mode="wait">
-                          {successAction === "dislike" ? (
-                            <motion.div key="done" initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.5, opacity: 0 }} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--color-dislike)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                              <span style={{ color: "var(--color-dislike)", fontWeight: 700 }}>Noted</span>
-                            </motion.div>
-                          ) : (
-                            <motion.div key="icon" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--color-dislike)" }}>
-                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10z" /><path d="M17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17" /></svg>
-                              Dislike
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                      </button>
-                    </div>
-                    <div style={{ display: "flex", gap: "12px", marginTop: "12px" }}>
-                      <button className="glass-button" onClick={() => handleActionClick("watchlist")} style={{ flex: 1, padding: "12px", color: "var(--color-text-primary)", fontSize: "14px", display: "flex", justifyContent: "center", alignItems: "center", height: "46px" }}>
-                        <AnimatePresence mode="wait">
-                          {successAction === "watchlist" ? (
-                            <motion.div key="check" initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.5, opacity: 0 }} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--color-success)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                              <span style={{ color: "var(--color-success)", fontWeight: 700 }}>Added</span>
-                            </motion.div>
-                          ) : (
-                            <motion.div key="icon" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /></svg>
-                              Watchlist
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                      </button>
-                      <button className="glass-button" onClick={() => handleActionClick("skip")} style={{ flex: 1, padding: "12px", color: "var(--color-text-primary)", fontSize: "14px", display: "flex", justifyContent: "center", alignItems: "center", height: "46px" }}>
-                        <AnimatePresence mode="wait">
-                          {successAction === "skip" ? (
-                            <motion.div key="check" initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.5, opacity: 0 }} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                              <span style={{ fontWeight: 700 }}>Skipped</span>
-                            </motion.div>
-                          ) : (
-                            <motion.div key="icon" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" y1="5" x2="19" y2="19"></line></svg>
-                              Skip
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* ── Cast & Crew ──────────────────────────── */}
-            {(creditsLoading || cast.length > 0 || directors.length > 0 || writers.length > 0) && (
-              <div style={{ padding: "8px 20px 0", position: "relative", zIndex: 1 }}>
-                {(directors.length > 0 || writers.length > 0) && (
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "16px 24px", marginBottom: "16px", fontSize: "13px" }}>
-                    {directors.length > 0 && (
-                      <div>
-                        <div style={{ fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--color-text-muted)", marginBottom: "3px" }}>
-                          {directors.length > 1 ? "Directors" : "Director"}
-                        </div>
-                        <div style={{ color: "var(--color-text-primary)", fontWeight: 500 }}>
-                          {directors.map((d, i) => (
-                            <span key={`${d.id}-${i}`}>
-                              <button
-                                onClick={() => setActivePersonId(d.id)}
-                                style={{ padding: 0, background: "none", borderBottom: "1px dotted rgba(255,255,255,0.25)", cursor: "pointer", color: "inherit", textDecoration: "none", fontSize: "inherit", fontFamily: "inherit" }}
-                              >
-                                {d.name}
-                              </button>
-                              {i < directors.length - 1 ? ", " : ""}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {writers.length > 0 && (
-                      <div>
-                        <div style={{ fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--color-text-muted)", marginBottom: "3px" }}>
-                          {writers.length > 1 ? "Writers" : "Writer"}
-                        </div>
-                        <div style={{ color: "var(--color-text-primary)", fontWeight: 500 }}>
-                          {(() => {
-                            const seen = new Set<number>();
-                            const uniq = writers.filter((w) => {
-                              if (seen.has(w.id)) return false;
-                              seen.add(w.id);
-                              return true;
-                            }).slice(0, 4);
-                            return uniq.map((w, i) => (
-                              <span key={`${w.id}-${i}`}>
-                                <button
-                                  onClick={() => setActivePersonId(w.id)}
-                                  style={{ padding: 0, background: "none", borderBottom: "1px dotted rgba(255,255,255,0.25)", cursor: "pointer", color: "inherit", textDecoration: "none", fontSize: "inherit", fontFamily: "inherit" }}
-                                >
-                                  {w.name}
-                                </button>
-                                {i < uniq.length - 1 ? ", " : ""}
-                              </span>
-                            ));
-                          })()}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {(creditsLoading || cast.length > 0) && (
-                  <div>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
-                      <h4 style={{ margin: 0, fontSize: "12px", textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--color-text-muted)", fontWeight: 600 }}>
-                        Cast
-                      </h4>
-                      {!creditsLoading && cast.length > 0 && (
-                        <div style={{ display: "flex", gap: "6px" }}>
-                          <button
-                            onClick={() => {
-                              const el = castRowRef.current;
-                              if (!el) return;
-                              const cardWithGap = 104; // 92px avatar + 12px gap
-                              const cards = Math.min(3, Math.max(1, Math.floor((el.clientWidth * 0.5) / cardWithGap)));
-                              el.scrollBy({ left: -(cards * cardWithGap), behavior: "smooth" });
-                            }}
-                            aria-label="Scroll cast left"
-                            style={{ width: "28px", height: "28px", borderRadius: "50%", border: "1px solid var(--color-border-subtle)", background: "rgba(255,255,255,0.06)", color: "var(--color-text-secondary)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
-                          >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
-                          </button>
-                          <button
-                            onClick={() => {
-                              const el = castRowRef.current;
-                              if (!el) return;
-                              const cardWithGap = 104; // 92px avatar + 12px gap
-                              const cards = Math.min(3, Math.max(1, Math.floor((el.clientWidth * 0.5) / cardWithGap)));
-                              el.scrollBy({ left: cards * cardWithGap, behavior: "smooth" });
-                            }}
-                            aria-label="Scroll cast right"
-                            style={{ width: "28px", height: "28px", borderRadius: "50%", border: "1px solid var(--color-border-subtle)", background: "rgba(255,255,255,0.06)", color: "var(--color-text-secondary)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
-                          >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                    {creditsLoading && cast.length === 0 ? (
-                      // Skeleton placeholders that match the real cast row
-                      // dimensions (92×92 circles + two title lines). Was a
-                      // bare "Loading…" string which read as a bug on slow
-                      // networks where the wait can stretch 1–2 seconds.
-                      <div style={{ display: "flex", gap: "12px", overflowX: "hidden", paddingBottom: "0" }}>
-                        {Array.from({ length: 6 }).map((_, i) => (
-                          <div key={i} style={{ width: "92px", flexShrink: 0 }}>
-                            <div
-                              className="skeleton-shimmer"
-                              style={{
-                                width: "92px", height: "92px",
-                                borderRadius: "50%", marginBottom: "8px",
-                              }}
-                            />
-                            <div
-                              className="skeleton-shimmer"
-                              style={{ height: "12px", width: "78%", borderRadius: "999px", marginBottom: "4px" }}
-                            />
-                            <div
-                              className="skeleton-shimmer"
-                              style={{ height: "11px", width: "55%", borderRadius: "999px" }}
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div ref={castRowRef} style={{ display: "flex", gap: "12px", overflowX: "auto", paddingBottom: "0", scrollbarWidth: "none", msOverflowStyle: "none" }}>
-                        {cast.map((c) => (
-                          <button
-                            key={c.id}
-                            onClick={() => setActivePersonId(c.id)}
-                            style={{
-                              // Hard-pin the column width so the avatar circle
-                              // can't get stretched or squeezed by flex layout
-                              // pressure / different label lengths below it.
-                              width: "92px",
-                              minWidth: "92px",
-                              maxWidth: "92px",
-                              flexShrink: 0,
-                              flexGrow: 0,
+                              position: "absolute",
+                              bottom: "14px", left: "14px", right: "14px",
+                              padding: "11px 16px",
+                              borderRadius: "14px",
+                              fontSize: "13px",
+                              fontWeight: 700,
+                              color: "#ffffff",
+                              cursor: "pointer",
                               display: "flex",
-                              flexDirection: "column",
                               alignItems: "center",
-                              textAlign: "center", textDecoration: "none", color: "inherit",
-                              background: "none", border: "none", padding: 0, cursor: "pointer", outline: "none", fontFamily: "inherit"
+                              justifyContent: "center",
+                              gap: "8px",
+                              background: "linear-gradient(130deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.18) 100%)",
+                              border: "1px solid rgba(255, 255, 255, 0.3)",
+                              backdropFilter: "blur(16px) saturate(1.4)",
+                              WebkitBackdropFilter: "blur(16px) saturate(1.4)",
+                              boxShadow: "0 8px 24px rgba(0, 0, 0, 0.35)",
+                              zIndex: 5,
                             }}
                           >
-                            <div style={{
-                              // Explicit width + aspectRatio guarantees a
-                              // perfect circle even when the underlying
-                              // <Image> hasn't loaded or the fallback initial
-                              // is rendered. `flexShrink: 0` belt-and-braces
-                              // for any nested flex contexts above.
-                              width: "92px",
-                              height: "92px",
-                              minWidth: "92px",
-                              minHeight: "92px",
-                              aspectRatio: "1 / 1",
-                              flexShrink: 0,
-                              borderRadius: "50%",
-                              overflow: "hidden",
-                              background: "var(--color-surface)",
-                              marginBottom: "8px",
-                              position: "relative",
-                            }}>
-                              {c.profile_path ? (
-                                <img
-                                  src={posterUrl(c.profile_path, "w185")}
-                                  alt={c.name}
-                                  style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
-                                />
-                              ) : (
-                                <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-text-muted)", fontSize: "24px" }}>
-                                  {c.name?.[0] || "?"}
-                                </div>
-                              )}
-                            </div>
-                            <div style={{ fontSize: "12px", color: "var(--color-text-primary)", fontWeight: 500, lineHeight: 1.25, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", minHeight: "30px" }}>
-                              {c.name}
-                            </div>
-                            {c.character && (
-                              <div style={{ fontSize: "11px", color: "var(--color-text-muted)", marginTop: "2px", lineHeight: 1.25, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
-                                {c.character}
+                            {whereToWatchIcon}
+                            <span>{showWatchProviders ? "Hide Providers" : "Where to Watch"}</span>
+                          </motion.button>
+                        )}
+
+                        {/* Watch Providers Overlay inside Poster Card */}
+                        <AnimatePresence>
+                          {showWatchProviders && hasTmdb && (
+                            <motion.div
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              exit={{ opacity: 0 }}
+                              transition={{ duration: 0.18 }}
+                              style={{
+                                position: "absolute",
+                                inset: 0,
+                                background: "rgba(12, 14, 20, 0.92)",
+                                backdropFilter: "blur(16px) saturate(1.4)",
+                                WebkitBackdropFilter: "blur(16px) saturate(1.4)",
+                                display: "flex",
+                                flexDirection: "column",
+                                padding: "16px 14px",
+                                zIndex: 10,
+                                overflowY: "auto",
+                              }}
+                            >
+                              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
+                                <h4 style={{ margin: 0, fontSize: "12px", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: "#fff" }}>
+                                  Where to Watch
+                                </h4>
+                                <button
+                                  onClick={() => setShowWatchProviders(false)}
+                                  style={{
+                                    background: "rgba(255,255,255,0.1)",
+                                    border: "none",
+                                    color: "rgba(255,255,255,0.8)",
+                                    cursor: "pointer",
+                                    fontSize: "12px",
+                                    fontWeight: 600,
+                                    borderRadius: "50%",
+                                    width: "22px",
+                                    height: "22px",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                  }}
+                                >
+                                  ✕
+                                </button>
                               </div>
-                            )}
-                          </button>
-                        ))}
+                              <WatchProvidersPanel
+                                tmdbId={(movie.tmdb_id ?? movie.id) as number}
+                                defaultCountry={guessedCountry}
+                                movieTitle={movie.title}
+                              />
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* ── More Like This ───────────────────────── */}
-            {(similarLoading || similar.length > 0) && (
-              <div style={{
-                padding: "4px 20px 20px",
-                position: "relative",
-                zIndex: 1,
-              }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                    <h4 style={{
-                      margin: 0,
-                      fontSize: "12px",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.08em",
-                      color: "var(--color-text-muted)",
-                      fontWeight: 600,
-                    }}>
-                      More like this
-                    </h4>
-                    {preferredLanguages.length > 0 && (
-                      <label style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "6px",
-                        fontSize: "11px",
-                        color: "var(--color-text-secondary)",
-                        cursor: "pointer"
-                      }}>
-                        <input 
-                          type="checkbox" 
-                          checked={filterSimilarByLang}
-                          onChange={(e) => setFilterSimilarByLang(e.target.checked)}
-                          style={{ margin: 0, accentColor: "var(--color-primary)" }}
-                        />
-                        Selected languages only
-                      </label>
-                    )}
-                  </div>
-                  {!similarLoading && filteredSimilar.length > 0 && (
-                    <div style={{ display: "flex", gap: "6px" }}>
-                      <button
-                        onClick={() => {
-                          const el = similarRowRef.current;
-                          if (!el) return;
-                          const cardWithGap = 102; // 90px card width + 12px gap
-                          const cards = Math.min(3, Math.max(1, Math.floor((el.clientWidth * 0.5) / cardWithGap)));
-                          el.scrollBy({ left: -(cards * cardWithGap), behavior: "smooth" });
-                        }}
-                        style={{
-                          width: "28px", height: "28px", borderRadius: "50%",
-                          border: "1px solid var(--color-border-subtle)",
-                          background: "rgba(255,255,255,0.06)",
-                          color: "var(--color-text-secondary)",
-                          cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-                        }}
-                      >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                          <polyline points="15 18 9 12 15 6" />
-                        </svg>
-                      </button>
-                      <button
-                        onClick={() => {
-                          const el = similarRowRef.current;
-                          if (!el) return;
-                          const cardWithGap = 102; // 90px card width + 12px gap
-                          const cards = Math.min(3, Math.max(1, Math.floor((el.clientWidth * 0.5) / cardWithGap)));
-                          el.scrollBy({ left: cards * cardWithGap, behavior: "smooth" });
-                        }}
-                        style={{
-                          width: "28px", height: "28px", borderRadius: "50%",
-                          border: "1px solid var(--color-border-subtle)",
-                          background: "rgba(255,255,255,0.06)",
-                          color: "var(--color-text-secondary)",
-                          cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-                        }}
-                      >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                          <polyline points="9 18 15 12 9 6" />
-                        </svg>
-                      </button>
                     </div>
-                  )}
-                </div>
 
-                {/* Skeleton row while loading */}
-                {similarLoading && (
-                  <div style={{ display: "flex", gap: "12px", overflowX: "hidden" }}>
-                    {Array.from({ length: 6 }).map((_, i) => (
-                      <div key={i} style={{ flexShrink: 0, width: "90px" }}>
-                        <div className="skeleton-shimmer" style={{ width: "90px", paddingBottom: "135px", borderRadius: "10px" }} />
-                        <div className="skeleton-shimmer" style={{ height: "10px", width: "75%", borderRadius: "999px", marginTop: "8px" }} />
+                    {/* Right Column: Title, Info, Trailer, Overview, Rate */}
+                    <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "20px" }}>
+                      {/* Title, Meta, Genres */}
+                      <div>
+                        {matchPct && (
+                          <div style={{ marginBottom: "8px" }}>
+                            <span style={{
+                              display: "inline-block",
+                              background: `${matchColor}22`,
+                              border: `1px solid ${matchColor}55`,
+                              color: matchColor,
+                              borderRadius: "var(--radius-pill)",
+                              padding: "3px 12px",
+                              fontSize: "12px",
+                              fontWeight: 700,
+                              letterSpacing: "0.02em",
+                            }}>
+                              {matchPct}% Match
+                            </span>
+                          </div>
+                        )}
+                        {titleBlock}
+                        {metaLine}
+                        {genresRow && <div style={{ marginTop: "12px" }}>{genresRow}</div>}
                       </div>
-                    ))}
-                  </div>
-                )}
 
-                {/* Similar movies row */}
-                {!similarLoading && similar.length > 0 && filteredSimilar.length === 0 && (
-                  <div style={{ fontSize: "13px", color: "var(--color-text-muted)", padding: "12px 0", fontStyle: "italic" }}>
-                    No similar movies found in your selected languages.
-                  </div>
-                )}
-                {!similarLoading && filteredSimilar.length > 0 && (
-                  <div
-                    ref={similarRowRef}
-                    style={{
-                      display: "flex",
-                      gap: "12px",
-                      overflowX: "auto",
-                      paddingBottom: "4px",
-                      msOverflowStyle: "none",
-                      scrollbarWidth: "none",
-                    }}
-                  >
-                    {filteredSimilar.map((m) => (
-                      <SimilarCard
-                        key={m.tmdb_id ?? m.id}
-                        movie={m}
-                        onClick={() => {
-                          if (onMovieSelect) {
-                            onMovieSelect({
-                              id: m.tmdb_id ?? m.id,
-                              tmdb_id: m.tmdb_id,
-                              title: m.title,
-                              poster_path: m.poster_path,
-                              backdrop_path: m.backdrop_path,
-                              year: m.year,
-                              original_language: m.original_language,
-                              imdb_rating: m.imdb_rating,
-                              vote_average: m.vote_average,
-                              genres: m.genres,
-                              primary_genre: m.primary_genre,
-                              overview: m.overview,
-                              director: m.director,
-                              runtime: m.runtime,
-                              score: m.score,
-                              reason: m.reason,
-                            });
-                          }
-                        }}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+                      {/* Middle grid: Trailer/Overview/Credits on left + Rate box on right with subtle divider line */}
+                      <div style={{ display: "grid", gridTemplateColumns: onAction ? "1.2fr 1fr" : "1fr", gap: "28px", alignItems: "stretch" }}>
+                        {/* Left sub-column: Trailer, Overview, Reason, Credits */}
+                        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                          {trailerNode}
+                          {overviewNode}
+                          {reasonNode}
+                          {creditsRow}
+                        </div>
 
+                        {/* Right sub-column: Rate box with subtle vertical divider line */}
+                        {rateSection && (
+                          <div style={{
+                            borderLeft: "1px solid rgba(255, 255, 255, 0.12)",
+                            paddingLeft: "28px",
+                            display: "flex",
+                            flexDirection: "column",
+                            justifyContent: "flex-start",
+                          }}>
+                            {rateSection}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
 
+                  {/* ── Bottom Half: FULL-WIDTH Cast & More Like This across the entire modal width ── */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: "24px", paddingTop: "8px", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                    {/* Cast Section (full width) */}
+                    {castSection}
+
+                    {/* More Like This Section (full width) */}
+                    {similarSection}
+                  </div>
+                </div>
+              )}
+            </div>
 
             <AnimatePresence>
               {activePersonId && (
@@ -1411,7 +1278,9 @@ export function TrailerOverlay({
 
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect */
     setMounted(true);
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
 
   if (!mounted) return null;
@@ -1423,36 +1292,56 @@ export function TrailerOverlay({
       exit={{ opacity: 0 }}
       transition={{ duration: 0.2 }}
       style={{
-        position: "fixed", inset: 0, zIndex: 200,
+        position: "fixed",
+        inset: 0,
+        zIndex: 200,
         background: "rgba(0,0,0,0.96)",
-        display: "flex", flexDirection: "column",
-        alignItems: "center", justifyContent: "center",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
         padding: "16px",
       }}
     >
       {/* Header row */}
-      <div style={{
-        width: "100%", maxWidth: "900px",
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        marginBottom: "12px",
-      }}>
-        <p style={{
-          margin: 0, fontSize: "14px", fontWeight: 600,
-          color: "rgba(255,255,255,0.8)",
-          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-          maxWidth: "calc(100% - 52px)",
-        }}>
+      <div
+        style={{
+          width: "100%",
+          maxWidth: "900px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: "12px",
+        }}
+      >
+        <p
+          style={{
+            margin: 0,
+            fontSize: "14px",
+            fontWeight: 600,
+            color: "rgba(255,255,255,0.8)",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            maxWidth: "calc(100% - 52px)",
+          }}
+        >
           {title}
         </p>
         <button
           onClick={onClose}
           style={{
             flexShrink: 0,
-            width: "40px", height: "40px", borderRadius: "50%",
+            width: "40px",
+            height: "40px",
+            borderRadius: "50%",
             background: "rgba(255,255,255,0.1)",
             border: "1px solid rgba(255,255,255,0.15)",
-            color: "white", cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center",
+            color: "white",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
           }}
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -1463,19 +1352,17 @@ export function TrailerOverlay({
       </div>
 
       {/* 16:9 iframe container */}
-      <div style={{
-        width: "100%", maxWidth: "900px",
-        aspectRatio: "16 / 9",
-        borderRadius: "12px",
-        overflow: "hidden",
-        background: "#000",
-        boxShadow: "0 32px 80px rgba(0,0,0,0.8)",
-      }}>
-        {/*  YouTube embed:
-            - Validate the key (YouTube IDs are 11 chars [A-Za-z0-9_-]); refuse anything else.
-            - youtube-nocookie.com instead of youtube.com (privacy + matches CSP allow-list).
-            - Sandbox limits what the embed can do (no top-nav, no form posts, no popups).
-            - referrerpolicy avoids leaking our path to YouTube. */}
+      <div
+        style={{
+          width: "100%",
+          maxWidth: "900px",
+          aspectRatio: "16 / 9",
+          borderRadius: "12px",
+          overflow: "hidden",
+          background: "#000",
+          boxShadow: "0 32px 80px rgba(0,0,0,0.8)",
+        }}
+      >
         {/^[A-Za-z0-9_-]{11}$/.test(videoKey) && (
           <iframe
             width="100%"
@@ -1508,7 +1395,9 @@ function SimilarCard({ movie, onClick }: { movie: Recommendation; onClick: () =>
   const [imgSrc, setImgSrc] = useState(initialSrc);
 
   useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect */
     setImgSrc(initialSrc);
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [initialSrc]);
 
   return (
@@ -1530,14 +1419,16 @@ function SimilarCard({ movie, onClick }: { movie: Recommendation; onClick: () =>
         flexDirection: "column",
       }}
     >
-      <div style={{
-        width: "100%",
-        aspectRatio: "2 / 3",
-        borderRadius: "10px",
-        overflow: "hidden",
-        background: "var(--color-surface)",
-        position: "relative",
-      }}>
+      <div
+        style={{
+          width: "100%",
+          aspectRatio: "2 / 3",
+          borderRadius: "10px",
+          overflow: "hidden",
+          background: "var(--color-surface)",
+          position: "relative",
+        }}
+      >
         <img
           src={imgSrc}
           alt={movie.title}
@@ -1547,34 +1438,38 @@ function SimilarCard({ movie, onClick }: { movie: Recommendation; onClick: () =>
           }}
         />
         {movie.imdb_rating && (
-          <div style={{
-            position: "absolute",
-            bottom: "5px",
-            left: "5px",
-            background: "rgba(0,0,0,0.75)",
-            backdropFilter: "blur(4px)",
-            borderRadius: "5px",
-            padding: "2px 5px",
-            fontSize: "9px",
-            fontWeight: 700,
-            color: "var(--color-rating)",
-          }}>
+          <div
+            style={{
+              position: "absolute",
+              bottom: "5px",
+              left: "5px",
+              background: "rgba(0,0,0,0.75)",
+              backdropFilter: "blur(4px)",
+              borderRadius: "5px",
+              padding: "2px 5px",
+              fontSize: "9px",
+              fontWeight: 700,
+              color: "var(--color-rating)",
+            }}
+          >
             {movie.imdb_rating.toFixed(1)}
           </div>
         )}
       </div>
-      <p style={{
-        margin: "6px 0 0",
-        fontSize: "10px",
-        fontWeight: 500,
-        color: "var(--color-text-secondary)",
-        lineHeight: 1.3,
-        minHeight: "26px",
-        display: "-webkit-box",
-        WebkitLineClamp: 2,
-        WebkitBoxOrient: "vertical",
-        overflow: "hidden",
-      }}>
+      <p
+        style={{
+          margin: "6px 0 0",
+          fontSize: "10px",
+          fontWeight: 500,
+          color: "var(--color-text-secondary)",
+          lineHeight: 1.3,
+          minHeight: "26px",
+          display: "-webkit-box",
+          WebkitLineClamp: 2,
+          WebkitBoxOrient: "vertical",
+          overflow: "hidden",
+        }}
+      >
         {movie.title}
       </p>
       {movie.year && (
@@ -1585,3 +1480,4 @@ function SimilarCard({ movie, onClick }: { movie: Recommendation; onClick: () =>
     </button>
   );
 }
+

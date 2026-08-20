@@ -88,10 +88,14 @@
      map common UI roles so a header can ask for `--s-header-y`
      instead of memorizing whether that's `--s-3` or `--s-4`.
      Change once here to retune the whole app. */
-  --s-header-y: 12px;     /* sticky header vertical padding */
-  --s-header-x: 20px;     /* sticky header horizontal padding */
-  --s-section-gap: 32px;  /* gap between rails on dashboard / explore */
-  --s-card-gap: 16px;     /* gap inside a row of cards */
+  --s-header-y: 12px;
+  /* sticky header vertical padding */
+  --s-header-x: 20px;
+  /* sticky header horizontal padding */
+  --s-section-gap: 32px;
+  /* gap between rails on dashboard / explore */
+  --s-card-gap: 16px;
+  /* gap inside a row of cards */
   --s-bottom-clearance: calc(120px + env(safe-area-inset-bottom));
 
   /* ─── Radius Scale (Apple uses continuous curvature) ─── */
@@ -202,13 +206,12 @@
   border: var(--hl-medium);
   box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55), 0 1px 0 rgba(255, 255, 255, 0.10) inset;
 }
+
 .glass-strong {
-  background: linear-gradient(
-    145deg,
-    rgba(24, 26, 32, 0.96) 0%,
-    rgba(14, 16, 20, 0.98) 50%,
-    rgba(18, 20, 24, 0.97) 100%
-  );
+  background: linear-gradient(145deg,
+      rgba(24, 26, 32, 0.96) 0%,
+      rgba(14, 16, 20, 0.98) 50%,
+      rgba(18, 20, 24, 0.97) 100%);
   -webkit-backdrop-filter: blur(60px) saturate(2.2) brightness(1.08);
   backdrop-filter: blur(60px) saturate(2.2) brightness(1.08);
   box-shadow: var(--shadow-xl);
@@ -239,14 +242,17 @@
     opacity var(--dur-base) var(--ease-out);
   -webkit-tap-highlight-color: transparent;
 }
+
 .btn:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
+
 .btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
 .btn:active:not(:disabled) {
   transform: scale(0.98);
 }
@@ -256,6 +262,7 @@
   color: #0a0a0f;
   box-shadow: 0 6px 22px rgba(0, 0, 0, 0.45);
 }
+
 .btn-primary:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.92);
 }
@@ -267,6 +274,7 @@
   -webkit-backdrop-filter: blur(20px) saturate(1.4);
   backdrop-filter: blur(20px) saturate(1.4);
 }
+
 .btn-secondary:hover:not(:disabled) {
   background: rgba(40, 42, 50, 0.78);
 }
@@ -276,6 +284,7 @@
   color: var(--color-text-secondary);
   padding: 8px 14px;
 }
+
 .btn-ghost:hover:not(:disabled) {
   color: var(--color-text-primary);
   background: rgba(255, 255, 255, 0.06);
@@ -299,6 +308,7 @@
   margin: 0;
   color: var(--color-text-primary);
 }
+
 .h-page--brand {
   background: var(--gradient-brand);
   -webkit-background-clip: text;
@@ -329,6 +339,7 @@
   line-height: var(--lh-base);
   color: var(--color-text-secondary);
 }
+
 .t-meta {
   font-size: var(--fs-sm);
   color: var(--color-text-muted);
@@ -362,9 +373,11 @@
   -webkit-appearance: none;
   appearance: none;
 }
+
 .app-search-input::placeholder {
   color: var(--color-text-muted);
 }
+
 .app-search-input:focus {
   border-color: rgba(255, 255, 255, 0.30);
   background: rgba(36, 38, 46, 0.92);
@@ -379,6 +392,7 @@
   text-decoration: none;
   transition: color var(--dur-base) var(--ease-out);
 }
+
 .app-footer-link:hover {
   color: var(--color-text-primary);
 }
@@ -392,6 +406,7 @@
   font-size: 15px;
   line-height: 1.65;
 }
+
 .legal-prose h2 {
   margin: 32px 0 12px;
   font-size: 18px;
@@ -399,7 +414,11 @@
   color: var(--color-text-primary);
   letter-spacing: -0.01em;
 }
-.legal-prose h2:first-of-type { margin-top: 0; }
+
+.legal-prose h2:first-of-type {
+  margin-top: 0;
+}
+
 .legal-prose h3 {
   margin: 24px 0 8px;
   font-size: 14px;
@@ -408,22 +427,36 @@
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
-.legal-prose p { margin: 0 0 14px; }
-.legal-prose ul, .legal-prose ol {
+
+.legal-prose p {
+  margin: 0 0 14px;
+}
+
+.legal-prose ul,
+.legal-prose ol {
   margin: 0 0 14px;
   padding-left: 22px;
 }
-.legal-prose li { margin: 4px 0; }
+
+.legal-prose li {
+  margin: 4px 0;
+}
+
 .legal-prose a {
   color: var(--color-text-primary);
   text-decoration: underline;
   text-decoration-color: rgba(255, 255, 255, 0.30);
   text-underline-offset: 3px;
 }
+
 .legal-prose a:hover {
   text-decoration-color: rgba(255, 255, 255, 0.65);
 }
-.legal-prose strong { color: var(--color-text-primary); font-weight: 600; }
+
+.legal-prose strong {
+  color: var(--color-text-primary);
+  font-weight: 600;
+}
 
 /* ═══════════════════════════════════════════════════════════
    Reset + base
@@ -452,7 +485,8 @@ body {
   color: var(--color-text-primary);
   min-height: 100dvh;
   overflow-x: hidden;
-  overscroll-behavior: none; /* Prevent iOS bounce/rubber-banding to top pill */
+  overscroll-behavior: none;
+  /* Prevent iOS bounce/rubber-banding to top pill */
   position: relative;
   /* No top inset here: sticky headers pin to the viewport top when scrolled,
      so they own their env(safe-area-inset-top) padding themselves. Padding
@@ -663,12 +697,10 @@ textarea,
   position: relative;
   isolation: isolate;
   background:
-    linear-gradient(
-      180deg,
+    linear-gradient(180deg,
       rgba(255, 255, 255, 0.12) 0%,
       rgba(255, 255, 255, 0.05) 38%,
-      rgba(255, 255, 255, 0.02) 100%
-    ),
+      rgba(255, 255, 255, 0.02) 100%),
     rgba(18, 20, 26, 0.45);
   -webkit-backdrop-filter: blur(28px) saturate(200%) brightness(1.15);
   backdrop-filter: blur(28px) saturate(200%) brightness(1.15);
@@ -685,12 +717,10 @@ textarea,
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
-  background: radial-gradient(
-    140% 100% at 50% -10%,
-    rgba(255, 255, 255, 0.22) 0%,
-    rgba(255, 255, 255, 0.05) 35%,
-    rgba(255, 255, 255, 0) 60%
-  );
+  background: radial-gradient(140% 100% at 50% -10%,
+      rgba(255, 255, 255, 0.22) 0%,
+      rgba(255, 255, 255, 0.05) 35%,
+      rgba(255, 255, 255, 0) 60%);
   z-index: 0;
 }
 
@@ -701,12 +731,10 @@ textarea,
   inset: 0;
   border-radius: inherit;
   padding: 1px;
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.45) 0%,
-    rgba(255, 255, 255, 0.12) 45%,
-    rgba(255, 255, 255, 0.06) 100%
-  );
+  background: linear-gradient(180deg,
+      rgba(255, 255, 255, 0.45) 0%,
+      rgba(255, 255, 255, 0.12) 45%,
+      rgba(255, 255, 255, 0.06) 100%);
   -webkit-mask:
     linear-gradient(#000 0 0) content-box,
     linear-gradient(#000 0 0);
@@ -755,6 +783,20 @@ textarea,
   background: rgba(6, 6, 10, 0.55);
   -webkit-backdrop-filter: blur(16px) saturate(1.2);
   backdrop-filter: blur(16px) saturate(1.2);
+}
+
+.tab-pill {
+  padding: 7px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  cursor: pointer;
+  border-radius: var(--radius-pill);
+}
+
+.tab-pill.active {
+  font-weight: 600;
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -963,6 +1005,7 @@ textarea,
      card in a row whether a title wraps to one line or two. */
   min-height: 2.7em;
 }
+
 .poster-info-meta {
   margin-top: 5px;
   display: flex;
@@ -970,6 +1013,7 @@ textarea,
   gap: 6px;
   min-height: 18px;
 }
+
 .poster-info-meta-text {
   min-width: 0;
   overflow: hidden;
@@ -1062,6 +1106,7 @@ textarea,
 .poster-card:focus-within {
   outline: none;
 }
+
 .poster-card:has(:focus-visible) .poster-container {
   box-shadow: var(--focus-ring);
   border-color: rgba(110, 168, 254, 0.55) !important;
@@ -1074,6 +1119,7 @@ button:focus-visible,
 a:focus-visible {
   outline: none;
 }
+
 button.poster-card-btn:focus-visible,
 a.poster-card-btn:focus-visible {
   box-shadow: var(--focus-ring);
@@ -1233,12 +1279,10 @@ a.poster-card-btn:focus-visible {
 .skeleton-shimmer-overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(255, 255, 255, 0.06) 50%,
-    transparent 100%
-  );
+  background: linear-gradient(90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.06) 50%,
+      transparent 100%);
   background-size: 200% 100%;
   animation: shimmer 1.6s linear infinite;
 }
@@ -1577,7 +1621,8 @@ body:has(.onboarding-rating-layout) {
      bottom-nav and footer at 60 fps even when a modal is animating.
    ═══════════════════════════════════════════════════════════ */
 
-html, body {
+html,
+body {
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -1614,6 +1659,7 @@ a[role="button"]:active,
 }
 
 @media (prefers-reduced-motion: reduce) {
+
   button:active,
   a[role="button"]:active,
   [role="button"]:active,

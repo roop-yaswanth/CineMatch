@@ -14,40 +14,40 @@ interface MobileMenuProps {
 }
 
 const IconCompass = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="12" cy="12" r="10" />
     <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" />
   </svg>
 );
 
 const IconHome = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
     <polyline points="9 22 9 12 15 12 15 22" />
   </svg>
 );
 
 const IconBookmark = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M19 21l-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
   </svg>
 );
 
 const IconReset = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
     <path d="M3 3v5h5" />
   </svg>
 );
 
 const IconHeart = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l8.72-8.72 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
   </svg>
 );
 
 const IconPreferences = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <line x1="4" y1="21" x2="4" y2="14" />
     <line x1="4" y1="10" x2="4" y2="3" />
     <line x1="12" y1="21" x2="12" y2="12" />
@@ -61,7 +61,7 @@ const IconPreferences = () => (
 );
 
 const IconLogOut = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
     <polyline points="16 17 21 12 16 7" />
     <line x1="21" y1="12" x2="9" y2="12" />
@@ -69,14 +69,14 @@ const IconLogOut = () => (
 );
 
 const IconUser = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
     <circle cx="12" cy="7" r="4" />
   </svg>
 );
 
 const IconChevronDown = () => (
-  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
     <polyline points="6 9 12 15 18 9" />
   </svg>
 );
@@ -93,12 +93,14 @@ export function DesktopNavTabs({
   const pathname = usePathname() ?? "/";
   const [filterParam, setFilterParam] = useState<string | null>(null);
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       setFilterParam(params.get("filter"));
     }
   }, [pathname]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const isDashboardActive = pathname.startsWith("/dashboard");
   const isExploreActive = pathname.startsWith("/explore");
@@ -183,25 +185,6 @@ export default function MobileMenu({
     if (action) action();
   };
 
-  const handleDashboard = () => {
-    setIsOpen(false);
-    setShowResetConfirm(false);
-    router.push("/dashboard");
-  };
-
-  const handleExplore = () => {
-    setIsOpen(false);
-    setShowResetConfirm(false);
-    router.push("/explore");
-  };
-
-  const handleWatchlist = () => {
-    setIsOpen(false);
-    setShowResetConfirm(false);
-    if (onWatchlist) onWatchlist();
-    else router.push("/your-likes?filter=watchlist");
-  };
-
   const handleYourLikes = () => {
     setIsOpen(false);
     setShowResetConfirm(false);
@@ -241,30 +224,58 @@ export default function MobileMenu({
         </span>
       </button>
 
-      {/* MOBILE HAMBURGER TRIGGER BUTTON (Visible < 900px) */}
+      {/* MOBILE TRIGGER BUTTON */}
       <button
-        className="glass-button mobile-menu-trigger"
+        className="mobile-menu-trigger"
         onClick={(e) => {
           e.stopPropagation();
           setIsOpen((prev) => !prev);
         }}
-        style={{
-          width: "40px",
-          height: "40px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          cursor: "pointer",
-          color: "var(--color-text-primary)",
-          padding: 0,
-        }}
-        aria-label="Open menu"
+        aria-expanded={isOpen}
+        aria-label={isOpen ? "Close menu" : "Open menu"}
       >
-        <svg width="18" height="13" viewBox="0 0 20 14" fill="none">
-          <rect width="20" height="2" rx="1" fill="currentColor" />
-          <rect y="6" width="14" height="2" rx="1" fill="currentColor" />
-          <rect y="12" width="20" height="2" rx="1" fill="currentColor" />
-        </svg>
+        <AnimatePresence mode="wait">
+          {isOpen ? (
+            <motion.svg
+              key="close"
+              initial={{ rotate: -90, opacity: 0 }}
+              animate={{ rotate: 0, opacity: 1 }}
+              exit={{ rotate: 90, opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </motion.svg>
+          ) : (
+            <motion.svg
+              key="menu"
+              initial={{ rotate: 90, opacity: 0 }}
+              animate={{ rotate: 0, opacity: 1 }}
+              exit={{ rotate: -90, opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <line x1="4" y1="7" x2="20" y2="7" />
+              <line x1="4" y1="12" x2="20" y2="12" />
+              <line x1="4" y1="17" x2="20" y2="17" />
+            </motion.svg>
+          )}
+        </AnimatePresence>
       </button>
 
       {/* DROPDOWN CARD (Shared between desktop account button & mobile menu trigger) */}
@@ -314,29 +325,8 @@ export default function MobileMenu({
                 `,
               }}
             >
-              {/* Mobile-only navigation items */}
-              <div className="mobile-only-items">
-                <button className="menu-btn" onClick={handleDashboard}>
-                  <span className="menu-btn-icon"><IconHome /></span>
-                  <span>Dashboard</span>
-                </button>
-
-                <button className="menu-btn" onClick={handleExplore}>
-                  <span className="menu-btn-icon"><IconCompass /></span>
-                  <span>Explore</span>
-                </button>
-
-                <button className="menu-btn" onClick={handleWatchlist}>
-                  <span className="menu-btn-icon"><IconBookmark /></span>
-                  <span>Watchlist</span>
-                </button>
-
-                <div className="menu-divider" />
-              </div>
-
-              {/* Your Collection is moved to the account dropdown menu */}
+              {/* Your Collection */}
               <button className="menu-btn" onClick={handleYourLikes}>
-                <span className="menu-btn-icon"><IconHeart /></span>
                 <span>Your Collection</span>
               </button>
 
@@ -391,16 +381,36 @@ export default function MobileMenu({
       <style>{`
         @media (min-width: 900px) {
           .mobile-menu-trigger { display: none !important; }
-          .mobile-only-items { display: none !important; }
           .desktop-account-btn { display: flex !important; }
           .desktop-center-nav { display: flex !important; }
         }
 
         @media (max-width: 899px) {
           .mobile-menu-trigger { display: flex !important; }
-          .mobile-only-items { display: flex !important; }
           .desktop-account-btn { display: none !important; }
           .desktop-center-nav { display: none !important; }
+        }
+
+        .mobile-menu-trigger {
+          width: 40px;
+          height: 40px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: rgba(14, 16, 22, 0.45);
+          backdrop-filter: blur(20px) saturate(1.5);
+          -webkit-backdrop-filter: blur(20px) saturate(1.5);
+          border: 1px solid rgba(255, 255, 255, 0.22);
+          box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4), 0 1px 0 rgba(255, 255, 255, 0.2) inset;
+          color: #ffffff;
+          cursor: pointer;
+          padding: 0;
+          transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .mobile-menu-trigger:active {
+          transform: scale(0.92);
+          background: rgba(14, 16, 22, 0.7);
         }
 
         .desktop-center-nav {
@@ -498,20 +508,20 @@ export default function MobileMenu({
         .menu-btn {
           width: 100%;
           text-align: left;
-          padding: 6px 10px;
+          padding: 8px 12px;
           height: 38px;
           background: transparent;
           border: none;
-          border-radius: 12px;
+          border-radius: 10px;
           cursor: pointer;
-          color: rgba(255, 255, 255, 0.88);
+          color: rgba(255, 255, 255, 0.82);
           font-size: 13.5px;
           font-weight: 500;
           letter-spacing: -0.01em;
           transition: all 0.16s cubic-bezier(0.16, 1, 0.3, 1);
           display: flex;
           align-items: center;
-          gap: 10px;
+          gap: 12px;
         }
         .menu-btn:hover {
           background: rgba(255, 255, 255, 0.08);
@@ -521,41 +531,37 @@ export default function MobileMenu({
           background: rgba(255, 255, 255, 0.14);
           transform: scale(0.98);
         }
+        .menu-btn-danger {
+          color: rgba(248, 113, 113, 0.9) !important;
+        }
         .menu-btn-danger:hover {
-          background: rgba(var(--rgb-dislike), 0.12) !important;
-          color: var(--color-danger) !important;
+          background: rgba(239, 68, 68, 0.12) !important;
+          color: #ef4444 !important;
         }
         .menu-btn-icon {
-          width: 26px;
-          height: 26px;
-          border-radius: 7px;
+          width: 18px;
+          height: 18px;
           display: flex;
           align-items: center;
           justify-content: center;
-          background: rgba(255, 255, 255, 0.05);
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          color: rgba(255, 255, 255, 0.75);
+          color: rgba(255, 255, 255, 0.6);
           flex-shrink: 0;
           transition: all 0.16s ease;
         }
         .menu-btn:hover .menu-btn-icon {
-          background: rgba(255, 255, 255, 0.12);
-          border-color: rgba(255, 255, 255, 0.2);
           color: #ffffff;
+          transform: scale(1.08);
         }
         .menu-btn-icon-danger {
-          background: rgba(var(--rgb-dislike), 0.1) !important;
-          border: 1px solid rgba(var(--rgb-dislike), 0.2) !important;
-          color: var(--color-danger) !important;
+          color: rgba(248, 113, 113, 0.85) !important;
         }
         .menu-btn-danger:hover .menu-btn-icon-danger {
-          background: rgba(var(--rgb-dislike), 0.22) !important;
-          border-color: rgba(var(--rgb-dislike), 0.4) !important;
-          color: var(--color-danger) !important;
+          color: #ef4444 !important;
+          transform: scale(1.08);
         }
         .menu-divider {
           height: 1px;
-          background: rgba(255, 255, 255, 0.07);
+          background: rgba(255, 255, 255, 0.08);
           margin: 4px 6px;
         }
         .menu-confirm-btn {

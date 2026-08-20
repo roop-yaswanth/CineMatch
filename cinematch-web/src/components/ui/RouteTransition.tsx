@@ -1,21 +1,15 @@
 "use client";
 
-/**
- * Adds two small affordances on every route change:
- *   1. A 2-px progress bar that animates across the top (YouTube/Linear style).
- *   2. A 180ms opacity fade on the page content so transitions don't feel like
- *      hard cuts.
- *
- * Implemented by listening to `usePathname()` — when it changes, run a brief
- * scripted animation. Cheap, no extra deps, no SSR mismatch (everything is
- * client-side and effects-driven).
- */
 
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 export default function RouteTransition({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const searchStr = searchParams?.toString() ?? "";
+  const navKey = `${pathname}?${searchStr}`;
+
   const [progress, setProgress] = useState<number>(0);
   const tRef = useRef<number | null>(null);
   const fadeRef = useRef<HTMLDivElement | null>(null);
@@ -24,12 +18,12 @@ export default function RouteTransition({ children }: { children: React.ReactNod
     // Trigger bar: 0 → 65 → 100 → 0 (reset hidden).
     Promise.resolve().then(() => setProgress(15));
     if (tRef.current) clearTimeout(tRef.current);
-    const t1 = window.setTimeout(() => setProgress(65), 80);
-    const t2 = window.setTimeout(() => setProgress(100), 220);
-    const t3 = window.setTimeout(() => setProgress(0), 380);
+    const t1 = window.setTimeout(() => setProgress(65), 70);
+    const t2 = window.setTimeout(() => setProgress(100), 200);
+    const t3 = window.setTimeout(() => setProgress(0), 340);
     tRef.current = t3;
 
-    // Re-trigger the fade-in animation on pathname change WITHOUT remounting
+    // Re-trigger the fade-in animation on navigation change WITHOUT remounting
     // the children. Toggling the class off+on in successive frames forces
     // the browser to restart the keyframes; React's tree stays untouched
     // so the dashboard / your-likes / etc. keep all their in-memory state.
@@ -46,7 +40,7 @@ export default function RouteTransition({ children }: { children: React.ReactNod
       clearTimeout(t2);
       clearTimeout(t3);
     };
-  }, [pathname]);
+  }, [navKey]);
 
   return (
     <>
@@ -100,14 +94,10 @@ export default function RouteTransition({ children }: { children: React.ReactNod
 
       <style>{`
         @keyframes routeFade {
-          from { opacity: 0; transform: translate3d(0, 3px, 0); }
-          to   { opacity: 1; transform: translate3d(0, 0, 0); }
+          0%   { opacity: 0.75; transform: translate3d(0, 4px, 0); }
+          100% { opacity: 1;    transform: translate3d(0, 0, 0); }
         }
-        /* 130 ms is below the perceptual "delay" threshold for navigation
-           on fast devices but still gives a soft visual hand-off. translate3d
-           promotes the layer to the GPU so it doesn't re-paint the whole
-           subtree on every frame. */
-        .route-fade { animation: routeFade 130ms cubic-bezier(0.22, 0.61, 0.36, 1); }
+        .route-fade { animation: routeFade 180ms cubic-bezier(0.16, 1, 0.3, 1) both; }
         @media (prefers-reduced-motion: reduce) {
           .route-fade { animation: none; }
         }
