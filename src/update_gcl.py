@@ -42,7 +42,7 @@ RATING_THRESHOLD = 3.5
 
 # Import training config from the main training script
 # These are duplicated here for standalone use
-EMBEDDING_SIZE = 128
+EMBEDDING_SIZE = 512
 N_LAYERS       = 3
 CL_RATE        = 0.5
 NOISE_EPS      = 0.1

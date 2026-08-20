@@ -33,7 +33,7 @@ The CineMatch system operates through a multi-stage pipeline:
 
 **5. Web Application & API**
 
-- **Frontend**: Next.js 14 (App Router), Tailwind CSS, and Framer Motion for a fluid, interactive UX.
+- **Frontend**: Next.js 16 (App Router), Tailwind CSS, and Framer Motion for a fluid, interactive UX.
 - **Backend**: FastAPI server hosting FAISS indices, embedding models, and CF inference.
 - **Persistence**: MongoDB for user session management and preference profiles.
 
@@ -52,7 +52,7 @@ CineMatch addresses the cold-start problem through a two-step process:
 
 The system is designed for periodic synchronization with global movie releases:
 
-- **`src/update_faiss.py`**: A weekly script that fetches new movies via the TMDB Discover API, encodes them incrementally with BGE-M3, and appends them to the FAISS index.
+- **`src/Update_Faiss.ipynb`**: A weekly script that fetches new movies via the TMDB Discover API, encodes them incrementally with BGE-M3, and appends them to the FAISS index.
 - **`src/update_gcl.py`**: Refreshes user/item embeddings to incorporate new interactions and titles.
 
 ---
@@ -61,7 +61,7 @@ The system is designed for periodic synchronization with global movie releases:
 
 ```text
 CineMatch/
-├── cinematch-web/                    # Next.js 15 Frontend Application
+├── cinematch-web/                    # Next.js 16 Frontend Application
 │   ├── public/                       # Static assets
 │   └── src/
 │       ├── app/
@@ -109,9 +109,9 @@ CineMatch/
 │   ├── 7)XSimGCL_Train.ipynb         # RecBole XSimGCL training & export
 │   ├── 8)Evaluation.ipynb            # Offline evaluation & metric reporting
 │   ├── merge_imdb_ratings.py         # Utility: merges IMDb ratings into catalog
-│   ├── update_faiss.py               # Weekly FAISS incremental update pipeline
+│   ├── Update_Faiss.ipynb            # Weekly FAISS incremental update pipeline
 │   ├── update_gcl.py                 # Weekly CF embeddings refresh pipeline
-│   ├── upload_to_hf.py               # Upload model artifacts to HuggingFace Hub
+│   ├── Upload_to_HF.ipynb            # Upload model artifacts to HuggingFace Hub
 │   ├── imdb/
 │   │   ├── 1)IMDB_01_Prep.ipynb      # IMDb data cleaning & filtering
 │   │   └── 2)IMDB_02_BGE_M3_Embeddings_FAISS.ipynb  # IMDb FAISS index construction
