@@ -106,16 +106,18 @@ const GENRE_LIST = [
 ];
 
 const LOADING_VARIANTS = [
-  "Curating your next pick…",
-  "Scanning the film archives…",
-  "Projecting something special…",
-  "Setting the scene…",
-  "Searching the catalog…",
-  "Splicing the reels…",
-  "Finding stars for you…",
-  "Powering up recommendations…",
-  "Getting your front row seat…",
-  "Rolling the cameras…",
+  { emoji: "🍿", text: "Curating your next pick..." },
+  { emoji: "🎞️", text: "Scanning the film archives..." },
+  { emoji: "📽️", text: "Projecting something special..." },
+  { emoji: "🎬", text: "Lights, camera, action!" },
+  { emoji: "🎭", text: "Setting the scene..." },
+  { emoji: "🔍", text: "Searching the cinematic galaxy..." },
+  { emoji: "✨", text: "Adding some movie magic..." },
+  { emoji: "🎞️", text: "Splicing the reels..." },
+  { emoji: "🌟", text: "Finding stars for you..." },
+  { emoji: "⚡", text: "Powering up recommendations..." },
+  { emoji: "🎟️", text: "Getting your front row seat..." },
+  { emoji: "🎥", text: "Rolling the cameras..." },
 ];
 
 export default function OnboardingView({ session, onComplete, onLogout, forcePreferences }: Props) {
@@ -447,7 +449,11 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
                   {/* Swipe glow feedback */}
                   <SwipeGlowOverlay dragX={dragX} dragY={dragY} />
 
-                  <MovieCard movie={state.movie} priority noLayout />
+                  {/* Overlay mode: title/meta sit ON the poster gradient, so the
+                      card's height is exactly 2:3 of its width. The default mode
+                      renders the info block below the poster, and this zone
+                      (flex: 1 + overflow: hidden) clipped that bottom row. */}
+                  <MovieCard movie={state.movie} priority noLayout overlay />
 
                   {!hasInteracted && (
                     <motion.div
@@ -484,7 +490,7 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
                           transition={{ delay: 1.2, type: "spring", stiffness: 200, damping: 20 }}
                           style={{ display: "flex", alignItems: "center", gap: "8px" }}
                         >
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-like)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="12" x2="20" y2="12" /><polyline points="13 5 20 12 13 19" /></svg>
+                          <span style={{ fontSize: "22px" }}>👉</span>
                           <span style={{ color: "var(--color-like)", fontSize: "13px", fontWeight: 600 }}>Like</span>
                         </motion.div>
 
@@ -495,7 +501,7 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
                           transition={{ delay: 1.4, type: "spring", stiffness: 200, damping: 20 }}
                           style={{ display: "flex", alignItems: "center", gap: "8px" }}
                         >
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-dislike)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="20" y1="12" x2="4" y2="12" /><polyline points="11 5 4 12 11 19" /></svg>
+                          <span style={{ fontSize: "22px" }}>👈</span>
                           <span style={{ color: "var(--color-dislike)", fontSize: "13px", fontWeight: 600 }}>Dislike</span>
                         </motion.div>
 
@@ -506,7 +512,7 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
                           transition={{ delay: 1.6, type: "spring", stiffness: 200, damping: 20 }}
                           style={{ display: "flex", alignItems: "center", gap: "8px" }}
                         >
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-okay)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="20" x2="12" y2="4" /><polyline points="5 11 12 4 19 11" /></svg>
+                          <span style={{ fontSize: "22px" }}>👆</span>
                           <span style={{ color: "var(--color-okay)", fontSize: "13px", fontWeight: 600 }}>Okay</span>
                         </motion.div>
 
@@ -517,7 +523,7 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
                           transition={{ delay: 1.8, type: "spring", stiffness: 200, damping: 20 }}
                           style={{ display: "flex", alignItems: "center", gap: "8px" }}
                         >
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-skip)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="4" x2="12" y2="20" /><polyline points="5 13 12 20 19 13" /></svg>
+                          <span style={{ fontSize: "22px" }}>👇</span>
                           <span style={{ color: "var(--color-skip)", fontSize: "13px", fontWeight: 600 }}>Skip</span>
                         </motion.div>
                       </div>
@@ -553,22 +559,16 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
                 </motion.div>
               ) : (loading || optimisticRemoved) ? (
                 <motion.div key="loading" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} style={{ textAlign: "center", width: "100%", padding: "40px 0" }}>
-                  <div className="onboarding-spinner" aria-hidden />
+                  <div style={{ fontSize: "64px", animation: "bounce 1s infinite alternate" }}>
+                    {LOADING_VARIANTS[loadingVariantIdx].emoji}
+                  </div>
                   <p style={{ marginTop: "16px", fontSize: "14px", color: "var(--color-text-primary)", fontWeight: 500 }}>
-                    {LOADING_VARIANTS[loadingVariantIdx]}
+                    {LOADING_VARIANTS[loadingVariantIdx].text}
                   </p>
                   <style>{`
-                  .onboarding-spinner {
-                    width: 36px;
-                    height: 36px;
-                    margin: 0 auto;
-                    border-radius: 50%;
-                    border: 3px solid rgba(255,255,255,0.12);
-                    border-top-color: var(--color-accent);
-                    animation: onboarding-spin 0.9s linear infinite;
-                  }
-                  @keyframes onboarding-spin {
-                    to { transform: rotate(360deg); }
+                  @keyframes bounce {
+                    from { transform: translateY(0); }
+                    to { transform: translateY(-16px); }
                   }
                 `}</style>
                 </motion.div>
@@ -613,6 +613,7 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
                       color: "var(--color-text-primary)",
                     }}
                   >
+                    <span style={{ fontSize: "16px", lineHeight: 1 }}>👋</span>
                     <span style={{ flex: 1, lineHeight: 1.4 }}>
                       Not finding your style? Adjusting your genres or region might help.
                     </span>
@@ -695,7 +696,8 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
                 ))}
               </div>
 
-              {/* Footer row: Undo (left) + Escape-obscure (right) — both secondary actions */}
+              {/* Footer row: Undo (left) + Escape-obscure (right) — both rendered
+                  as lightweight ghost actions so neither reads as a primary button. */}
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "10px", gap: "8px", minHeight: "28px" }}>
                 {(state?.session?.onboarding_index ?? 0) > 0 ? (
                   <motion.button
@@ -708,15 +710,15 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
                       display: "inline-flex",
                       alignItems: "center",
                       gap: "5px",
-                      background: "rgba(255,255,255,0.06)",
-                      border: "1px solid rgba(255,255,255,0.10)",
-                      color: "var(--color-text-secondary)",
+                      background: "transparent",
+                      border: "none",
+                      color: "var(--color-text-muted)",
                       cursor: loading ? "not-allowed" : "pointer",
-                      opacity: loading ? 0.4 : 1,
+                      opacity: loading ? 0.4 : 0.9,
                       borderRadius: "var(--radius-pill)",
-                      padding: "5px 12px",
+                      padding: "4px 8px 4px 0",
                       fontSize: "11px",
-                      fontWeight: 600,
+                      fontWeight: 500,
                     }}
                   >
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -870,10 +872,10 @@ const SWIPE_STEPS = [
   // Colors mirror the global rating palette (--color-like / --color-dislike /
   // --color-okay / --color-skip) as literals so framer-motion can interpolate
   // them in the tint/dot animations.
-  { dir: "right", label: "LIKE", sub: "You loved it or would watch it", color: "#30d158", exitX: 320, exitY: 0, rot: 15, arrowDeg: 0, gesture: "Swipe right" },
-  { dir: "left", label: "NOPE", sub: "Not your thing at all", color: "#ff453a", exitX: -320, exitY: 0, rot: -15, arrowDeg: 180, gesture: "Swipe left" },
-  { dir: "down", label: "OKAY", sub: "Seen it — it was fine", color: "#0a84ff", exitX: 0, exitY: 320, rot: -4, arrowDeg: 90, gesture: "Swipe down" },
-  { dir: "up", label: "SKIP", sub: "Haven't seen it yet", color: "#8e8e93", exitX: 0, exitY: -320, rot: 4, arrowDeg: 270, gesture: "Swipe up" },
+  { dir: "right", label: "LIKE", sub: "You loved it or would watch it", color: "#30d158", exitX: 320, exitY: 0, rot: 15, hand: "👉", gesture: "Swipe right" },
+  { dir: "left", label: "NOPE", sub: "Not your thing at all", color: "#ff453a", exitX: -320, exitY: 0, rot: -15, hand: "👈", gesture: "Swipe left" },
+  { dir: "down", label: "OKAY", sub: "Seen it — it was fine", color: "#0a84ff", exitX: 0, exitY: 320, rot: -4, hand: "👇", gesture: "Swipe down" },
+  { dir: "up", label: "SKIP", sub: "Haven't seen it yet", color: "#8e8e93", exitX: 0, exitY: -320, rot: 4, hand: "👆", gesture: "Swipe up" },
 ] as const;
 
 function MobileSwipeTutorial({ onDismiss }: { onDismiss: () => void }) {
@@ -944,16 +946,7 @@ function MobileSwipeTutorial({ onDismiss }: { onDismiss: () => void }) {
               position: "absolute", inset: 0, display: "flex",
               flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "10px",
             }}>
-              <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="2" y="2" width="20" height="20" rx="2.2" />
-                <line x1="7" y1="2" x2="7" y2="22" />
-                <line x1="17" y1="2" x2="17" y2="22" />
-                <line x1="2" y1="12" x2="22" y2="12" />
-                <line x1="2" y1="7" x2="7" y2="7" />
-                <line x1="2" y1="17" x2="7" y2="17" />
-                <line x1="17" y1="17" x2="22" y2="17" />
-                <line x1="17" y1="7" x2="22" y2="7" />
-              </svg>
+              <div style={{ fontSize: "44px", filter: "grayscale(0.3)" }}>🎬</div>
               <div style={{ width: "90px", height: "7px", background: "rgba(255,255,255,0.1)", borderRadius: "4px" }} />
               <div style={{ width: "60px", height: "5px", background: "rgba(255,255,255,0.06)", borderRadius: "3px" }} />
             </div>
@@ -994,7 +987,7 @@ function MobileSwipeTutorial({ onDismiss }: { onDismiss: () => void }) {
           </motion.div>
         </AnimatePresence>
 
-        {/* Animated arrow showing gesture direction */}
+        {/* Animated hand emoji showing gesture direction */}
         <motion.div
           key={`hand-${step}`}
           initial={{ opacity: 0 }}
@@ -1009,16 +1002,12 @@ function MobileSwipeTutorial({ onDismiss }: { onDismiss: () => void }) {
             bottom: s.exitY < 0 ? undefined : "-38px",
             top: s.exitY < 0 ? "-44px" : undefined,
             left: "50%", transform: "translateX(-50%)",
-            color: s.color,
+            fontSize: "30px",
             filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.6))",
             pointerEvents: "none",
-            display: "flex",
           }}
         >
-          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: `rotate(${s.arrowDeg}deg)` }}>
-            <line x1="4" y1="12" x2="20" y2="12" />
-            <polyline points="13 5 20 12 13 19" />
-          </svg>
+          {s.hand}
         </motion.div>
       </div>
 
@@ -1069,7 +1058,7 @@ function MobileSwipeTutorial({ onDismiss }: { onDismiss: () => void }) {
           transition: "all 0.3s ease",
         }}
       >
-        {isLast ? "Got it — start rating" : "Skip tutorial"}
+        {isLast ? "Got it — start rating 🍿" : "Skip tutorial"}
       </motion.button>
     </motion.div>
   );
@@ -1086,6 +1075,12 @@ const LANG_NATIVE: Record<string, string> = {
   en: "Aa", te: "తెలుగు", hi: "हिन्दी", ta: "தமிழ்", ml: "മലയാളം",
   ko: "한국어", ja: "日本語", es: "Español", fr: "Français", de: "Deutsch",
   it: "Italiano", pt: "Português", zh: "普通话", tw: "臺灣華語", cn: "粵語", ar: "العربية",
+};
+
+const GENRE_EMOJI: Record<string, string> = {
+  Action: "💥", Adventure: "🗺️", Animation: "🎨", Comedy: "😄", Crime: "🕵️",
+  Documentary: "🎥", Drama: "🎭", Family: "🧸", Fantasy: "🐉", Horror: "👻",
+  Romance: "💕", "Science Fiction": "🚀", Thriller: "🔪", Mystery: "🧩",
 };
 
 const WIZARD_STEPS = [
@@ -1256,7 +1251,7 @@ function PreferencesWizard({
                       return (
                         <WizardChip
                           key={genre}
-                          label={genre}
+                          label={`${GENRE_EMOJI[genre] ?? "🎬"} ${genre}`}
                           active={active}
                           onClick={() =>
                             setPreferences((p) => ({
@@ -1336,7 +1331,7 @@ function PreferencesWizard({
           {loading
             ? "Building your personalised slate…"
             : isLast
-            ? "Build my slate"
+            ? "Build my slate ✨"
             : selectedCount > 0
             ? `Continue with ${selectedCount} selected`
             : "Continue"}

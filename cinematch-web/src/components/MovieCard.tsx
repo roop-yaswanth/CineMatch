@@ -25,11 +25,28 @@ interface Props {
 }
 
 /**
+ * Gold score badge pinned to the poster's top-right corner (IMDb preferred,
+ * TMDB ★ fallback). Lives on the poster — not the meta row — so the "year ·
+ * language" line below never has to truncate the language to make room.
+ */
+export function PosterRatingBadge({ movie }: { movie: MovieLike }) {
+  const imdb = ("imdb_rating" in movie && movie.imdb_rating)
+    ? (movie.imdb_rating as number).toFixed(1)
+    : null;
+  const tmdbRating = movie.vote_average ? movie.vote_average.toFixed(1) : null;
+  if (!imdb && !tmdbRating) return null;
+  return (
+    <span className="poster-rating-badge">
+      {imdb ? `IMDb ${imdb}` : `★ ${tmdbRating}`}
+    </span>
+  );
+}
+
+/**
  * The one global "under the poster" block: two-line title with reserved
- * height, then a single metadata row — "year · language" muted on the left,
- * a gold rating chip pinned right. Every surface (explore grid, dashboard
- * rails, onboarding slate, stack detail) renders this, so cards never drift
- * apart typographically.
+ * height, then a single "year · language" meta line at full width.
+ * Every surface (explore grid, dashboard rails, onboarding slate, stack
+ * detail) renders this, so cards never drift apart typographically.
  */
 export function PosterInfo({ movie, showFullDate = false }: { movie: MovieLike; showFullDate?: boolean }) {
   let fullDate = "";
@@ -41,10 +58,6 @@ export function PosterInfo({ movie, showFullDate = false }: { movie: MovieLike; 
   }
   const year = fullDate ? "" : (movie.year ? movie.year.toString() : "");
   const lang = movie.original_language ? languageLabel(movie.original_language) : "";
-  const imdb = ("imdb_rating" in movie && movie.imdb_rating)
-    ? (movie.imdb_rating as number).toFixed(1)
-    : null;
-  const tmdbRating = movie.vote_average ? movie.vote_average.toFixed(1) : null;
 
   return (
     <div className="mt-3 w-full px-0.5">
@@ -54,18 +67,13 @@ export function PosterInfo({ movie, showFullDate = false }: { movie: MovieLike; 
           {fullDate}
         </div>
       )}
-      <div className="poster-info-meta">
-        {(year || lang) && (
+      {(year || lang) && (
+        <div className="poster-info-meta">
           <span className="poster-info-meta-text">
             {[year, lang].filter(Boolean).join(" · ")}
           </span>
-        )}
-        {imdb ? (
-          <span className="rating-chip">IMDb {imdb}</span>
-        ) : tmdbRating ? (
-          <span className="rating-chip">★ {tmdbRating}</span>
-        ) : null}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -154,6 +162,7 @@ export default function MovieCard({ movie, priority = false, className = "", com
           loading={priority ? "eager" : "lazy"}
           style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
         />
+        <PosterRatingBadge movie={movie} />
       </div>
 
       <PosterInfo movie={movie} showFullDate={showFullDate} />

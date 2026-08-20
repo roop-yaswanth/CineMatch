@@ -981,22 +981,30 @@ textarea,
   color: var(--color-text-muted);
 }
 
-/* Gold score chip (IMDb preferred, TMDB ★ fallback). */
-.rating-chip {
+/* Score badge overlaid on the poster's top-right corner. Moving the rating
+   onto the poster keeps the meta line below free for "year · language" —
+   the language label used to truncate ("2022 · Tel…") when it shared a row
+   with the chip. */
+.poster-rating-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 3;
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  margin-left: auto;
-  flex-shrink: 0;
-  padding: 2px 6px;
-  border-radius: 6px;
-  background: rgba(var(--rgb-rating), 0.14);
+  padding: 3px 7px;
+  border-radius: 7px;
+  background: rgba(0, 0, 0, 0.55);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
   color: var(--color-rating);
   font-size: 10px;
   font-weight: 700;
   line-height: 1.4;
   white-space: nowrap;
   letter-spacing: 0.01em;
+  pointer-events: none;
 }
 
 /* ═══════════════════════════════════════════════════════════

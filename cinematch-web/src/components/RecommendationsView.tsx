@@ -17,7 +17,7 @@ import dynamic from "next/dynamic";
 import BackButton from "@/components/ui/BackButton";
 import HeroFeature from "@/components/dashboard/HeroFeature";
 import CompactRail from "@/components/dashboard/CompactRail";
-import { PosterInfo } from "@/components/MovieCard";
+import { PosterInfo, PosterRatingBadge } from "@/components/MovieCard";
 import AppFooter from "@/components/AppFooter";
 import { toast } from "@/components/ui/Toast";
 import { useSession } from "@/context/SessionContext";
@@ -1004,14 +1004,11 @@ export default function RecommendationsView({
                 }}
               >
                 <motion.span
-                  aria-hidden
-                  animate={{ rotate: 360 }}
-                  transition={{ repeat: Infinity, duration: 0.9, ease: "linear" }}
-                  style={{ display: "inline-flex", width: 14, height: 14 }}
+                  animate={{ y: [0, -3, 0] }}
+                  transition={{ repeat: Infinity, duration: 0.9, ease: "easeInOut" }}
+                  style={{ fontSize: "18px", display: "inline-flex" }}
                 >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{ color: "var(--color-text-secondary)" }}>
-                    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-                  </svg>
+                  🍿
                 </motion.span>
                 <span
                   style={{
@@ -1656,6 +1653,7 @@ export function PosterCard({
           style={{ position: "relative", aspectRatio: "2 / 3", borderRadius: "12px", overflow: "hidden", background: "transparent", cursor: "pointer", border: "1px solid transparent", transition: "border-color 0.22s ease" }}
         >
           <img src={poster} alt={movie.title} loading={priority ? "eager" : "lazy"} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+          <PosterRatingBadge movie={movie} />
         </div>
         <div onClick={(e) => { e.stopPropagation(); if (onClick) onClick(); }} style={{ padding: "0 6px 12px", cursor: "pointer" }}>
           {/* The single global under-poster treatment — same title + meta
