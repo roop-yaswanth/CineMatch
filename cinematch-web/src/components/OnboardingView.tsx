@@ -1067,7 +1067,7 @@ function MobileSwipeTutorial({ onDismiss }: { onDismiss: () => void }) {
           transition: "all 0.3s ease",
         }}
       >
-        {isLast ? "Got it — start rating 🍿" : "Skip tutorial"}
+        {isLast ? "Start rating 🍿" : "Skip tutorial"}
       </motion.button>
     </motion.div>
   );
