@@ -16,6 +16,13 @@ const nextConfig: NextConfig = {
         hostname: "http.cat",
         pathname: "/images/**",
       },
+      // IMDb API poster art (m.media-amazon.com) shown for search results
+      // that only exist on IMDb, not TMDB.
+      {
+        protocol: "https",
+        hostname: "m.media-amazon.com",
+        pathname: "/images/M/**",
+      },
     ],
     // AVIF first, WebP fallback (Next auto-negotiates with the browser).
     formats: ["image/avif", "image/webp"],
@@ -33,7 +40,7 @@ const nextConfig: NextConfig = {
     //   default-src 'self'         — only own origin by default.
     //   script-src                 — Next.js needs inline bootstrap; framer-motion is fine with 'self'.
     //   style-src 'unsafe-inline'  — required because we use inline style={} extensively.
-    //   img-src                    — TMDB posters + the http.cat error illustrations.
+    //   img-src                    — TMDB posters, http.cat error illustrations, IMDb/Amazon poster art.
     //   frame-src youtube-nocookie — for trailer embeds.
     //   connect-src                — fetch() targets: same-origin only (TMDB calls go through /api/*).
     //   frame-ancestors 'none'     — modern equivalent of X-Frame-Options: DENY.
@@ -49,7 +56,7 @@ const nextConfig: NextConfig = {
       "default-src 'self'",
       "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com https://accounts.google.com",
       "style-src 'self' 'unsafe-inline' https://accounts.google.com",
-      "img-src 'self' data: blob: https://image.tmdb.org https://www.themoviedb.org https://http.cat",
+      "img-src 'self' data: blob: https://image.tmdb.org https://www.themoviedb.org https://http.cat https://m.media-amazon.com",
       "font-src 'self' data:",
       "frame-src 'self' https://www.youtube-nocookie.com https://www.youtube.com https://accounts.google.com",
       "connect-src 'self' https://image.tmdb.org https://vitals.vercel-insights.com https://va.vercel-scripts.com https://accounts.google.com",
