@@ -11,6 +11,8 @@ type GoogleIdentity = {
       initialize: (config: {
         client_id: string;
         callback: (resp: { credential?: string }) => void;
+        /** Fires when the One Tap / FedCM prompt fails (network, sign-out, etc.) */
+        error_callback?: (error: { type?: string; message?: string }) => void;
       }) => void;
       renderButton: (parent: HTMLElement, options: Record<string, unknown>) => void;
       prompt: () => void;
@@ -95,6 +97,16 @@ export default function GoogleSignInButton({
           callback: (resp: { credential?: string }) => {
             if (resp?.credential) void handleCredentialRef.current(resp.credential);
           },
+          // One Tap failures (browser not signed into Google, FedCM blocked by
+          // extensions/Safari, etc.) are expected and non-fatal — the rendered
+          // button flow is unaffected. Handle them quietly instead of letting
+          // GSI_LOGGER noise dominate the console.
+          error_callback: (error) => {
+            console.debug(
+              "[GoogleSignIn] One Tap unavailable:",
+              error?.type || "unknown_reason"
+            );
+          },
         });
         initializedRef.current = true;
       }
@@ -107,7 +119,20 @@ export default function GoogleSignInButton({
         logo_alignment: "center",
       });
       setReady(true);
-      if (oneTap) g.accounts.id.prompt();
+      if (oneTap && document.visibilityState === "visible") {
+        // Throttle auto-prompt attempts: repeated FedCM failures on browsers
+        // without an active Google session otherwise re-log every visit.
+        try {
+          const KEY = "gsi_onetap_last_attempt";
+          const last = Number(localStorage.getItem(KEY) ?? 0);
+          if (Date.now() - last > 10 * 60 * 1000) {
+            localStorage.setItem(KEY, String(Date.now()));
+            g.accounts.id.prompt();
+          }
+        } catch {
+          g.accounts.id.prompt();
+        }
+      }
     };
 
     const existing = document.querySelector<HTMLScriptElement>(`script[src="${SCRIPT_SRC}"]`);
