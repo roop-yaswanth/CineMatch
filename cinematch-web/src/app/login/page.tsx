@@ -27,7 +27,5 @@ export default function LoginPage() {
     }
   };
 
-  if (isLoading || session) return null; // Avoid flicker
-
   return <LoginScreen onLogin={handleLogin} />;
 }

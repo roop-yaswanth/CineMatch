@@ -1073,11 +1073,7 @@ function MobileSwipeTutorial({ onDismiss }: { onDismiss: () => void }) {
   );
 }
 
-/* ─── Preferences Wizard (Step 1) ────────────────────────────────────────────
- * One question per screen, Apple-setup style: about you → languages → genres.
- * Every field is optional, so Continue is never blocked; selection states use
- * the brand accent instead of the old gray pill wall.
- * ──────────────────────────────────────────────────────────────────────────*/
+
 type Prefs = ReturnType<typeof preferencesFromProfile>;
 
 const LANG_NATIVE: Record<string, string> = {

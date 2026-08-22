@@ -1,19 +1,5 @@
 "use client";
 
-/**
- * Mobile-only floating bottom navigation, modelled on the Apple TV app:
- *   - One pill-shaped glass bar holding the four primary destinations.
- *   - A separate floating glass circle to the right of the pill, dedicated
- *     to Search (matches Apple's pattern).
- *   - The "active" highlight is a single shared element that magic-moves
- *     between items via framer-motion's layoutId — gives the soft
- *     liquid-glass slide that Apple uses.
- *
- * Visibility:
- *   - Only renders on viewports < 900px (desktop has its own header menu).
- *   - Auto-hides while the user scrolls down, slides back in on scroll up.
- *   - Hidden on auth-flow routes (/login, /onboarding).
- */
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";

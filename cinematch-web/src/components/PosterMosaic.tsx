@@ -1,15 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { useState, useEffect, useMemo } from "react";
 
+// Curated cross-cultural wall: Hollywood landmarks, Ghibli/anime, Korean
+// thrillers, Telugu/Hindi/Tamil cinema, and European classics — mirroring
+// CineMatch's multilingual catalog.
 const ALL_POSTERS = [
   "nMKdUUepR0i5zn0y1T4CsSB5chy.jpg", // The Dark Knight
   "j0BB9DoqobGvRqKVeAveP70hWi2.jpg", // Interstellar
   "7RyHsO4yDXtBv1zUU3mTpHeQ0d5.jpg", // Avengers: Infinity War
   "oMsxZEvz9a708d49b6UdZK1KAo5.jpg", // The Matrix
   "hZkgoQYus5vegHoetLkCJzb17zJ.jpg", // Fight Club
-  "nMKdUUepR0i5zn0y1T4CsSB5chy.jpg", // Joker
   "14QbnygCuTO0vl7CAFmPf1fgZfV.jpg", // Spider-Man: No Way Home
   "CpLAfXgSNeNRRbRzPrTuzKmIHO.jpg", // Dune
   "8b8R8l88Qje9dn9OE8PY05Nxl1X.jpg", // Dune: Part Two
@@ -82,7 +83,6 @@ const ALL_POSTERS = [
   "uDg52hGwy4Dm8hGGVYK3PHQzsKc.jpg", // OG
 ];
 
-// Shuffle and pick a display set each visit.
 function shuffled<T>(arr: T[]): T[] {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -93,52 +93,132 @@ function shuffled<T>(arr: T[]): T[] {
 }
 
 const BASE = "/login-posters/";
+/** Poster cell footprint including gap — kept in sync with the img styles. */
+const CELL_W = 146;
+const CELL_H = 211;
+/** Deterministic SSR/default grid. Real dimensions are measured after mount;
+ *  until then this over-provisioned grid simply clips behind the scrim. */
+const DEFAULT_COLS = 18;
+const DEFAULT_ROWS = 14;
+
+type GridDims = { cols: number; rows: number };
 
 /**
  * Animated cinematic poster-wall background. Fills its nearest positioned
  * ancestor (or the viewport) and is purely decorative (aria-hidden). Shared by
  * the login screen and the public landing page.
- *
- * The shuffle happens AFTER mount, not during render, so the server-rendered
- * order matches the first client render — important because the landing page is
- * statically prerendered and would otherwise throw a hydration mismatch.
  */
 export default function PosterMosaic() {
-  const [posters, setPosters] = useState(ALL_POSTERS);
+  // Deterministic pre-measurement grid — identical on server and client.
+  const [dims, setDims] = useState<GridDims>({ cols: DEFAULT_COLS, rows: DEFAULT_ROWS });
+  const [pool, setPool] = useState<string[]>(ALL_POSTERS);
+
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- cosmetic shuffle, client-only post-hydration
-    setPosters(shuffled(ALL_POSTERS));
+    const measure = () => {
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      // Generously cover rotated footprint across all standard & ultrawide aspect ratios
+      const cols = Math.min(32, Math.max(10, Math.ceil((vw * 1.35 + vh * 0.35) / CELL_W)));
+      const rows = Math.min(24, Math.max(12, Math.ceil((vh * 1.55 + vw * 0.25) / CELL_H)));
+      setDims({ cols, rows });
+    };
+    measure();
+    window.addEventListener("resize", measure, { passive: true });
+    return () => window.removeEventListener("resize", measure);
   }, []);
 
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- cosmetic shuffle, client-only post-hydration
+    setPool(shuffled(ALL_POSTERS));
+  }, []);
+
+  // Wrap around the pool when the grid is larger than the catalog slice.
   return (
-    <div aria-hidden style={{ position: "absolute", inset: 0, overflow: "hidden", zIndex: 0, background: "#0a0a12" }}>
+    <div aria-hidden style={{ position: "absolute", inset: 0, overflow: "hidden", zIndex: 0, background: "#0a0a12", pointerEvents: "none" }}>
+      {/* Single clean cinematic poster wall with continuous flow */}
+      <WallLayer pool={pool} cols={dims.cols} rows={dims.rows} opacity={1} />
+
       {/* Scrim */}
       <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse at 50% 50%, rgba(10,10,18,0.15) 0%, rgba(0,0,0,0.85) 100%)", zIndex: 3, pointerEvents: "none" }} />
-      <div style={{ position: "absolute", inset: "-20%", width: "140%", height: "140%", display: "flex", flexWrap: "wrap", gap: "16px", transform: "rotate(-10deg) scale(1.2)", opacity: 0.55, zIndex: 1, willChange: "transform" }}>
-        <motion.div
-          animate={{ y: [0, -1000] }}
-          transition={{ repeat: Infinity, duration: 60, ease: "linear" }}
-          style={{ display: "flex", flexWrap: "wrap", gap: "16px", justifyContent: "center", willChange: "transform" }}
-        >
-          {[...posters, ...posters, ...posters].map((path, i) => (
-            <img
-              key={i}
-              src={`${BASE}${path}`}
-              alt=""
-              loading="lazy"
-              decoding="async"
-              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-              style={{
-                width: "130px",
-                height: "195px",
-                borderRadius: "12px",
-                objectFit: "cover",
-                flexShrink: 0,
-                opacity: 1,
-              }}
-            />
-          ))}
-        </motion.div>
+    </div>
+  );
+}
+
+/**
+ * One rotated poster grid filling the viewport (plus rotation spill).
+ */
+function WallLayer({
+  pool,
+  cols,
+  rows,
+  opacity,
+}: {
+  pool: string[];
+  cols: number;
+  rows: number;
+  opacity: number;
+}) {
+  const total = cols * rows;
+  const tiles = useMemo(() => {
+    const out: string[] = [];
+    for (let i = 0; i < total; i++) out.push(pool[i % pool.length]);
+    return out;
+  }, [pool, total]);
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        inset: "-45% -35%",
+        width: "170%",
+        height: "190%",
+        transform: "rotate(-10deg)",
+        opacity,
+        zIndex: 2,
+        overflow: "hidden",
+        pointerEvents: "none",
+      }}
+    >
+      <div
+        className="mosaic-track"
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "16px",
+          willChange: "transform",
+        }}
+      >
+        {[false, true].map((isDup) => (
+          <div
+            key={isDup ? "dup" : "base"}
+            aria-hidden={isDup}
+            style={{
+              display: "grid",
+              gridTemplateColumns: `repeat(${cols}, 130px)`,
+              gap: "16px",
+              justifyContent: "center",
+            }}
+          >
+            {tiles.map((path, i) => (
+              <img
+                key={`${isDup ? "d" : ""}${i}`}
+                src={`${BASE}${path}`}
+                alt=""
+                loading="lazy"
+                decoding="async"
+                fetchPriority="low"
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                style={{
+                  width: "130px",
+                  height: "195px",
+                  borderRadius: "12px",
+                  objectFit: "cover",
+                  backgroundColor: "#141420",
+                }}
+              />
+            ))}
+          </div>
+        ))}
       </div>
     </div>
   );

@@ -2,7 +2,6 @@
 
 /* ═══════════════════════════════════════════════════════════
    CineMatch 
-   Apple-inspired translucency, depth, and motion.
    ═══════════════════════════════════════════════════════════ */
 
 :root {
@@ -55,7 +54,7 @@
   --color-accent-warm: #ffb84d;
   --gradient-brand: linear-gradient(135deg, #ffffff 0%, #d8dcff 45%, #a5b4fc 100%);
 
-  /* ─── Interactive / System Tints (Apple SF Symbols palette) ─── */
+  /* ─── Interactive / System Tints ─── */
   --color-blue: #0a84ff;
   --color-green: #30d158;
   --color-red: #ff453a;
@@ -99,7 +98,7 @@
   --s-bottom-clearance: calc(120px + env(safe-area-inset-bottom));
   --poster-w: min(38vw, 150px);
 
-  /* ─── Radius Scale (Apple uses continuous curvature) ─── */
+  /* ─── Radius Scale─── */
   --radius-xs: 6px;
   --radius-sm: 10px;
   --radius-md: 14px;
@@ -557,10 +556,6 @@ a {
   color: #fff;
 }
 
-/* ═══════════════════════════════════════════════════════════
-   Focus ring — Apple blue halo
-   ═══════════════════════════════════════════════════════════ */
-
 *:focus {
   outline: none;
 }
@@ -689,14 +684,6 @@ textarea,
   filter: none;
 }
 
-/* ── Liquid Glass ──────────────────────────────────────────────────────────
-   A richer take on the glass material for floating chrome (the bottom nav).
-   Apple's "Liquid Glass" is a proprietary NATIVE material — it can't be pulled
-   into a website, and installing the site as a PWA on macOS/iOS still renders
-   your CSS (the OS won't swap your <nav> for a native bar). So this approximates
-   the look in pure CSS: heavy blur + high saturation so the content behind
-   bleeds through vividly, a luminous top specular sheen, and a bright refractive
-   rim. Apply to rounded, floating elements. */
 .liquid-glass {
   position: relative;
   isolation: isolate;
@@ -1307,6 +1294,59 @@ a.poster-card-btn:focus-visible {
   }
 }
 
+@keyframes mosaic-drift {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+
+  to {
+    transform: translate3d(0, calc(-50% - 8px), 0);
+  }
+}
+
+.mosaic-track {
+  display: flex;
+  flex-direction: column;
+  will-change: transform;
+  animation: mosaic-drift 75s linear infinite;
+}
+
+@keyframes hero-kenburns {
+  from {
+    transform: scale(1);
+  }
+
+  to {
+    transform: scale(1.07);
+  }
+}
+
+.hero-backdrop-img {
+  will-change: transform;
+  animation: hero-kenburns 8.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* Card hover lift — pre-rendered shadow on a pseudo-element whose
+   OPACITY transitions. Transitioning opacity instead of box-shadow
+   keeps the shadow rasterized once instead of repainting every frame. */
+.card-poster-frame::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow:
+    0 18px 40px -12px rgba(0, 0, 0, 0.65),
+    0 0 0 1px rgba(255, 255, 255, 0.14) inset;
+  opacity: 0;
+  transition: opacity var(--dur-base) var(--ease-out);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.card-hover:hover .card-poster-frame::after {
+  opacity: 1;
+}
+
 .skeleton-shimmer {
   background: linear-gradient(100deg,
       rgba(255, 255, 255, 0.04) 20%,
@@ -1489,6 +1529,7 @@ input[type="number"]::-webkit-inner-spin-button {
     --s-card-gap: 18px;
     --s-section-gap: 40px;
   }
+
   .poster-card {
     width: min(18vw, 160px) !important;
     min-width: 130px !important;
@@ -1501,6 +1542,7 @@ input[type="number"]::-webkit-inner-spin-button {
     --s-card-gap: 20px;
     --s-section-gap: 44px;
   }
+
   .poster-card {
     width: min(13vw, 185px) !important;
     min-width: 140px !important;
@@ -1513,6 +1555,7 @@ input[type="number"]::-webkit-inner-spin-button {
     --s-card-gap: 20px;
     --s-section-gap: 48px;
   }
+
   .poster-card {
     width: min(10vw, 175px) !important;
     min-width: 140px !important;
@@ -1660,24 +1703,6 @@ body:has(.onboarding-rating-layout) {
   }
 }
 
-/* ═══════════════════════════════════════════════════════════
-   Smoothness — global perf hints applied app-wide.
-
-   • `-webkit-tap-highlight-color: transparent` removes the iOS gray flash
-     on every tap, which always reads as "laggy" no matter how fast the app
-     actually responds.
-
-   • `touch-action: manipulation` on interactive elements skips the 300 ms
-     double-tap zoom delay that mobile browsers add by default.
-
-   • `text-rendering: optimizeLegibility` is *not* set — it's slower than
-     `optimizeSpeed` for short labels and Apple/Google have moved away from
-     it. Default kicks in.
-
-   • `contain: layout paint` on full-screen overlays means a re-render
-     inside them can never invalidate the outer page layout — keeps the
-     bottom-nav and footer at 60 fps even when a modal is animating.
-   ═══════════════════════════════════════════════════════════ */
 
 html,
 body {
@@ -1725,6 +1750,12 @@ a[role="button"]:active,
   .glass-pill:active,
   .menu-btn:active {
     transform: none;
+  }
+
+  /* Freeze the cinematic ambience entirely. */
+  .hero-backdrop-img,
+  .mosaic-track {
+    animation: none !important;
   }
 }
 

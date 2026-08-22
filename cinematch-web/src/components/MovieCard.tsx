@@ -152,12 +152,12 @@ export default function MovieCard({ movie, priority = false, className = "", com
       whileHover={{ scale: 1.06, y: -6, zIndex: 30 }}
       transition={{ type: "spring", stiffness: 350, damping: 22 }}
       onHoverStart={() => prefetchMovieDetails(recommendationId(movie))}
-      className={`relative flex flex-col items-center no-select ${className}`}
+      className={`card-hover relative flex flex-col items-center no-select ${className}`}
       style={{ position: "relative" }}
     >
       {/* Poster */}
       <div
-        className="relative w-full aspect-[2/3] overflow-hidden bg-[var(--color-surface)]"
+        className="card-poster-frame relative w-full aspect-[2/3] overflow-hidden bg-[var(--color-surface)]"
         style={{ borderRadius: compact ? "14px" : "var(--radius-poster)" }}
       >
         <img

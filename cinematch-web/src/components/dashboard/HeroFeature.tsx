@@ -138,9 +138,13 @@ export default function HeroFeature({ movies, onOpenDetail, onWatchlist }: Props
           transition={{ duration: 0.6, ease: "easeOut" }}
           style={{ position: "absolute", inset: 0 }}
         >
+          {/* Ken Burns push-in: the img is keyed by movie id (parent motion.div),
+              so every slide remount restarts the CSS animation.
+              Transform-only → compositor thread, no rAF. */}
           <img
             src={backdropUrl}
             alt=""
+            className="hero-backdrop-img"
             style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 15%" }}
           />
           {/* Dual gradient — bottom to anchor text, left for desktop side-text legibility. */}
