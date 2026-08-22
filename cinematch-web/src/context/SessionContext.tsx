@@ -220,7 +220,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const updateSession = useCallback((newSession: UserSession) => {
     if (!isValidUserSession(newSession)) {
       // Never let a malformed response overwrite a good in-memory session.
-      console.warn("[SessionProvider] Ignored invalid session update:", newSession);
+      const sid = (newSession as { session_id?: unknown } | null)?.session_id;
+      console.warn(
+        "[SessionProvider] Ignored invalid session update:",
+        JSON.stringify({ has_session_id: Boolean(sid), type_of_session_id: typeof sid })
+      );
       return;
     }
     setSession(newSession);
