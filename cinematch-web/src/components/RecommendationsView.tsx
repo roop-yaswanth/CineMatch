@@ -5,18 +5,25 @@ import {
   useEffect,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import { useRouter } from "next/navigation";
+
+function useMounted(): boolean {
+  return useSyncExternalStore(
+    () => () => { },
+    () => true,
+    () => false
+  );
+}
 
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 
 
 
-import dynamic from "next/dynamic";
 import BackButton from "@/components/ui/BackButton";
 import HeroFeature from "@/components/dashboard/HeroFeature";
-import CompactRail from "@/components/dashboard/CompactRail";
 import { PosterInfo, PosterRatingBadge } from "@/components/MovieCard";
 import AppFooter from "@/components/AppFooter";
 import { toast } from "@/components/ui/Toast";
@@ -27,16 +34,13 @@ import MobileMenu, { DesktopNavTabs } from "@/components/MobileMenu";
 import {
   apiMultiRecommendations,
   apiRecommendationAction,
-  apiSearchMovies,
   languageLabel,
-  posterUrl,
   prefetchPosters,
   preferencesFromProfile,
   recommendationId,
   type MultiBucketResponse,
   type Recommendation,
   type RecommendationPreferences,
-  type SearchResult,
   type UserSession,
 } from "@/lib/api";
 import { usePoster } from "@/lib/usePoster";
@@ -60,45 +64,7 @@ interface Stack {
   movies: Recommendation[];
 }
 
-// ── Language keyword extractor ──────────────────────────────────────────────
-// Allows queries like "rebel telugu", "parasite korean", "intouchables french"
-// to be interpreted as: search "rebel" and boost/filter by language "te".
-const LANG_KEYWORDS: Record<string, string> = {
-  telugu: "te", hindi: "hi", tamil: "ta", malayalam: "ml", kannada: "kn",
-  marathi: "mr", bengali: "bn", gujarati: "gu", punjabi: "pa", urdu: "ur",
-  korean: "ko", japanese: "ja", chinese: "zh", mandarin: "zh", cantonese: "cn",
-  french: "fr", spanish: "es", german: "de", italian: "it", portuguese: "pt",
-  russian: "ru", arabic: "ar", turkish: "tr", thai: "th", indonesian: "id",
-  persian: "fa", farsi: "fa", swedish: "sv", danish: "da", dutch: "nl",
-  polish: "pl", ukrainian: "uk", greek: "el", hebrew: "he", english: "en",
-};
 
-function extractLangKeyword(query: string): { cleanQuery: string; langCode: string | null; year: number | null } {
-  let working = query;
-  let langCode: string | null = null;
-  let year: number | null = null;
-
-  // Detect language keyword
-  const tokens = working.toLowerCase().split(/\s+/);
-  for (const token of tokens) {
-    const code = LANG_KEYWORDS[token];
-    if (code) {
-      langCode = code;
-      working = working.replace(new RegExp(`\\b${token}\\b`, "gi"), "").replace(/\s{2,}/g, " ").trim();
-      break;
-    }
-  }
-
-  // Detect 4-digit year (1888–2099)
-  const yearMatch = working.match(/\b(18[89]\d|19\d{2}|20\d{2})\b/);
-  if (yearMatch) {
-    year = parseInt(yearMatch[1], 10);
-    working = working.replace(yearMatch[0], "").replace(/\s{2,}/g, " ").trim();
-  }
-
-  return { cleanQuery: working || query, langCode, year };
-}
-// ────────────────────────────────────────────────────────────────────────────
 
 function toDetailMovie(movie: Recommendation): DetailMovie {
   return { ...movie };
@@ -229,18 +195,13 @@ export default function RecommendationsView({
   onLogout,
 }: Props) {
   const router = useRouter();
-  const [mounted, setMounted] = useState(false);
+  const mounted = useMounted();
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const [initialCache] = useState(() => readRecsCache(session.user_id));
+  const hadCache = initialCache !== null;
 
-  // ── Try to restore from navigation cache on mount ─────────────────────────
-  const cachedRef = useRef(readRecsCache(session.user_id));
-  const hadCache = cachedRef.current !== null;
-
-  const [stacks, setStacks] = useState<Stack[]>(() => cachedRef.current?.stacks ?? []);
-  const [movies, setMovies] = useState<Recommendation[]>(() => cachedRef.current?.movies ?? []);
+  const [stacks, setStacks] = useState<Stack[]>(() => initialCache?.stacks ?? []);
+  const [movies, setMovies] = useState<Recommendation[]>(() => initialCache?.movies ?? []);
   const [loading, setLoading] = useState(!hadCache);
   const [initialLoad, setInitialLoad] = useState(!hadCache);
 
@@ -252,14 +213,6 @@ export default function RecommendationsView({
   const [preferences] = useState<RecommendationPreferences>(
     () => preferencesFromProfile(session.profile)
   );
-
-  // Search state
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
-  const [searchLoading, setSearchLoading] = useState(false);
-  const [showSearch, setShowSearch] = useState(false);
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   // Detail Modal state
   const [activeMovie, setActiveMovie] = useState<DetailMovie | null>(null);
@@ -305,64 +258,20 @@ export default function RecommendationsView({
 
   // Every movie ID the user has acted on — prevents re-showing after refresh
   const seenIdsRef = useRef<Set<number>>(
-    new Set(cachedRef.current?.seenIds ?? [])
+    new Set(initialCache?.seenIds ?? [])
   );
 
   // All movie IDs ever displayed — sent to backend on auto-rerun so it generates truly new movies
   const displayedIdsRef = useRef<Set<number>>(
-    new Set(cachedRef.current?.displayedIds ?? [])
+    new Set(initialCache?.displayedIds ?? [])
   );
 
 
   const bucketCacheRef = useRef<StackCache>(
-    cachedRef.current?.bucketCache ?? EMPTY_CACHE()
+    initialCache?.bucketCache ?? EMPTY_CACHE()
   );
 
-  // Search handler with debounce
-  const handleSearch = useCallback(async (query: string) => {
-    setSearchQuery(query);
 
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
-
-    if (!query.trim() || query.trim().length < 2) {
-      setSearchResults([]);
-      setShowSearch(false);
-      return;
-    }
-
-    searchTimeoutRef.current = setTimeout(async () => {
-      setSearchLoading(true);
-      setShowSearch(true);
-      try {
-        // Detect language keywords ("telugu", "hindi", "korean") and 4-digit years
-        // from the query. E.g. "rebel telugu 2012" → search "rebel", lang="te", year=2012.
-        const { cleanQuery, langCode, year } = extractLangKeyword(query.trim());
-        const resp = await apiSearchMovies(cleanQuery, 15);
-
-        // Re-sort: apply language boost then year proximity boost
-        let results = resp.results;
-        if (langCode) {
-          const match = results.filter((r) => r.original_language === langCode);
-          const rest = results.filter((r) => r.original_language !== langCode);
-          results = [...match, ...rest];
-        }
-        if (year) {
-          // Float exact/near-year matches (±1) to the very top within each language group
-          const exact = results.filter((r) => r.year && Math.abs(r.year - year) <= 1);
-          const other = results.filter((r) => !r.year || Math.abs(r.year - year) > 1);
-          results = [...exact, ...other];
-        }
-        setSearchResults(results);
-      } catch (err) {
-        console.error("Search error:", err);
-        setSearchResults([]);
-      } finally {
-        setSearchLoading(false);
-      }
-    }, 250); // 250ms debounce — fast search
-  }, []);
 
   const applyFilters = useCallback((arr: Recommendation[], prefs: RecommendationPreferences): Recommendation[] => {
     if (!prefs.include_classics) {
@@ -603,15 +512,28 @@ export default function RecommendationsView({
         setIsUpdating(false);
       }
     },
-    [applyBucketResponse, onSessionUpdate, preferences, session.user_id]
+    [
+      applyBucketResponse,
+      applyFilters,
+      movies,
+      onSessionUpdate,
+      preferences,
+      session.session_id,
+      session.user_id,
+      stacks,
+    ]
   );
 
 
 
   useEffect(() => {
     if (!initialLoad) return;
-    void generate(preferences);
-    setInitialLoad(false);
+
+    const t = setTimeout(() => {
+      void generate(preferences);
+      setInitialLoad(false);
+    }, 0);
+    return () => clearTimeout(t);
   }, [generate, initialLoad, preferences]);
 
   // Keep navigation cache in sync with optimistic stack updates (actions, etc.)
@@ -703,7 +625,7 @@ export default function RecommendationsView({
         })
         .catch((err) => console.error("Recommendation action failed:", err));
     },
-    [activeMovie, generate, onSessionUpdate, preferences, session.session_id, silentRefresh]
+    [generate, onSessionUpdate, preferences, session.session_id, silentRefresh]
   );
 
   // Preference updates are now applied via the overlay PreferencesModal, which
@@ -1128,16 +1050,7 @@ function StackDetailView({
         position: "fixed",
         inset: 0,
         zIndex: 50,
-        // Solid bg, NOT transparent. Two reasons:
-        //  (1) RouteTransition wraps children with a 180ms `transform`
-        //      animation. While that transform is active, `position:fixed`
-        //      descendants are re-anchored to the transformed ancestor
-        //      instead of the viewport — which briefly exposed the global
-        //      footer through the transparent grid gaps on this overlay.
-        //  (2) Even without that quirk, a transparent full-screen overlay
-        //      is fragile: anything painted in the body below (footer,
-        //      extra route content) bleeds through whenever the stacking
-        //      context changes. Solid bg = bug surface area = 0.
+
         background: "var(--color-bg)",
         overflowY: "auto",
         overflowX: "hidden",
@@ -1211,10 +1124,7 @@ function StackDetailView({
     </motion.div>
   );
 
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = useMounted();
 
   if (!mounted) return null;
   return createPortal(content, document.body);

@@ -34,7 +34,11 @@ async function request<T>(
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
-      const { retries, retryDelay, timeout, ...fetchOptions } = options ?? {};
+      // Strip the client-only tuning keys before spreading into fetch().
+      const fetchOptions: RequestOptions = { ...(options ?? {}) };
+      delete fetchOptions.retries;
+      delete fetchOptions.retryDelay;
+      delete fetchOptions.timeout;
       const res = await fetch(url, {
         headers: { "Content-Type": "application/json" },
         ...fetchOptions,

@@ -33,7 +33,7 @@ export function parseBoundedInt(raw: string | null, min: number, max: number, fa
  */
 export function sanitizeQuery(raw: string | null, maxLen = 200): string {
   if (!raw) return "";
-  // eslint-disable-next-line no-control-regex
+   
   return raw.replace(/[\x00-\x1F\x7F]/g, "").trim().slice(0, maxLen);
 }
 

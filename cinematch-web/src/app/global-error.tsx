@@ -51,7 +51,6 @@ export default function GlobalError({
         >
           {/* Plain <img> on purpose — bypasses next/image which depends on
               the very layout that just failed. */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="https://http.cat/images/500.jpg"
             alt="HTTP 500"

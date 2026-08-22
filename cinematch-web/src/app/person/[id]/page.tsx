@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { motion } from "framer-motion";
 
 import dynamic from "next/dynamic";
 import { PersonContent } from "@/components/PersonProfileContent";
@@ -15,7 +14,6 @@ const MovieDetailModal = dynamic(() => import("@/components/modals/MovieDetailMo
 import { useSession } from "@/context/SessionContext";
 import {
   apiPerson,
-  posterUrl,
   type PersonCredit,
   type PersonDetail,
 } from "@/lib/api";

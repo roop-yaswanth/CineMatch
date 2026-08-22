@@ -12,7 +12,7 @@
  *   - Pagination dots at the bottom.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -28,7 +28,7 @@ interface Props {
 }
 
 export default function HeroFeature({ movies, onOpenDetail, onWatchlist }: Props) {
-  const items = movies.slice(0, MAX_ITEMS);
+  const items = useMemo(() => movies.slice(0, MAX_ITEMS), [movies]);
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
   const wasInteractedRef = useRef(false);
@@ -40,7 +40,7 @@ export default function HeroFeature({ movies, onOpenDetail, onWatchlist }: Props
   useEffect(() => {
     Promise.resolve().then(() => setIndex(0));
     wasInteractedRef.current = false;
-    
+
     // Fetch live high-quality backdrops & title logos from TMDB for the hero items
     items.forEach((m) => {
       const tmdbId = m.tmdb_id || m.id;
@@ -55,9 +55,9 @@ export default function HeroFeature({ movies, onOpenDetail, onWatchlist }: Props
             setLiveLogos((prev) => ({ ...prev, [m.id]: data.logo_path }));
           }
         })
-        .catch(() => {});
+        .catch(() => { });
     });
-  }, [items.length, items[0]?.id]);
+  }, [items]);
 
   // Auto-rotate. Pauses while `paused` is true (user touch/hover).
   useEffect(() => {

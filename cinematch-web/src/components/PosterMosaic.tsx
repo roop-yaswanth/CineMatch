@@ -121,7 +121,6 @@ export default function PosterMosaic() {
           style={{ display: "flex", flexWrap: "wrap", gap: "16px", justifyContent: "center", willChange: "transform" }}
         >
           {[...posters, ...posters, ...posters].map((path, i) => (
-            // eslint-disable-next-line @next/next/no-img-element
             <img
               key={i}
               src={`${BASE}${path}`}

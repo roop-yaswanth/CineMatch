@@ -2,25 +2,20 @@
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { motion } from "framer-motion";
-
 import dynamic from "next/dynamic";
 import MovieCard from "@/components/MovieCard";
 import type { DetailMovie } from "@/components/modals/MovieDetailModal";
 import MobileMenu from "@/components/MobileMenu";
 import PageHeader from "@/components/ui/PageHeader";
 import EmptyState from "@/components/ui/EmptyState";
-import { SkeletonGrid, SkeletonRail } from "@/components/ui/Skeleton";
+import { SkeletonGrid } from "@/components/ui/Skeleton";
 
 const MovieDetailModal = dynamic(() => import("@/components/modals/MovieDetailModal"), { ssr: false });
-import { PosterCard } from "@/components/RecommendationsView";
-import { toast } from "@/components/ui/Toast";
 import { useSession } from "@/context/SessionContext";
 import {
   apiDiscover,
   apiExplore,
   apiGenres,
-  apiRecommendationAction,
   LANGUAGE_LABELS,
   languageLabel,
   type DiscoverFilters,
@@ -230,25 +225,6 @@ function ExplorePageInner() {
     } catch { /* ignore */ }
     finally { setGridLoading(false); }
   }, [tab, gridPage, gridTotalPages, gridLoading, region, selectedLanguage, selectedGenre, sortByFilter]);
-
-  const handleAction = useCallback(
-    async (m: { id?: number; tmdb_id?: number; title: string }, action: "like" | "okay" | "dislike" | "watchlist" | "skip") => {
-      if (!session) return;
-      try {
-        await apiRecommendationAction(session.session_id, (m.id || m.tmdb_id)!, action);
-        if (action === "watchlist") {
-          toast({ message: `Added "${m.title}" to your watchlist`, tone: "success" });
-        } else if (action === "like") {
-          toast({ message: `Liked "${m.title}"`, tone: "success" });
-        } else if (action === "dislike") {
-          toast({ message: `Disliked "${m.title}"`, tone: "neutral" });
-        }
-      } catch (err) {
-        console.error("Action failed:", err);
-      }
-    },
-    [session]
-  );
 
   if (isLoading || !session) {
     return <div style={{ minHeight: "100dvh", background: "var(--color-bg)" }} />;

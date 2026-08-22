@@ -23,7 +23,7 @@ export async function GET(req: Request) {
     } else {
         return NextResponse.json({ ok: false, error: 'Failed to ping HF API' }, { status: 500 });
     }
-  } catch (error) {
+  } catch {
     return NextResponse.json({ ok: false, error: 'Error pinging HF API' }, { status: 500 });
   }
 }

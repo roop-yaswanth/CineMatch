@@ -8,7 +8,6 @@
 import React from "react";
 
 const SHIMMER_BG = "rgba(255,255,255,0.04)";
-const SHIMMER_HIGHLIGHT = "rgba(255,255,255,0.08)";
 
 const baseBox: React.CSSProperties = {
   position: "relative",

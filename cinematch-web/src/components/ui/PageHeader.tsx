@@ -4,7 +4,7 @@
  * One canonical sticky page header.
  */
 
-import { useEffect, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import BackButton from "@/components/ui/BackButton";
 import { DesktopNavTabs } from "@/components/MobileMenu";
 

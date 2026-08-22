@@ -134,6 +134,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const savedIdentifier = localStorage.getItem(STORAGE_KEY);
 
     if (!cached && !savedIdentifier) {
+      clearStoredSession();
       setSession(null);
       setIsLoading(false);
       return;
@@ -180,12 +181,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+
+    clearStoredSession();
     setSession(null);
     setIsLoading(false);
   }, []);
 
   useEffect(() => {
-    void restoreSession();
+    const t = setTimeout(() => void restoreSession(), 0);
+    return () => clearTimeout(t);
   }, [restoreSession]);
 
   const logout = useCallback(() => {

@@ -94,10 +94,10 @@ export default function RouteTransition({ children }: { children: React.ReactNod
 
       <style>{`
         @keyframes routeFade {
-          0%   { opacity: 0.75; transform: translate3d(0, 4px, 0); }
-          100% { opacity: 1;    transform: translate3d(0, 0, 0); }
+          0%   { opacity: 0.75; }
+          100% { opacity: 1; }
         }
-        .route-fade { animation: routeFade 180ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+        .route-fade { animation: routeFade 180ms cubic-bezier(0.16, 1, 0.3, 1); }
         @media (prefers-reduced-motion: reduce) {
           .route-fade { animation: none; }
         }

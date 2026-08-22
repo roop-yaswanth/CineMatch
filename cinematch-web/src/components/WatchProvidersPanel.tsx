@@ -66,10 +66,7 @@ function countryName(iso: string): string {
   return COUNTRY_NAMES[code] ?? regionNames?.of(code) ?? code;
 }
 
-function countryLabel(iso: string): string {
-  const code = iso?.toUpperCase();
-  return `${flagEmoji(code)} ${countryName(code)}`;
-}
+
 
 
 function toJustWatchSlug(title: string): string {
@@ -256,16 +253,8 @@ export default function WatchProvidersPanel({ tmdbId, defaultCountry, movieTitle
   const [country, setCountry] = useState<string>(defaultCountry || "US");
   const [pickerOpen, setPickerOpen] = useState(false);
   const [countryQuery, setCountryQuery] = useState("");
-  const [isMobile, setIsMobile] = useState(false);
   const popoverRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
-
-  useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 768);
-    check();
-    window.addEventListener("resize", check);
-    return () => window.removeEventListener("resize", check);
-  }, []);
 
   // Close popover on outside click / Escape
   useEffect(() => {

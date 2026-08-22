@@ -137,7 +137,7 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
   const [showTutorial, setShowTutorial] = useState(false);
 
   const inFlightRef = useRef(false);
-  const cardShownAtRef = useRef<number>(Date.now());
+  const cardShownAtRef = useRef<number>(0);
   const [escapeUsed, setEscapeUsed] = useState(false);
   const [nudgeDismissed, setNudgeDismissed] = useState(false);
 
@@ -1331,10 +1331,10 @@ function PreferencesWizard({
           {loading
             ? "Building your personalised slate…"
             : isLast
-            ? "Build my slate ✨"
-            : selectedCount > 0
-            ? `Continue with ${selectedCount} selected`
-            : "Continue"}
+              ? "Build my slate ✨"
+              : selectedCount > 0
+                ? `Continue with ${selectedCount} selected`
+                : "Continue"}
         </motion.button>
       </div>
     </div>

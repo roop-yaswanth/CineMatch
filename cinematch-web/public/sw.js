@@ -11,7 +11,7 @@
  * Session & Auth management is handled on the client via SessionContext.
  */
 
-const CACHE_VERSION = "26.4";
+const CACHE_VERSION = "26.4.1";
 const SHELL_CACHE = `cinematch-shell-${CACHE_VERSION}`;
 const IMAGE_CACHE = `cinematch-images-${CACHE_VERSION}`;
 const API_CACHE = `cinematch-api-${CACHE_VERSION}`;
@@ -113,7 +113,7 @@ async function staleWhileRevalidate(request, cacheName, maxAgeSeconds) {
     if (age < maxAgeSeconds) {
       return cached;
     }
-    fetchPromise; // fire & forget
+    fetchPromise.catch(() => null); // fire & forget
     return cached;
   }
 
