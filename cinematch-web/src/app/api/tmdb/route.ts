@@ -44,9 +44,17 @@ export async function GET(req: NextRequest) {
     const englishLogo = logos.find((l) => l.iso_639_1 === "en") || logos[0];
     const logo_path = englishLogo?.file_path || null;
 
+    // Prefer an English-language poster even for non-English movies (TMDB
+    // often hosts localized artwork variants); fall back to the default
+    // primary poster when no English variant exists.
+    const posters: Array<{ file_path: string; iso_639_1?: string | null }> = data.images?.posters || [];
+    const englishPoster = posters.find((p) => p.iso_639_1 === "en") || null;
+    const poster_path = englishPoster?.file_path || data.poster_path || null;
+
     return NextResponse.json(
       {
-        poster_path: data.poster_path || null,
+        poster_path,
+        poster_is_english: Boolean(englishPoster),
         backdrop_path: data.backdrop_path || null,
         logo_path,
         overview: data.overview || null,

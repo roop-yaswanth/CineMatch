@@ -611,10 +611,22 @@ const SIMILAR_CACHE_MAX = 200;
 const similarCache = new Map<string, Recommendation[]>();
 const similarInflight = new Map<string, Promise<Recommendation[]>>();
 
+/** Seed metadata for movies that may not exist in the backend catalog
+ * (e.g. TMDB trending/upcoming titles on Explore). Lets /api/movies/similar
+ * build a semantic seed without a server-side TMDB lookup. */
+export interface SimilarSeedMeta {
+  title?: string;
+  overview?: string;
+  genres?: string[];
+  lang?: string;
+  year?: number;
+}
+
 export async function apiSimilarMovies(
   tmdbId: number,
   sessionId?: string | null,
-  n = 10
+  n = 10,
+  meta?: SimilarSeedMeta
 ): Promise<Recommendation[]> {
   const key = `${tmdbId}:${sessionId ?? "anon"}:${n}`;
   const cached = similarCache.get(key);
@@ -625,6 +637,11 @@ export async function apiSimilarMovies(
     try {
       const params = new URLSearchParams({ tmdb_id: String(tmdbId), n: String(n) });
       if (sessionId) params.set("session_id", sessionId);
+      if (meta?.title) params.set("title", meta.title);
+      if (meta?.overview) params.set("overview", meta.overview);
+      if (meta?.genres?.length) params.set("genres", meta.genres.join(","));
+      if (meta?.lang) params.set("lang", meta.lang);
+      if (meta?.year) params.set("year", String(meta.year));
       const data = await request<{ results: Recommendation[] }>(
         `/api/movies/similar?${params.toString()}`
       );
@@ -730,6 +747,8 @@ export interface CreditsResponse {
   writers: CrewMember[];
   logo_path?: string | null;
   logo_aspect_ratio?: number | null;
+  /** English-preferred poster path (falls back to the default primary poster). */
+  poster_path?: string | null;
 }
 
 export interface PersonCredit {

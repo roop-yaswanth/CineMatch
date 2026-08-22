@@ -49,6 +49,7 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
   const [directors, setDirectors] = useState<CrewMember[]>([]);
   const [writers, setWriters] = useState<CrewMember[]>([]);
   const [logoPath, setLogoPath] = useState<string | null>(null);
+  const [englishPosterPath, setEnglishPosterPath] = useState<string | null>(null);
   const [creditsLoading, setCreditsLoading] = useState(false);
   const [trailerKey, setTrailerKey] = useState<string | null>(null);
   const [trailerLanguages, setTrailerLanguages] = useState<Array<{ lang: string; label: string; key: string }>>([]);
@@ -121,13 +122,26 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
     setSimilar([]);
 
     let cancelled = false;
-    apiSimilarMovies(id, sessionId ?? null, 20)
+    // Pass seed metadata so titles that aren't in the backend catalog
+    // (Explore's live TMDB tabs, e.g. upcoming releases) still get
+    // "more like this" suggestions without a server-side TMDB lookup.
+    const seedYear = movie?.year != null ? Number(movie.year) || undefined : undefined;
+    apiSimilarMovies(id, sessionId ?? null, 20, {
+      title: movie?.title,
+      overview: movie?.overview,
+      genres: movie?.genres,
+      lang: movie?.original_language,
+      year: seedYear,
+    })
       .then((results) => { if (!cancelled) setSimilar(results); })
-      .catch(() => { if (!cancelled) setSimilar([]); })
+      .catch((err) => {
+        console.warn("Similar movies fetch failed:", err);
+        if (!cancelled) setSimilar([]);
+      })
       .finally(() => { if (!cancelled) setSimilarLoading(false); });
 
     return () => { cancelled = true; };
-  }, [movie?.id, movie?.tmdb_id, isOpen, sessionId]);
+  }, [movie?.id, movie?.tmdb_id, movie?.title, movie?.overview, movie?.genres, movie?.original_language, movie?.year, isOpen, sessionId]);
 
   // Fetch cast & crew whenever the movie changes.
   useEffect(() => {
@@ -137,12 +151,13 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
       setCast([]); setDirectors([]); setWriters([]);
       setActivePersonId(null);
       setLogoPath(null);
+      setEnglishPosterPath(null);
       /* eslint-enable react-hooks/set-state-in-effect */
       return;
     }
     let cancelled = false;
     setCreditsLoading(true);
-    setCast([]); setDirectors([]); setWriters([]); setLogoPath(null);
+    setCast([]); setDirectors([]); setWriters([]); setLogoPath(null); setEnglishPosterPath(null);
 
     apiCredits(id, "movie")
       .then((c) => {
@@ -151,6 +166,7 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
         setDirectors(c.directors);
         setWriters(c.writers);
         setLogoPath(c.logo_path || null);
+        setEnglishPosterPath(c.poster_path || null);
       })
       .catch(() => { })
       .finally(() => { if (!cancelled) setCreditsLoading(false); });
@@ -218,7 +234,9 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
     return preferredLanguages.includes(m.original_language);
   });
 
-  const poster = posterUrl(movie.poster_path, "w780");
+  // English-preferred artwork once the credits payload arrives; falls back to
+  // the movie's own poster until/unless an 'en' variant exists.
+  const poster = posterUrl(englishPosterPath || movie.poster_path, "w780");
   const bgImage = movie.backdrop_path
     ? `https://image.tmdb.org/t/p/w1280${movie.backdrop_path}`
     : poster;

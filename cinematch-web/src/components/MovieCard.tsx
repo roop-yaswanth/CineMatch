@@ -83,7 +83,8 @@ export default function MovieCard({ movie, priority = false, className = "", com
   // compact rails ≈ 130–140px, default cards ≈ 360px hero. Account for 2×/3×
   // DPR by going one size up.
   const posterSize = compact ? "w342" : "w500";
-  const poster = usePoster(movie.poster_path, recommendationId(movie), posterSize);
+  // Non-English titles get TMDB's English poster variant when available.
+  const poster = usePoster(movie.poster_path, recommendationId(movie), posterSize, movie.original_language);
 
   const year = movie.year ? movie.year.toString() : "";
   const lang = movie.original_language ? languageLabel(movie.original_language) : "";
