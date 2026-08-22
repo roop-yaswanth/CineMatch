@@ -803,14 +803,22 @@ export default function RecommendationsView({
                         marginBottom: "14px",
                       }}
                     />
-                    <div style={{ display: "flex", gap: "16px", overflow: "hidden", paddingBottom: "8px" }}>
+                    <div
+                      className="hide-scrollbar"
+                      style={{
+                        display: "flex",
+                        gap: "var(--s-card-gap, 16px)",
+                        overflow: "hidden",
+                        padding: "8px 20px",
+                      }}
+                    >
                       {Array.from({ length: 6 }).map((_, j) => (
-                        <div key={j} style={{ width: "min(40vw, 150px)", flexShrink: 0 }}>
+                        <div key={j} className="dash-skel-card">
                           <div
                             className="skeleton-shimmer skeleton-grain"
                             style={{
                               aspectRatio: "2 / 3",
-                              borderRadius: "16px",
+                              borderRadius: "var(--radius-poster, 14px)",
                               marginBottom: "12px"
                             }}
                           />
@@ -895,7 +903,8 @@ export default function RecommendationsView({
               <div
                 style={{
                   display: "grid",
-                  gap: "40px",
+                  gap: "var(--s-section-gap, 36px)",
+                  paddingBottom: "var(--s-bottom-clearance)",
                 }}
               >
                 {stacks.map((stack) => (
@@ -1258,7 +1267,7 @@ function StackRow({
 
         <button
           type="button"
-          className="glass-pill"
+          className="glass-pill stack-view-all-btn"
           onClick={(e) => { e.stopPropagation(); onOpenDetail(); }}
           style={{
             cursor: "pointer",

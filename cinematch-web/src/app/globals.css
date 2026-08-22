@@ -92,11 +92,12 @@
   /* sticky header vertical padding */
   --s-header-x: 20px;
   /* sticky header horizontal padding */
-  --s-section-gap: 32px;
+  --s-section-gap: 36px;
   /* gap between rails on dashboard / explore */
   --s-card-gap: 16px;
   /* gap inside a row of cards */
   --s-bottom-clearance: calc(120px + env(safe-area-inset-bottom));
+  --poster-w: min(38vw, 150px);
 
   /* ─── Radius Scale (Apple uses continuous curvature) ─── */
   --radius-xs: 6px;
@@ -653,6 +654,9 @@ textarea,
   -webkit-mask:
     linear-gradient(#000 0 0) content-box,
     linear-gradient(#000 0 0);
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
   pointer-events: none;
@@ -736,6 +740,9 @@ textarea,
       rgba(255, 255, 255, 0.12) 45%,
       rgba(255, 255, 255, 0.06) 100%);
   -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask:
     linear-gradient(#000 0 0) content-box,
     linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
@@ -999,6 +1006,7 @@ textarea,
   color: var(--color-text-primary);
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
   /* Reserve two lines so the metadata row lines up across every
@@ -1427,11 +1435,24 @@ input[type="number"]::-webkit-inner-spin-button {
   flex-shrink: 0;
 }
 
+@media (hover: none) {
+  .stack-name-btn .chevron-icon {
+    opacity: 0.55;
+  }
+}
+
 .stack-name-btn:hover .chevron-icon,
 .stack-name-btn:focus-visible .chevron-icon {
   opacity: 1;
   transform: translateX(3px);
   color: var(--color-text-primary);
+}
+
+@media (max-width: 640px) {
+  .stack-view-all-btn {
+    font-size: 11px !important;
+    padding: 4px 8px !important;
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -1456,7 +1477,18 @@ input[type="number"]::-webkit-inner-spin-button {
 }
 
 /* Responsive poster cards in carousel */
+.dash-skel-card {
+  width: var(--poster-w);
+  min-width: 120px;
+  flex-shrink: 0;
+}
+
 @media (min-width: 768px) {
+  :root {
+    --poster-w: min(18vw, 160px);
+    --s-card-gap: 18px;
+    --s-section-gap: 40px;
+  }
   .poster-card {
     width: min(18vw, 160px) !important;
     min-width: 130px !important;
@@ -1464,6 +1496,11 @@ input[type="number"]::-webkit-inner-spin-button {
 }
 
 @media (min-width: 1024px) {
+  :root {
+    --poster-w: min(13vw, 185px);
+    --s-card-gap: 20px;
+    --s-section-gap: 44px;
+  }
   .poster-card {
     width: min(13vw, 185px) !important;
     min-width: 140px !important;
@@ -1471,6 +1508,11 @@ input[type="number"]::-webkit-inner-spin-button {
 }
 
 @media (min-width: 1440px) {
+  :root {
+    --poster-w: min(10vw, 175px);
+    --s-card-gap: 20px;
+    --s-section-gap: 48px;
+  }
   .poster-card {
     width: min(10vw, 175px) !important;
     min-width: 140px !important;

@@ -110,10 +110,10 @@ export default function HeroFeature({ movies, onOpenDetail, onWatchlist }: Props
       style={{
         position: "relative",
         width: "100%",
-        height: "min(64vh, 580px)",
+        height: "min(58vh, 520px)",
         minHeight: 360,
         overflow: "hidden",
-        marginBottom: 24,
+        marginBottom: 20,
         touchAction: "pan-y", // Allow normal vertical page scrolling while capturing horizontal swipes
         userSelect: "none",
         WebkitUserSelect: "none",
@@ -150,7 +150,7 @@ export default function HeroFeature({ movies, onOpenDetail, onWatchlist }: Props
               position: "absolute",
               inset: 0,
               background:
-                "linear-gradient(180deg, rgba(0,0,0,0) 35%, rgba(0,0,0,0.55) 75%, rgba(0,0,0,0.92) 100%), linear-gradient(90deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.10) 45%, rgba(0,0,0,0) 70%)",
+                "linear-gradient(180deg, rgba(0,0,0,0) 30%, rgba(0,0,0,0.65) 75%, rgba(5,5,7,0.96) 100%), linear-gradient(90deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.10) 45%, rgba(0,0,0,0) 70%)",
             }}
           />
         </motion.div>
@@ -162,7 +162,7 @@ export default function HeroFeature({ movies, onOpenDetail, onWatchlist }: Props
           position: "relative",
           zIndex: 2,
           height: "100%",
-          padding: "0 20px 28px",
+          padding: "0 20px 24px",
           display: "flex",
           flexDirection: "column",
           justifyContent: "flex-end",
@@ -240,7 +240,12 @@ export default function HeroFeature({ movies, onOpenDetail, onWatchlist }: Props
             )}
 
             <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
-              <button type="button" className="btn btn-primary" onClick={() => onOpenDetail(movie)}>
+              <button
+                type="button"
+                className="btn btn-primary"
+                style={{ minHeight: 44, padding: "0 18px" }}
+                onClick={() => onOpenDetail(movie)}
+              >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
                   <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="2" />
                   <line x1="12" y1="8" x2="12" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -249,7 +254,12 @@ export default function HeroFeature({ movies, onOpenDetail, onWatchlist }: Props
                 More info
               </button>
               {onWatchlist && (
-                <button type="button" className="btn btn-secondary" onClick={() => onWatchlist(movie)}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ minHeight: 44, padding: "0 18px" }}
+                  onClick={() => onWatchlist(movie)}
+                >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                     <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
                   </svg>
@@ -260,9 +270,9 @@ export default function HeroFeature({ movies, onOpenDetail, onWatchlist }: Props
           </motion.div>
         </AnimatePresence>
 
-        {/* Pagination dots */}
+        {/* Pagination dots with expanded touch hit target */}
         {items.length > 1 && (
-          <div style={{ marginTop: 20, display: "flex", gap: 6 }} aria-hidden>
+          <div style={{ marginTop: 18, display: "flex", gap: 2 }} aria-hidden>
             {items.map((_, i) => (
               <button
                 key={i}
@@ -270,16 +280,25 @@ export default function HeroFeature({ movies, onOpenDetail, onWatchlist }: Props
                 onClick={() => goTo(i)}
                 aria-label={`Show featured item ${i + 1}`}
                 style={{
-                  width: i === index ? 22 : 8,
-                  height: 4,
-                  padding: 0,
-                  borderRadius: 999,
+                  padding: "8px 4px",
+                  background: "transparent",
                   border: "none",
-                  background: i === index ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.30)",
                   cursor: "pointer",
-                  transition: "width 240ms ease, background 240ms ease",
+                  display: "flex",
+                  alignItems: "center",
                 }}
-              />
+              >
+                <span
+                  style={{
+                    display: "block",
+                    width: i === index ? 22 : 8,
+                    height: 4,
+                    borderRadius: 999,
+                    background: i === index ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.30)",
+                    transition: "width 240ms ease, background 240ms ease",
+                  }}
+                />
+              </button>
             ))}
           </div>
         )}
