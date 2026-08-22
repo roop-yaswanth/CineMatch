@@ -35,13 +35,26 @@ function readCachedSession(): UserSession | null {
     const raw = localStorage.getItem(SESSION_CACHE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    if (parsed && typeof parsed.session_id === "string" && typeof parsed.identifier === "string") {
-      return parsed as UserSession;
-    }
+    if (isValidUserSession(parsed)) return parsed;
     return null;
   } catch {
     return null;
   }
+}
+
+/**
+ * Runtime guard against malformed session objects. One poisoned response used
+ * to reach setSession() and linger in memory (session_id: null), making every
+ * subsequent dashboard poll POST a 422 until the user reloaded.
+ */
+function isValidUserSession(s: unknown): s is UserSession {
+  return Boolean(
+    s &&
+    typeof s === "object" &&
+    typeof (s as UserSession).session_id === "string" &&
+    (s as UserSession).session_id.length > 0 &&
+    typeof (s as UserSession).identifier === "string"
+  );
 }
 
 // Lightweight signed-in hint for middleware.ts. Carries no secrets (real auth
@@ -154,8 +167,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           const next = profileOptimisticActive() && cached.profile
             ? { ...fresh, profile: cached.profile, auth_token: fresh.auth_token ?? cached.auth_token }
             : fresh;
-          setSession(next);
-          persistSession(next);
+          if (isValidUserSession(next)) {
+            setSession(next);
+            persistSession(next);
+          } else {
+            // Malformed refresh response — keep the cached session rather
+            // than poisoning in-memory state with a null id.
+            console.warn("[SessionProvider] Refresh returned an invalid session; keeping cached copy.");
+          }
         } catch (err) {
           const msg = err instanceof Error ? err.message : "";
           if (
@@ -199,6 +218,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [clearSession, session]);
 
   const updateSession = useCallback((newSession: UserSession) => {
+    if (!isValidUserSession(newSession)) {
+      // Never let a malformed response overwrite a good in-memory session.
+      console.warn("[SessionProvider] Ignored invalid session update:", newSession);
+      return;
+    }
     setSession(newSession);
     persistSession(newSession);
   }, []);

@@ -30,6 +30,7 @@ The CineMatch system operates through a multi-stage pipeline:
 
 - Combines semantic similarity scores with collaborative filtering predictions via a **Late-Fusion Linear Aggregation** ensemble.
 - Applies **Determinantal Point Process (DPP)** diversity reranking to explicitly break echo chambers and provide a global diversity guarantee.
+- **IMDb-only quality policy**: every rating gate uses IMDb data with per-language Bayesian shrinkage, so hyped low-vote releases sink while genuine small films survive — TMDB ratings are never used for quality decisions.
 
 **5. Web Application & API**
 
@@ -65,7 +66,9 @@ CineMatch/
 │   ├── public/                       # Static assets
 │   └── src/
 │       ├── app/
-│       │   ├── api/tmdb/             # Next.js API proxy route (TMDB poster fetching)
+│       │   ├── api/[...path]/         # Hardened reverse proxy to the FastAPI backend
+│       │   ├── api/tmdb/              # TMDB proxy (English-preferred posters, credits, discover)
+│       │   ├── api/search/multi/      # Catalog + TMDB + IMDb merged search
 │       │   ├── globals.css           # Global styles
 │       │   ├── layout.tsx            # Root layout
 │       │   └── page.tsx              # App entry point
@@ -82,8 +85,21 @@ CineMatch/
 │           ├── api.ts                # FastAPI backend client
 │           └── usePoster.ts          # TMDB poster hook
 ├── cinematchproapi/                  # Dedicated FastAPI Backend Service
-│   ├── app.py                        # Main FastAPI server application
-│   ├── cooccurrence.py               # Co-occurrence logic
+│   ├── app.py                        # Composition root: routes, models, startup wiring
+│   ├── cm_config.py                  # Env flags, constants, dataset path detection
+│   ├── text_utils.py                 # Pure string/frame helpers
+│   ├── semantic.py                   # BGE-M3 encoder, FAISS indices, retrieval
+│   ├── collab.py                     # XSimGCL embeddings & user-vector builders
+│   ├── mongo_store.py                # MongoDB persistence layer
+│   ├── catalog.py                    # Dataset bootstrap, onboarding catalog & slates
+│   ├── quality.py                    # IMDb-only rating gates & Bayesian scoring
+│   ├── dpp.py                        # DPP diversity rerank & final selection
+│   ├── recommender.py                # Cold-start + language-bucket fusion pipelines
+│   ├── session_ops.py                # Session store & onboarding slate operations
+│   ├── auth_utils.py                 # Signed auth tokens, Google credential check
+│   ├── searching.py                  # Fast title-search index
+│   ├── tmdb_meta.py                  # TMDB metadata lookups, director affinity
+│   ├── recs_cache.py / imdb_api.py / cooccurrence.py / catalog_filter.py
 │   ├── Dockerfile                    # Docker configuration for API deployment
 │   └── requirements.txt              # Backend-specific dependencies
 ├── Data/
@@ -138,10 +154,10 @@ CineMatch/
 
 1. Install dependencies:
    ```bash
-   pip install fastapi uvicorn sentence-transformers faiss-gpu-cu12 pymongo python-dotenv
+   pip install -r cinematchproapi/requirements.txt
    ```
 2. Set up `.env` with `CINEMATCH_MONGO_URI` and `TMDB_BEARER_TOKEN`.
-3. Navigate to the API directory and launch the server:
+3. Launch the server (set `GPU_USAGE = 0` in `cinematchproapi/cm_config.py` for local/CPU runs):
    ```bash
    cd cinematchproapi
    python app.py

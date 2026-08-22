@@ -354,6 +354,7 @@ export default function RecommendationsView({
     silentRefreshInFlight.current = true;
     silentRefreshToken.current += 1;
     const myToken = silentRefreshToken.current;
+    if (!session?.session_id) return; // no hydrated session — skip instead of 422 spam
     try {
       const resp = await apiMultiRecommendations(session.session_id, {
         languages: prefs.languages,
@@ -413,6 +414,7 @@ export default function RecommendationsView({
         displayedIdsRef.current = new Set();
         actionCountRef.current = { positive: 0, negative: 0, total: 0 }; countedActionsRef.current = new Set();
       }
+      if (!session?.session_id) return; // no hydrated session — skip instead of 422 spam
       try {
         const excludeIds = autoRerun
           ? Array.from(displayedIdsRef.current)

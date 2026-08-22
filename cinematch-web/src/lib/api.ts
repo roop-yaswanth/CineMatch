@@ -455,7 +455,7 @@ export async function apiMultiRecommendations(
 ): Promise<MultiBucketResponse> {
   return request<MultiBucketResponse>("/api/recommendations/multi", {
     method: "POST",
-    body: JSON.stringify({ session_id: sessionId, ...preferences }),
+    body: JSON.stringify({ session_id: sessionId ?? "", ...preferences }),
     retries: 2,
     timeout: 20000,
   });
