@@ -339,8 +339,8 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
 
       <div className="onboarding-rating-layout" style={{
         display: "flex", flexDirection: "column", alignItems: "center",
-        position: "fixed", inset: 0, padding: "10px 12px 12px",
-        fontFamily: "var(--font-sans)", width: "100%", overflow: "hidden",
+        position: "fixed", inset: 0, padding: "clamp(8px, 1.8vh, 18px) clamp(10px, 2vw, 20px)",
+        fontFamily: "var(--font-sans)", width: "100%", overflowY: "auto", overflowX: "hidden",
       }}>
         {/* Header */}
         <div style={{
@@ -364,7 +364,7 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
 
         {/* Progress Horizontal */}
         {state && (
-          <div style={{ width: "100%", maxWidth: "700px", marginTop: "12px", flexShrink: 0 }}>
+          <div style={{ width: "100%", maxWidth: "700px", marginTop: "clamp(6px, 1.2vh, 12px)", flexShrink: 0 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "6px" }}>
               <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-text-primary)", letterSpacing: "0.02em", textTransform: "uppercase" }}>
                 Rated
@@ -382,7 +382,7 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
               />
             </div>
 
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginTop: "10px", marginBottom: "6px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginTop: "8px", marginBottom: "6px" }}>
               <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-text-primary)", letterSpacing: "0.02em", textTransform: "uppercase" }}>
                 Likes Needed
               </span>
@@ -411,15 +411,14 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            minHeight: 0,
-            overflow: "hidden",
+            minHeight: "100px",
             margin: "0",
             padding: "0",
             position: "relative",
             isolation: "isolate",
           }}
         >
-          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+          <div style={{ position: "relative", width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <AnimatePresence initial={false} custom={lastSwipe} mode="wait">
               {(!optimisticRemoved && state?.movie) ? (
                 <motion.div
@@ -428,7 +427,17 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
                   custom={lastSwipe}
                   variants={cardVariants}
                   initial="enter" animate="center" exit="exit"
-                  style={{ width: "clamp(220px, min(72vw, 36vh), 460px)", maxWidth: "100%", maxHeight: "100%", cursor: "grab", touchAction: "none", position: "relative", borderRadius: "var(--radius-poster)", boxShadow: cardGlow }}
+                  style={{
+                    height: "100%",
+                    maxHeight: "100%",
+                    aspectRatio: "2 / 3",
+                    maxWidth: "min(76vw, 320px)",
+                    cursor: "grab",
+                    touchAction: "none",
+                    position: "relative",
+                    borderRadius: "var(--radius-poster)",
+                    boxShadow: cardGlow,
+                  }}
                   drag
                   dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
                   dragElastic={0.65}
@@ -1077,11 +1086,7 @@ const LANG_NATIVE: Record<string, string> = {
   it: "Italiano", pt: "Português", zh: "普通话", tw: "臺灣華語", cn: "粵語", ar: "العربية",
 };
 
-const GENRE_EMOJI: Record<string, string> = {
-  Action: "💥", Adventure: "🗺️", Animation: "🎨", Comedy: "😄", Crime: "🕵️",
-  Documentary: "🎥", Drama: "🎭", Family: "🧸", Fantasy: "🐉", Horror: "👻",
-  Romance: "💕", "Science Fiction": "🚀", Thriller: "🔪", Mystery: "🧩",
-};
+
 
 const WIZARD_STEPS = [
   { title: "Tell us about you", sub: "Helps us pick the right regional mix. Both optional." },
@@ -1251,7 +1256,7 @@ function PreferencesWizard({
                       return (
                         <WizardChip
                           key={genre}
-                          label={`${GENRE_EMOJI[genre] ?? "🎬"} ${genre}`}
+                          label={genre}
                           active={active}
                           onClick={() =>
                             setPreferences((p) => ({
@@ -1331,7 +1336,7 @@ function PreferencesWizard({
           {loading
             ? "Building your personalised slate…"
             : isLast
-              ? "Build my slate ✨"
+              ? "Build my slate"
               : selectedCount > 0
                 ? `Continue with ${selectedCount} selected`
                 : "Continue"}

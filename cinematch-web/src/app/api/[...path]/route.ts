@@ -80,7 +80,7 @@ async function proxy(
     upstream = await fetch(url, { method: req.method, headers, body, signal: controller.signal });
   } catch {
     return NextResponse.json(
-      { error: "SERVER_SLEEPING", message: "Server is waking up from sleep mode. Please retry after 3 minutes." },
+      { error: "SERVER_SLEEPING", message: "Server is waking up from sleep mode. Please retry after 2 minutes." },
       { status: 500 }
     );
   } finally {

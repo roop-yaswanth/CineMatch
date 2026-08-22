@@ -7,7 +7,7 @@ export default function ServerErrorPage() {
     <ErrorView
       code={500}
       title="Server is waking up"
-      description="The server enters sleep mode due to limited Hugging Face free space. Signing in automatically triggers a server restart which takes about 3 minutes. Please retry after 3 minutes."
+      description="The server enters sleep mode due to limited Hugging Face free space. Signing in automatically triggers a server restart which takes about 2 minutes. Please retry after 2 minutes."
       showTimer={true}
       action={{
         label: "Retry Login",

@@ -9,7 +9,7 @@ const MAX_RETRIES = 0; // Don't hang user in retries when server is sleeping
 
 export class ServerSleepingError extends Error {
   isServerSleeping = true;
-  constructor(message = "Server is waking up from sleep mode. Please retry after 3 minutes.") {
+  constructor(message = "Server is waking up from sleep mode. Please retry after 2 minutes.") {
     super(message);
     this.name = "ServerSleepingError";
   }
@@ -68,12 +68,12 @@ async function request<T>(
       return res.json();
     } catch (err) {
       clearTimeout(timeoutId);
-      
+
       if (attempt < maxRetries) {
         await new Promise((r) => setTimeout(r, options?.retryDelay ?? 2000));
         continue;
       }
-      
+
       if (err instanceof ServerSleepingError) {
         throw err;
       }
@@ -811,8 +811,8 @@ export async function apiCredits(tmdbId: number, kind: "movie" | "tv" = "movie")
 export function prefetchMovieDetails(tmdbId: number): void {
   if (!tmdbId) return;
   // No await: we just want the underlying cache to fill in the background.
-  void apiCredits(tmdbId, "movie").catch(() => {});
-  void apiSimilarMovies(tmdbId, null, 20).catch(() => {});
+  void apiCredits(tmdbId, "movie").catch(() => { });
+  void apiSimilarMovies(tmdbId, null, 20).catch(() => { });
 }
 
 export interface TmdbGenre { id: number; name: string }

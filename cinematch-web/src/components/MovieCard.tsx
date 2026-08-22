@@ -99,11 +99,11 @@ export default function MovieCard({ movie, priority = false, className = "", com
         layout={!noLayout}
         whileHover={{ scale: 1.03, y: -4 }}
         transition={{ type: "spring", stiffness: 300, damping: 20 }}
-        className={`relative flex flex-col items-center no-select ${className}`}
+        className={`relative flex flex-col items-center justify-center no-select w-full h-full ${className}`}
       >
         {/* Poster with overlay */}
         <div
-          className="relative w-full aspect-[2/3] overflow-hidden bg-[var(--color-surface)] group"
+          className="relative w-full h-full aspect-[2/3] overflow-hidden bg-[var(--color-surface)] group"
           style={{ borderRadius: compact ? "14px" : "var(--radius-poster)" }}
         >
           <img
@@ -114,20 +114,23 @@ export default function MovieCard({ movie, priority = false, className = "", com
           />
 
           {/* Gradient overlay at bottom */}
-          <div className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-black/90 via-black/60 to-transparent pointer-events-none" />
+          <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/95 via-black/65 to-transparent pointer-events-none" />
 
           {/* Info overlay at bottom — same vocabulary as PosterInfo:
               title + one "year · lang" line + gold rating. */}
-          <div className="absolute inset-x-0 bottom-0 p-3 text-white">
+          <div
+            className="absolute inset-x-0 bottom-0 text-white"
+            style={{ padding: "14px 18px 16px 18px" }}
+          >
             {(imdb || tmdbRating) && (
-              <div className="mb-1.5">
+              <div className="mb-1">
                 <span className="text-[11px] font-bold text-[var(--color-rating)]">
                   {imdb ? `IMDb ${imdb}` : `★ ${tmdbRating}`}
                 </span>
               </div>
             )}
 
-            <h2 className="text-[13px] font-semibold leading-snug tracking-tight line-clamp-2 drop-shadow-lg">
+            <h2 className="text-[13.5px] font-semibold leading-snug tracking-tight line-clamp-2 drop-shadow-lg">
               {movie.title}
             </h2>
             {(year || lang) && (

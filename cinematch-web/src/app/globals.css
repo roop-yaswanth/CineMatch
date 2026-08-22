@@ -1496,14 +1496,30 @@ input[type="number"]::-webkit-inner-spin-button {
 
 .onboarding-rating-layout {
   justify-content: space-between;
+  min-height: 100dvh;
+  box-sizing: border-box;
 }
 
 .onboarding-card-zone {
-  max-height: min(52vh, 460px);
+  flex: 1 1 auto;
+  min-height: 100px;
+  max-height: min(58vh, 520px);
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
 }
 
 .onboarding-card-shell {
-  width: clamp(195px, 58vw, 300px) !important;
+  height: 100% !important;
+  max-height: 100% !important;
+  aspect-ratio: 2 / 3 !important;
+  width: auto !important;
+  max-width: min(76vw, 320px) !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .onboarding-actions {
@@ -1514,37 +1530,37 @@ body:has(.onboarding-rating-layout) {
   overflow: hidden;
 }
 
-@media (max-height: 760px) {
-  .onboarding-card-zone {
-    max-height: min(46vh, 380px);
+@media (max-height: 720px) {
+  .onboarding-rating-layout {
+    padding: 8px 12px !important;
+    gap: 8px !important;
   }
 
-  .onboarding-card-shell {
-    width: clamp(180px, 52vw, 260px) !important;
+  .onboarding-card-zone {
+    max-height: 52vh;
   }
 }
 
-@media (min-width: 1024px) {
+@media (min-width: 1024px) and (min-height: 760px) {
   .onboarding-rating-layout {
     justify-content: center;
-    gap: 18px;
-    padding: 24px;
+    gap: 16px;
+    padding: 20px 24px;
   }
 
   .onboarding-card-zone {
-    flex: 0 1 auto !important;
-    height: clamp(380px, 60vh, 520px) !important;
-    min-height: 0 !important;
-    max-width: 500px !important;
+    flex: 1 1 auto;
+    max-height: 54vh;
+    max-width: 520px;
   }
 
   .onboarding-card-shell {
-    width: clamp(220px, 35vh, 260px) !important;
+    max-width: 320px !important;
   }
 
   .onboarding-actions {
-    max-width: 540px !important;
-    padding-top: 8px !important;
+    max-width: 540px;
+    padding-top: 6px;
   }
 }
 

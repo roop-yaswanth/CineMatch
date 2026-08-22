@@ -36,7 +36,7 @@ const DEFAULT_COPY: Record<number, { title: string; description: string }> = {
   500: {
     title: "Server is waking up",
     description:
-      "The server enters sleep mode due to limited Hugging Face free space. Signing in automatically triggers a server restart which takes about 3 minutes. Please retry after 3 minutes.",
+      "The server enters sleep mode due to limited Hugging Face free space. Signing in automatically triggers a server restart which takes about 2 minutes. Please retry after 2 minutes.",
   },
 };
 
@@ -48,7 +48,7 @@ export default function ErrorView({ code, title, description, action, showTimer 
   const headline = title ?? fallback.title;
   const subhead = description ?? fallback.description;
 
-  const [timeLeft, setTimeLeft] = useState(180); // 3 minutes = 180 seconds
+  const [timeLeft, setTimeLeft] = useState(120);
 
   useEffect(() => {
     if (!showTimer) return;
