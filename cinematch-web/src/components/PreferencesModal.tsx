@@ -18,8 +18,10 @@ interface Preferences {
 
 interface Props {
   preferences: Preferences;
-  /** May be async (e.g. persisting prefs to the server); handleApply awaits it
-      before closing so navigation can't race ahead of the save. */
+  /** Applies the change optimistically (SessionContext updates the profile and
+      persists to the server in the background) — intentionally NOT awaited so
+      the modal closes instantly; the dashboard shows its own loading skeleton
+      while the regenerated slate arrives. */
   onUpdate: (prefs: Preferences) => void | Promise<void>;
   onClose: () => void;
   /** "recommendations" = Language + Genre only; "onboarding" = Region + Age + Language + Genre */

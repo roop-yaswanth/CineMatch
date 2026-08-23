@@ -4,7 +4,14 @@ import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 import dynamic from "next/dynamic";
-import { apiGetHistory, languageLabel, apiRecommendationAction, type HistoryItem } from "@/lib/api";
+import {
+  apiGetHistory,
+  languageLabel,
+  apiRecommendationAction,
+  readHistoryCache,
+  writeHistoryCache,
+  type HistoryItem,
+} from "@/lib/api";
 import { usePoster } from "@/lib/usePoster";
 import PageHeader from "@/components/ui/PageHeader";
 import EmptyState from "@/components/ui/EmptyState";
@@ -23,19 +30,6 @@ interface Props {
 
 type InteractionFilter = "all" | "like" | "okay" | "dislike" | "not_watched" | "watchlist";
 type HistoryListItem = HistoryItem & { genres?: string[] };
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
-
-function readHistoryCache(sessionId: string): { data: HistoryListItem[]; isFresh: boolean } | null {
-  try {
-    const cached = localStorage.getItem(`history_cache_${sessionId}`);
-    if (!cached) return null;
-    const parsed = JSON.parse(cached) as { data?: HistoryListItem[]; ts?: number };
-    if (!Array.isArray(parsed.data) || typeof parsed.ts !== "number") return null;
-    return { data: parsed.data, isFresh: Date.now() - parsed.ts < CACHE_TTL_MS };
-  } catch {
-    return null;
-  }
-}
 
 const RATING_CONFIG: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
   like: {
@@ -98,12 +92,6 @@ const INTERACTION_FILTERS: Array<{ value: InteractionFilter; label: string }> = 
   { value: "watchlist", label: "Watchlist" },
 ];
 
-const IconHeart = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
-  </svg>
-);
-
 function toDetailMovie(item: HistoryListItem): DetailMovie {
   return {
     id: item.tmdb_id,
@@ -120,15 +108,14 @@ function toDetailMovie(item: HistoryListItem): DetailMovie {
 export default function YourLikesView({ sessionId, onClose, initialFilter = "all" }: Props) {
   const { logout } = useSession();
   const router = useRouter();
-  const initialCache = readHistoryCache(sessionId);
-  // Stale-while-revalidate: if we have ANY cached items at all (fresh OR
-  // stale), paint them immediately and skip the skeleton state. The
-  // background refetch below will reconcile silently. Only show skeletons
-  // when the user is genuinely cold (no cache) — that's the "slow first
-  // time" case we can't avoid without a server-side prefetch.
-  const hasAnyCachedItems = !!initialCache?.data?.length;
-  const [items, setItems] = useState<HistoryListItem[]>(() => initialCache?.data ?? []);
-  const [loading, setLoading] = useState(!hasAnyCachedItems);
+  // Stale-while-revalidate: if we have ANY cached items at all, paint them
+  // immediately and skip the skeleton state. The background refetch below
+  // ALWAYS runs and reconciles silently. Only show skeletons when the user
+  // is genuinely cold (no cache) — that's the "slow first time" case we
+  // can't avoid without a server-side prefetch.
+  const [cachedItems] = useState<HistoryListItem[]>(() => readHistoryCache<HistoryListItem>(sessionId) ?? []);
+  const [items, setItems] = useState<HistoryListItem[]>(cachedItems);
+  const [loading, setLoading] = useState(cachedItems.length === 0);
   const [activeMovie, setActiveMovie] = useState<DetailMovie | null>(null);
 
   // Filters
@@ -137,39 +124,37 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
   const [languageFilter, setLanguageFilter] = useState<string>("all");
 
   useEffect(() => {
-    /* eslint-disable react-hooks/set-state-in-effect */
+    /* eslint-disable-next-line react-hooks/set-state-in-effect */
     setInteractionFilter(initialFilter);
-    /* eslint-enable react-hooks/set-state-in-effect */
   }, [initialFilter]);
   // We don't watch searchParams here since it's passed from parent as initialFilter
 
   useEffect(() => {
-    // Always refetch on mount to reconcile against the server, but only
-    // *show* the loading skeleton when we have nothing to display. With
-    // stale items already painted from cache, the refetch is invisible.
-    /* eslint-disable react-hooks/set-state-in-effect */
-    if (initialCache?.isFresh) {
-      setLoading(false);
-      return;
-    }
-    if (!hasAnyCachedItems) setLoading(true);
-    /* eslint-enable react-hooks/set-state-in-effect */
+    // Always reconcile against the server on mount. Skipping this when the
+    // cache looked "fresh" left movies added to the watchlist elsewhere
+    // (dashboard hero/card "+", search, detail modal) invisible here for up
+    // to 5 minutes — those surfaces mutate server-side history without
+    // touching this localStorage cache. With cached items painted above,
+    // the refetch is invisible (no skeleton flash).
+    let cancelled = false;
     apiGetHistory(sessionId)
       .then((data) => {
+        if (cancelled) return;
         setItems(data);
-        try {
-          localStorage.setItem(`history_cache_${sessionId}`, JSON.stringify({ data, ts: Date.now() }));
-        } catch { /* storage full */ }
+        writeHistoryCache(sessionId, data);
       })
       .catch(console.error)
-      .finally(() => setLoading(false));
-  }, [sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [sessionId]);
 
   // Extract unique genres and languages from items
   const { genres, languages } = useMemo(() => {
     const genreSet = new Set<string>();
     const langSet = new Set<string>();
-    
+
     items.forEach((item) => {
       if (item.genres && Array.isArray(item.genres)) {
         item.genres.forEach((g) => genreSet.add(g));
@@ -241,9 +226,6 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
           backAriaLabel="Go back"
           title={
             <span style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}>
-              <span style={{ color: "var(--color-like)", display: "inline-flex" }}>
-                <IconHeart />
-              </span>
               Your Collection
             </span>
           }
@@ -452,11 +434,11 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
                 }}
               >
                 {filteredItems.map((item, idx) => (
-                  <MovieCard 
-                    key={`${item.tmdb_id}-${idx}`} 
-                    item={item} 
-                    idx={idx} 
-                    onClick={() => setActiveMovie(toDetailMovie(item))} 
+                  <MovieCard
+                    key={`${item.tmdb_id}-${idx}`}
+                    item={item}
+                    idx={idx}
+                    onClick={() => setActiveMovie(toDetailMovie(item))}
                   />
                 ))}
               </div>
@@ -464,7 +446,7 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
           )}
         </div>
       </div>
-      
+
       {activeMovie && (
         <MovieDetailModal
           isOpen={activeMovie !== null}
@@ -484,12 +466,7 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
               const next = prev.map((it) =>
                 it.tmdb_id === targetId ? { ...it, rating: action } : it
               );
-              try {
-                localStorage.setItem(
-                  `history_cache_${sessionId}`,
-                  JSON.stringify({ data: next, ts: Date.now() })
-                );
-              } catch { /* storage full */ }
+              writeHistoryCache(sessionId, next);
               return next;
             });
             if (action !== "watchlist") setActiveMovie(null);
@@ -499,10 +476,7 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
               await apiRecommendationAction(sessionId, targetId, action);
               const data = await apiGetHistory(sessionId);
               setItems(data);
-              localStorage.setItem(
-                `history_cache_${sessionId}`,
-                JSON.stringify({ data, ts: Date.now() })
-              );
+              writeHistoryCache(sessionId, data);
             } catch (e) {
               console.error(e);
             }
@@ -625,7 +599,7 @@ function MovieCard({ item, idx, onClick }: { item: HistoryItem; idx: number; onC
           alt={item.title}
           style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
         />
-        
+
         {/* Rating Badge */}
         <div
           style={{

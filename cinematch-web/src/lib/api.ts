@@ -486,6 +486,44 @@ export async function apiGetHistory(
   return request<HistoryItem[]>(`/api/history?session_id=${sessionId}`);
 }
 
+/* ─── History cache (localStorage mirror of /api/history) ───
+ * Your Collection paints from this cache instantly, then reconciles with the
+ * server. Every surface that mutates history (dashboard cards, detail modal,
+ * search) must invalidate it after a successful action, otherwise a fresh
+ * cache makes the page trust a snapshot that predates the new watchlist add. */
+
+function historyCacheKey(sessionId: string): string {
+  return `history_cache_${sessionId}`;
+}
+
+/** Read the cached history array for a session. Returns null on miss/corruption. */
+export function readHistoryCache<T = HistoryItem>(sessionId: string): T[] | null {
+  try {
+    const raw = localStorage.getItem(historyCacheKey(sessionId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { data?: unknown };
+    return Array.isArray(parsed.data) ? (parsed.data as T[]) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Persist a history snapshot with a fresh timestamp. */
+export function writeHistoryCache(sessionId: string, data: unknown): void {
+  try {
+    localStorage.setItem(historyCacheKey(sessionId), JSON.stringify({ data, ts: Date.now() }));
+  } catch { /* storage full */ }
+}
+
+/** Drop the cached history copy. Call right after any successful
+ *  /api/recommendations/action so Your Collection refetches instead of
+ *  showing a stale list that's missing the movie just rated/watchlisted. */
+export function invalidateHistoryCache(sessionId: string): void {
+  try {
+    localStorage.removeItem(historyCacheKey(sessionId));
+  } catch { /* ignore */ }
+}
+
 export interface SearchResult {
   tmdb_id: number;
   title: string;

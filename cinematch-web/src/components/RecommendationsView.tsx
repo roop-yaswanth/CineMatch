@@ -34,6 +34,7 @@ import MobileMenu, { DesktopNavTabs } from "@/components/MobileMenu";
 import {
   apiMultiRecommendations,
   apiRecommendationAction,
+  invalidateHistoryCache,
   languageLabel,
   prefetchPosters,
   preferencesFromProfile,
@@ -205,12 +206,12 @@ export default function RecommendationsView({
   const [loading, setLoading] = useState(!hadCache);
   const [initialLoad, setInitialLoad] = useState(!hadCache);
 
-  const [showUpdateToast] = useState(false);
   const [activeStack, setActiveStack] = useState<StackId | null>(null);
-  // Derived once from the session profile at mount. Preference changes happen
-  // via the overlay modal (PreferencesModal), which persists the new profile —
-  // so this component remounts and re-derives rather than mutating in place.
-  const [preferences] = useState<RecommendationPreferences>(
+  // Seeded from the session profile at mount, then kept in sync by the
+  // preference-change effect below: when the user saves new preferences in
+  // the overlay modal (SessionContext updates session.profile optimistically),
+  // this view regenerates the whole slate against the new taste profile.
+  const [preferences, setPreferences] = useState<RecommendationPreferences>(
     () => preferencesFromProfile(session.profile)
   );
 
@@ -270,6 +271,14 @@ export default function RecommendationsView({
   const bucketCacheRef = useRef<StackCache>(
     initialCache?.bucketCache ?? EMPTY_CACHE()
   );
+
+  // Render-time mirrors of the latest stacks/movies. Used by async handlers
+  // (e.g. the post-action refill check) to read current state without
+  // stuffing side effects inside setState updaters.
+  const stacksRef = useRef<Stack[]>(initialCache?.stacks ?? []);
+  const moviesRef = useRef<Recommendation[]>(initialCache?.movies ?? []);
+  useEffect(() => { stacksRef.current = stacks; }, [stacks]);
+  useEffect(() => { moviesRef.current = movies; }, [movies]);
 
 
 
@@ -397,11 +406,17 @@ export default function RecommendationsView({
     }
   }, [applyBucketResponse, onSessionUpdate, session.session_id]);
 
+  // Monotonic token for generate(). Preference saves can now trigger a
+  // regeneration while a previous one is still in flight; without this
+  // guard a slow older response could land last and overwrite the fresher
+  // slate with stale data.
+  const generateTokenRef = useRef(0);
   const generate = useCallback(
     async (
       nextPreferences: RecommendationPreferences = preferences,
       { autoRerun = false }: { autoRerun?: boolean } = {}
     ) => {
+      const myToken = ++generateTokenRef.current;
       if (autoRerun) {
         setIsUpdating(true);
       } else {
@@ -436,6 +451,10 @@ export default function RecommendationsView({
           ...(resp.buckets.global || []),
         ];
         await prefetchPosters(allMovies);
+
+        // A newer generate() superseded this one (e.g. the user saved
+        // preferences twice in a row) — discard the stale response.
+        if (myToken !== generateTokenRef.current) return;
 
         if (autoRerun) {
           // Keep current stacks visible — the user may still be browsing
@@ -483,8 +502,8 @@ export default function RecommendationsView({
           // the freshly-fetched recs (the write effect only fires on
           // stacks/movies changes, not cache-only mutations).
           writeRecsCache(session.user_id, {
-            stacks,
-            movies,
+            stacks: stacksRef.current,
+            movies: moviesRef.current,
             bucketCache: bucketCacheRef.current,
             seenIds: Array.from(seenIdsRef.current),
             displayedIds: Array.from(displayedIdsRef.current),
@@ -510,19 +529,22 @@ export default function RecommendationsView({
           }
         }
       } finally {
-        setLoading(false);
-        setIsUpdating(false);
+        // Only the newest generation may clear the loading flags — an older
+        // superseded call finishing late must not hide the newer one's
+        // skeleton/pill mid-flight.
+        if (myToken === generateTokenRef.current) {
+          setLoading(false);
+          setIsUpdating(false);
+        }
       }
     },
     [
       applyBucketResponse,
       applyFilters,
-      movies,
       onSessionUpdate,
       preferences,
       session.session_id,
       session.user_id,
-      stacks,
     ]
   );
 
@@ -550,9 +572,46 @@ export default function RecommendationsView({
     });
   }, [stacks, movies, session.user_id]);
 
+  // Undo for a freshly added watchlist entry. Sends "clear", which erases the
+  // stored feedback server-side instead of overwriting it — the old approach
+  // ("remove") left an entry behind that resurfaced in Your Collection as a
+  // phantom "Skipped" row. When the original card object + its stack are
+  // provided, the card is also restored to the front of its rail, undoing the
+  // optimistic removal instead of silently losing the recommendation.
+  const undoWatchlistAdd = useCallback(
+    (tmdbId: number, opts?: { movie?: Recommendation | null; stackId?: StackId | null }) => {
+      apiRecommendationAction(session.session_id, tmdbId, "clear")
+        .then((result) => {
+          onSessionUpdate(result.session);
+          invalidateHistoryCache(session.session_id);
+          const { movie, stackId } = opts ?? {};
+          if (movie && stackId) {
+            // Un-mark as seen so it flows through dedup/rerun logic normally.
+            seenIdsRef.current.delete(tmdbId);
+            setStacks((prev) =>
+              prev.map((s) => {
+                if (s.id !== stackId) return s;
+                if (s.movies.some((m) => recommendationId(m) === tmdbId)) return s;
+                return { ...s, movies: [movie, ...s.movies] };
+              })
+            );
+          }
+        })
+        .catch((err) => console.error("Undo watchlist failed:", err));
+    },
+    [onSessionUpdate, session.session_id]
+  );
+
   const handleAction = useCallback(
     async (movie: Recommendation | DetailMovie, action: RecommendationAction) => {
       const tmdbId = "tmdb_id" in movie && movie.tmdb_id ? movie.tmdb_id : movie.id;
+      // Capture the full Recommendation object (refs still hold the
+      // pre-removal state at this synchronous moment) so a watchlist Undo can
+      // put the exact card back on its rail.
+      const originalMovie: Recommendation | null =
+        moviesRef.current.find((m) => recommendationId(m) === tmdbId) ??
+        stacksRef.current.flatMap((s) => s.movies).find((m) => recommendationId(m) === tmdbId) ??
+        null;
 
       seenIdsRef.current.add(tmdbId);
 
@@ -601,6 +660,20 @@ export default function RecommendationsView({
           // response before fetching fresh multi-bucket recs. Running
           // them concurrently halves the wall-clock wait.
           const actionPromise = apiRecommendationAction(session.session_id, tmdbId, action)
+            .then((result) => {
+              invalidateHistoryCache(session.session_id);
+              if (action === "watchlist") {
+                toast({
+                  message: `Added "${movie.title}" to your watchlist`,
+                  tone: "success",
+                  action: {
+                    label: "Undo",
+                    onClick: () => undoWatchlistAdd(tmdbId, { movie: originalMovie, stackId: targetStackId }),
+                  },
+                });
+              }
+              onSessionUpdate(result.session);
+            })
             .catch((err) => console.error("Action during rerun failed:", err));
           await generate(preferences, { autoRerun: true });
           await actionPromise;
@@ -614,27 +687,55 @@ export default function RecommendationsView({
       apiRecommendationAction(session.session_id, tmdbId, action)
         .then((result) => {
           onSessionUpdate(result.session);
-          if (targetStackId) {
-            const cacheRemaining = bucketCacheRef.current[targetStackId]?.length || 0;
-            setStacks(currentStacks => {
-              const s = currentStacks.find(st => st.id === targetStackId);
-              if (s && s.movies.length < CACHE_REFETCH_THRESHOLD && cacheRemaining === 0) {
-                void silentRefresh(preferences);
-              }
-              return currentStacks;
+          // This write just changed server-side history (rating or watchlist
+          // add). Drop Your Collection's cache so its next mount refetches
+          // instead of painting a snapshot that predates this action.
+          invalidateHistoryCache(session.session_id);
+          if (action === "watchlist") {
+            toast({
+              message: `Added "${movie.title}" to your watchlist`,
+              tone: "success",
+              action: {
+                label: "Undo",
+                onClick: () => undoWatchlistAdd(tmdbId, { movie: originalMovie, stackId: targetStackId }),
+              },
             });
+          }
+          // Refill check. Read committed state from stacksRef instead of
+          // running side effects inside a setState updater — StrictMode can
+          // invoke updaters twice, double-firing silentRefresh.
+          if (targetStackId) {
+            const st = stacksRef.current.find(s => s.id === targetStackId);
+            const cacheRemaining = bucketCacheRef.current[targetStackId]?.length || 0;
+            if (st && st.movies.length < CACHE_REFETCH_THRESHOLD && cacheRemaining === 0) {
+              void silentRefresh(preferences);
+            }
           }
         })
         .catch((err) => console.error("Recommendation action failed:", err));
     },
-    [generate, onSessionUpdate, preferences, session.session_id, silentRefresh]
+    [generate, onSessionUpdate, preferences, session.session_id, silentRefresh, undoWatchlistAdd]
   );
 
-  // Preference updates are now applied via the overlay PreferencesModal, which
-  // persists the new profile (server + cached session). This component re-derives
-  // `preferences` from `session.profile` at mount, and the initial-load effect
-  // above fires a single generate() against it. That replaces the old
-  // sessionStorage-stash / custom-event / visibilitychange relay.
+  // ─── Live preference changes → regenerate with a visible loading state ───
+  // Saving in the overlay PreferencesModal updates session.profile
+  // optimistically (SessionContext), which flows back into this view as a new
+  // prop. Whenever the derived recommendation prefs differ from what this view
+  // last rendered, rebuild the entire slate against them: generate() with
+  // autoRerun=false clears stacks/movies first, so the dashboard's skeleton
+  // shimmer plays while the new slate loads. This restores the feedback loop
+  // that vanished when the old custom-event relay was removed — before this,
+  // saving preferences left the mounted dashboard showing stale rails until a
+  // manual navigate-away-and-back.
+  const appliedPrefsKeyRef = useRef<string>(JSON.stringify(preferences));
+  useEffect(() => {
+    const nextPrefs = preferencesFromProfile(session.profile);
+    const nextKey = JSON.stringify(nextPrefs);
+    if (nextKey === appliedPrefsKeyRef.current) return;
+    appliedPrefsKeyRef.current = nextKey;
+    setPreferences(nextPrefs);
+    void generate(nextPrefs);
+  }, [session.profile, generate]);
 
   return (
     <div
@@ -879,17 +980,9 @@ export default function RecommendationsView({
                   <HeroFeature
                     movies={heroStack.movies}
                     onOpenDetail={(m) => setActiveMovie(toDetailMovie(m))}
-                    onWatchlist={(m) => {
-                      handleAction(m, "watchlist");
-                      toast({
-                        message: `Added "${m.title}" to your watchlist`,
-                        tone: "success",
-                        action: {
-                          label: "Undo",
-                          onClick: () => handleAction(m, "remove"),
-                        },
-                      });
-                    }}
+                    // Toast + Undo live inside handleAction so every watchlist
+                    // surface (hero, card "+", detail modal) behaves alike.
+                    onWatchlist={(m) => handleAction(m, "watchlist")}
                   />
                 </div>
               );
@@ -948,7 +1041,7 @@ export default function RecommendationsView({
             interactive throughout the rerun. */}
         {mounted && createPortal(
           <AnimatePresence>
-            {(showUpdateToast || isUpdating) && (
+            {isUpdating && (
               <motion.div
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
