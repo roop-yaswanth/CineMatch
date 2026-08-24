@@ -63,7 +63,7 @@ function dismiss(id: number) {
 
 const TONE_COLOR: Record<NonNullable<ToastOptions["tone"]>, string> = {
   neutral: "rgba(255,255,255,0.85)",
-  success: "var(--color-like)",
+  success: "var(--color-success)",
   danger: "var(--color-dislike)",
 };
 

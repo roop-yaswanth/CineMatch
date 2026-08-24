@@ -4,6 +4,7 @@
  * One canonical sticky page header.
  */
 
+import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import BackButton from "@/components/ui/BackButton";
 import { DesktopNavTabs } from "@/components/MobileMenu";
@@ -24,6 +25,8 @@ interface Props {
   sticky?: boolean;
   /** Stable accessibility label for the back button. */
   backAriaLabel?: string;
+  /** Show the global search button on desktop. Default true. */
+  showSearchButton?: boolean;
 }
 
 export default function PageHeader({
@@ -35,7 +38,9 @@ export default function PageHeader({
   children,
   sticky = true,
   backAriaLabel = "Back",
+  showSearchButton = true,
 }: Props) {
+  const router = useRouter();
   return (
     <header
       className="glass page-header-root"
@@ -92,17 +97,30 @@ export default function PageHeader({
           </h1>
         </div>
 
-        {/* Right Column: rightSlot (MobileMenu -> Account button on desktop) */}
+        {/* Right Column: search button on desktop + rightSlot */}
         <div
           style={{
             display: "flex",
             alignItems: "center",
             justifyContent: "flex-end",
+            gap: "8px",
             minWidth: "44px",
             zIndex: 10,
           }}
-          aria-hidden={!rightSlot}
         >
+          {showSearchButton && (
+            <button
+              type="button"
+              className="dash-search desktop-only"
+              onClick={() => router.push("/search")}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              Search movies…
+            </button>
+          )}
           {rightSlot ?? <div style={{ width: "44px" }} />}
         </div>
       </div>

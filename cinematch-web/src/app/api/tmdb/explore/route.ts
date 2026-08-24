@@ -124,9 +124,15 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "TMDB fetch failed" }, { status: 502 });
     }
     const data = await res.json();
+    const now = Date.now();
     const results = (data.results || []).map((m: TmdbMovie) => {
       const dateStr = m.release_date || m.first_air_date || "";
       const year = dateStr ? parseInt(dateStr.slice(0, 4), 10) || undefined : undefined;
+      const releaseTime = dateStr ? new Date(dateStr).getTime() : 0;
+      const isUpcoming = releaseTime > now;
+      const isRecent = !isUpcoming && releaseTime > 0 && (now - releaseTime < 60 * 24 * 3600 * 1000);
+      const status = isUpcoming ? "Upcoming" : (isRecent ? "In Theatres" : "Released");
+
       const genres = (m.genre_ids || [])
         .map((id) => genreMap[id])
         .filter((n): n is string => Boolean(n));
@@ -137,6 +143,7 @@ export async function GET(req: NextRequest) {
         original_title: m.original_title,
         year,
         release_date: m.release_date || null,
+        status,
         poster_path: m.poster_path || undefined,
         backdrop_path: m.backdrop_path || undefined,
         overview: m.overview,

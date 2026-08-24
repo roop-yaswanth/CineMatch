@@ -66,7 +66,7 @@
   /* ─── Semantic Rating Colors ─────────────────── */
   --color-success: #30d158;
   --color-danger: #ff453a;
-  --color-like: #30d158;
+  --color-like: #ff2d55;
   --color-okay: #0a84ff;
   --color-dislike: #ff453a;
   --color-skip: #8e8e93;
@@ -77,7 +77,7 @@
   --rgb-rating: 232, 200, 74;
 
   /* Color tints for rating glow/fill (rgba-ready) */
-  --rgb-like: 48, 209, 88;
+  --rgb-like: 255, 45, 85;
   --rgb-okay: 10, 132, 255;
   --rgb-dislike: 255, 69, 58;
   --rgb-skip: 142, 142, 147;
@@ -127,7 +127,7 @@
     0 18px 40px -10px rgba(0, 0, 0, 0.45),
     0 0 0 0.5px rgba(255, 255, 255, 0.08) inset;
   --shadow-glow-blue: 0 0 40px rgba(10, 132, 255, 0.35);
-  --shadow-glow-like: 0 0 32px rgba(48, 209, 88, 0.35);
+  --shadow-glow-like: 0 0 32px rgba(255, 45, 85, 0.40);
   --shadow-glow-dislike: 0 0 32px rgba(255, 69, 58, 0.35);
 
   /* ─── Motion ─── */
@@ -1398,7 +1398,7 @@ input[type="number"]::-webkit-inner-spin-button {
   position: absolute;
   top: 45%;
   transform: translateY(-50%);
-  z-index: 20;
+  z-index: 50;
   width: 44px;
   height: 44px;
   border-radius: 50%;
@@ -1412,31 +1412,51 @@ input[type="number"]::-webkit-inner-spin-button {
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  pointer-events: auto;
   line-height: 1;
+  user-select: none;
+  -webkit-user-select: none;
   box-shadow:
     0 1px 0 0 rgba(255, 255, 255, 0.15) inset,
     0 8px 24px rgba(0, 0, 0, 0.45);
   transition:
     background-color var(--dur-base) var(--ease-out),
-    transform var(--dur-base) var(--ease-spring),
+    border-color var(--dur-base) var(--ease-out),
+    box-shadow var(--dur-base) var(--ease-out),
     opacity var(--dur-base) var(--ease-out);
 }
 
+.carousel-btn::before {
+  content: "";
+  position: absolute;
+  inset: -12px;
+  border-radius: 50%;
+  pointer-events: auto;
+}
+
+.carousel-btn svg {
+  pointer-events: none;
+}
+
 .carousel-btn:hover {
-  background: rgba(255, 255, 255, 0.15);
-  transform: translateY(-50%) scale(1.08);
+  background: rgba(255, 255, 255, 0.24);
+  border-color: rgba(255, 255, 255, 0.4);
+  box-shadow:
+    0 1px 0 0 rgba(255, 255, 255, 0.25) inset,
+    0 8px 28px rgba(0, 0, 0, 0.6);
 }
 
 .carousel-btn:active {
-  transform: translateY(-50%) scale(0.94);
+  background: rgba(255, 255, 255, 0.32);
+  border-color: rgba(255, 255, 255, 0.6);
 }
 
 .carousel-btn-left {
-  left: 10px;
+  left: 12px;
 }
 
 .carousel-btn-right {
-  right: 10px;
+  right: 12px;
 }
 
 @media (hover: none) {
@@ -1449,20 +1469,71 @@ input[type="number"]::-webkit-inner-spin-button {
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 48px;
-  z-index: 10;
+  width: 68px;
+  z-index: 20;
   pointer-events: none;
+}
+
+.carousel-scrim.left {
+  left: 0;
+  background: linear-gradient(90deg, rgba(11, 11, 19, 0.85) 0%, rgba(11, 11, 19, 0) 100%);
+}
+
+.carousel-scrim.right {
+  right: 0;
+  background: linear-gradient(-90deg, rgba(11, 11, 19, 0.85) 0%, rgba(11, 11, 19, 0) 100%);
+}
+
+/* Suppress poster hover animation and action popups when hovering or clicking carousel arrows */
+.shelf-rail:has(.carousel-btn:hover) .shelf-card-wrap,
+.shelf-rail:has(.carousel-btn:active) .shelf-card-wrap,
+.shelf-rail.is-nav-hovered .shelf-card-wrap,
+.shelf-rail.is-scrolling .shelf-card-wrap {
+  transform: none !important;
+}
+
+.shelf-rail:has(.carousel-btn:hover) .shelf-poster-box,
+.shelf-rail:has(.carousel-btn:active) .shelf-poster-box,
+.shelf-rail.is-nav-hovered .shelf-poster-box,
+.shelf-rail.is-scrolling .shelf-poster-box {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35) !important;
+}
+
+.shelf-rail:has(.carousel-btn:hover) .shelf-poster-box img,
+.shelf-rail:has(.carousel-btn:active) .shelf-poster-box img,
+.shelf-rail.is-nav-hovered .shelf-poster-box img,
+.shelf-rail.is-scrolling .shelf-poster-box img {
+  transform: none !important;
+}
+
+.shelf-rail:has(.carousel-btn:hover) .shelf-card-actions,
+.shelf-rail:has(.carousel-btn:active) .shelf-card-actions,
+.shelf-rail.is-nav-hovered .shelf-card-actions,
+.shelf-rail.is-scrolling .shelf-card-actions {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transform: translateY(6px) !important;
+}
+
+.shelf-rail:has(.carousel-btn:hover) .spotlight-card,
+.shelf-rail:has(.carousel-btn:active) .spotlight-card,
+.shelf-rail.is-nav-hovered .spotlight-card,
+.shelf-rail.is-scrolling .spotlight-card {
+  transform: none !important;
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.4) !important;
+}
+
+.shelf-rail:has(.carousel-btn:hover) .spotlight-card img,
+.shelf-rail:has(.carousel-btn:active) .spotlight-card img,
+.shelf-rail.is-nav-hovered .spotlight-card img,
+.shelf-rail.is-scrolling .spotlight-card img {
+  transform: none !important;
 }
 
 /* Stack section — transparent so it merges with the page background */
 .stack-section {
   background: transparent;
   padding: 0;
-}
-
-.carousel-scrim.left,
-.carousel-scrim.right {
-  display: none;
 }
 
 /* Stack-name button chevron */
@@ -1760,7 +1831,7 @@ a[role="button"]:active,
 }
 
 /* ═══════════════════════════════════════════════════════════
-   Search header — responsive (Netflix-style)
+   Search header
    Mobile : icon only  →  tap → full-page overlay
    Desktop: mini search box + icon (box visible, icon hidden)
    ═══════════════════════════════════════════════════════════ */
@@ -1777,4 +1848,758 @@ a[role="button"]:active,
   .header-search-box {
     display: flex !important;
   }
+}
+
+.desktop-only {
+  display: none !important;
+}
+
+.mobile-only {
+  display: inline-flex !important;
+}
+
+@media (min-width: 900px) {
+  .desktop-only {
+    display: inline-flex !important;
+  }
+
+  .mobile-only {
+    display: none !important;
+  }
+}
+
+:root {
+  --rail-x: clamp(24px, 4.5vw, 56px);
+}
+
+
+.dash-root {
+  background:
+    radial-gradient(1100px 520px at 85% -8%, rgba(129, 140, 248, 0.13), transparent 62%),
+    radial-gradient(900px 480px at 0% 18%, rgba(255, 184, 77, 0.05), transparent 58%),
+    linear-gradient(180deg, #0b0b13 0%, #07070c 55%, #06060a 100%);
+}
+
+/* ── Top bar ──────────────────────────────────────────────── */
+.dash-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  width: 100%;
+  background: transparent;
+  border-bottom: 1px solid transparent;
+  transition:
+    background 260ms ease,
+    border-color 260ms ease,
+    backdrop-filter 260ms ease,
+    transform 280ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dash-topbar.is-scrolled {
+  background: rgba(5, 5, 7, 0.68);
+  -webkit-backdrop-filter: blur(22px) saturate(1.7);
+  backdrop-filter: blur(22px) saturate(1.7);
+  border-bottom-color: var(--color-border-subtle);
+}
+
+@media (max-width: 899px) {
+  .dash-topbar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: transparent !important;
+    border-bottom: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    pointer-events: none;
+    z-index: 40;
+  }
+
+  .dash-topbar.is-scrolled {
+    background: transparent !important;
+    border-bottom: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  .dash-topbar-inner {
+    display: flex !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+    padding: calc(16px + env(safe-area-inset-top, 0px)) var(--rail-x) 0 !important;
+    min-height: auto !important;
+  }
+
+  .dash-brand,
+  .dash-search,
+  .dash-topbar-nav {
+    display: none !important;
+  }
+
+  .dash-topbar-right {
+    pointer-events: auto !important;
+  }
+
+  .dash-topbar-right .dash-search,
+  .dash-topbar-right .dash-icon-btn {
+    display: none !important;
+  }
+}
+
+.dash-topbar-progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--color-accent-strong), var(--color-accent-warm));
+  transform-origin: left center;
+  transform: scaleX(0);
+  opacity: 0.85;
+  pointer-events: none;
+}
+
+.dash-topbar-inner {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 18px;
+  min-height: 56px;
+  padding: 4px var(--rail-x);
+}
+
+.dash-brand {
+  justify-self: start;
+  font-size: 19px;
+  font-weight: 800;
+  margin: 0;
+  white-space: nowrap;
+  cursor: pointer;
+  letter-spacing: -0.03em;
+  background: linear-gradient(92deg, #ffffff 30%, var(--color-accent) 70%, var(--color-accent-warm));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.dash-topbar-nav {
+  justify-self: center;
+}
+
+.dash-topbar-right {
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dash-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px 8px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 13px;
+  cursor: pointer;
+  min-width: 200px;
+  text-align: left;
+  transition: border-color 160ms ease, background 160ms ease;
+}
+
+.dash-search:hover {
+  border-color: rgba(255, 255, 255, 0.24);
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.dash-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(20, 22, 28, 0.55);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  color: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+}
+
+/* ── Hero accents ─────────────────────────────────────────── */
+.hero-kicker {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: rgba(255, 255, 255, 0.72);
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.hero-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(15, 17, 23, 0.45);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+/* ── Shelf scaffolding ────────────────────────────────────── */
+.shelf-section {
+  position: relative;
+  margin-top: clamp(28px, 4vw, 44px);
+}
+
+.shelf-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 var(--rail-x);
+  margin-bottom: 14px;
+}
+
+.shelf-eyebrow {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.13em;
+  color: var(--color-accent);
+  opacity: 0.85;
+  margin-bottom: 4px;
+}
+
+.shelf-title {
+  font-size: clamp(1.12rem, 2.3vw, 1.38rem);
+  color: var(--color-text-primary);
+  text-transform: none;
+}
+
+.shelf-subtitle {
+  margin: 3px 0 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  letter-spacing: -0.005em;
+}
+
+.shelf-see-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateY(2px);
+  transition: opacity 180ms ease, transform 180ms ease;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 14px;
+  flex-shrink: 0;
+}
+
+.shelf-section:hover .shelf-see-all,
+.shelf-section:focus-within .shelf-see-all {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (hover: none) {
+  .shelf-see-all {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.shelf-rail {
+  position: relative;
+  isolation: isolate;
+}
+
+.shelf-track {
+  display: flex;
+  gap: var(--s-card-gap);
+  overflow-x: auto;
+  /* scroll-padding keeps snapped cards aligned with the gutter, not the
+     raw viewport edge. */
+  scroll-padding-inline: var(--rail-x);
+  padding: 6px var(--rail-x) 16px;
+  scrollbar-width: none;
+}
+
+@media (hover: none),
+(pointer: coarse) {
+  .shelf-track {
+    scroll-snap-type: x proximity;
+  }
+}
+
+.shelf-cell {
+  flex-shrink: 0;
+  scroll-snap-align: start;
+}
+
+/* ── Poster card ──────────────────────────────────────────── */
+.shelf-card-wrap {
+  width: var(--poster-w);
+  flex-shrink: 0;
+  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.shelf-card-wrap:hover {
+  transform: translateY(-4px);
+}
+
+.shelf-card {
+  cursor: pointer;
+  outline: none;
+}
+
+.shelf-card:focus-visible {
+  border-radius: var(--radius-poster);
+  box-shadow: 0 0 0 2px var(--color-accent-strong);
+}
+
+.shelf-poster-box {
+  position: relative;
+  aspect-ratio: 2 / 3;
+  border-radius: var(--radius-poster);
+  overflow: hidden;
+  background: var(--color-surface);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  transition: box-shadow 220ms ease;
+}
+
+.shelf-card:hover .shelf-poster-box,
+.shelf-card:focus-visible .shelf-poster-box {
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.55);
+}
+
+.shelf-poster-box img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.shelf-card:hover .shelf-poster-box img {
+  transform: scale(1.06);
+}
+
+.shelf-card-badge {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  z-index: 2;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(8, 9, 12, 0.78);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  color: var(--color-rating);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.shelf-card-badge.ranked-badge {
+  top: 7px;
+}
+
+.shelf-card-actions {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  padding: 28px 8px 12px;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.85) 100%);
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 200ms ease, transform 200ms ease;
+  pointer-events: none;
+}
+
+.shelf-card:hover .shelf-card-actions,
+.shelf-card:focus-within .shelf-card-actions,
+.card-hover:hover .shelf-card-actions,
+.card-hover:focus-within .shelf-card-actions {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+/* Stabilize card animation when user is reaching/clicking the action buttons */
+.shelf-card:has(.shelf-card-actions:hover) .shelf-poster-box img {
+  transform: scale(1.02) !important;
+}
+
+@media (hover: none) {
+  .shelf-card-actions {
+    display: none;
+  }
+
+  /* tap = open modal; bottom nav covers watchlist */
+}
+
+/* Action button base */
+.shelf-action-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(14, 16, 22, 0.88);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  color: #fff;
+  font-size: 15px;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+}
+
+.shelf-action-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.45);
+  transform: scale(1.08);
+}
+
+.shelf-action-btn:active {
+  transform: scale(0.92);
+}
+
+.shelf-action-btn--reaction:hover {
+  background: rgba(59, 130, 246, 0.25);
+  border-color: #60a5fa;
+}
+
+.shelf-action-btn--watchlist:hover {
+  background: rgba(129, 140, 248, 0.25);
+  border-color: var(--color-accent-strong);
+}
+
+/* Reaction group containing trigger + floating reaction tray */
+.shelf-reaction-group {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Floating Reaction Tray above the trigger */
+.shelf-reaction-tray {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) translateY(6px) scale(0.92);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 6px;
+  border-radius: 999px;
+  background: rgba(12, 14, 20, 0.95);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease, transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  z-index: 25;
+}
+
+/* Safe hover bridge so mouse moving from trigger to tray doesn't close it */
+.shelf-reaction-group::before {
+  content: "";
+  position: absolute;
+  bottom: 100%;
+  left: -20px;
+  right: -20px;
+  height: 14px;
+  pointer-events: none;
+}
+
+.shelf-reaction-group:hover::before {
+  pointer-events: auto;
+}
+
+.shelf-reaction-group:hover .shelf-reaction-tray,
+.shelf-reaction-group:focus-within .shelf-reaction-tray {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(-50%) translateY(0) scale(1);
+}
+
+/* Individual emoji reaction item inside tray */
+.shelf-reaction-item {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform 180ms cubic-bezier(0.34, 1.56, 0.64, 1), background 140ms ease;
+}
+
+.shelf-reaction-item:hover {
+  transform: scale(1.32) translateY(-2px);
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.shelf-reaction-item:active {
+  transform: scale(1.05);
+}
+
+/* Tooltips */
+.shelf-tooltip {
+  position: absolute;
+  bottom: calc(100% + 7px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(8, 10, 15, 0.95);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 140ms ease, transform 140ms ease;
+  z-index: 30;
+}
+
+.shelf-tooltip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 4px;
+  border-style: solid;
+  border-color: rgba(8, 10, 15, 0.95) transparent transparent transparent;
+}
+
+.shelf-action-btn:hover .shelf-tooltip,
+.shelf-reaction-item:hover .shelf-tooltip {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.shelf-rank-num {
+  position: absolute;
+  left: 6px;
+  bottom: 4px;
+  z-index: 4;
+  font-size: clamp(44px, 4.5vw, 62px);
+  font-weight: 800;
+  line-height: 0.82;
+  letter-spacing: -0.06em;
+  pointer-events: none;
+  user-select: none;
+  background: linear-gradient(180deg, #ffffff 20%, rgba(165, 180, 250, 0.4) 95%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 6px 16px rgba(0, 0, 0, 0.85));
+}
+
+/* Title/meta block under the poster needs clear separation from the art. */
+.shelf-card-info {
+  margin-top: 14px;
+}
+
+.shelf-card-info .poster-info-title {
+  margin: 0 0 4px;
+}
+
+.shelf-card-info .poster-info-meta-text {
+  margin: 0;
+}
+
+/* ── Spotlight cards ──────────────────────────────────────── */
+.spotlight-cell {
+  scroll-snap-align: center;
+}
+
+.spotlight-card {
+  position: relative;
+  width: min(430px, 84vw);
+  height: clamp(150px, 21vw, 225px);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  cursor: pointer;
+  outline: none;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 240px;
+  background: var(--color-surface);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.4);
+  transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 240ms ease;
+}
+
+.spotlight-card:hover,
+.spotlight-card:focus-visible {
+  transform: translateY(-3px);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.6);
+}
+
+.spotlight-card:focus-visible {
+  box-shadow: 0 0 0 2px var(--color-accent-strong);
+}
+
+.spotlight-art {
+  position: absolute;
+  inset: 0;
+}
+
+.spotlight-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 400ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.spotlight-fallback {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.spotlight-fallback-blur {
+  position: absolute;
+  inset: -24px;
+  width: calc(100% + 48px);
+  height: calc(100% + 48px);
+  object-fit: cover;
+  filter: blur(26px) brightness(0.55) saturate(1.3);
+  transform: scale(1.15);
+}
+
+.spotlight-fallback-poster {
+  position: relative;
+  height: 100%;
+  aspect-ratio: 2 / 3;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.65);
+}
+
+.spotlight-card:hover .spotlight-art img {
+  transform: scale(1.05);
+}
+
+.spotlight-scrim {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.05) 0%, rgba(0, 0, 0, 0.55) 62%, rgba(0, 0, 0, 0.88) 100%),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.45) 0%, rgba(0, 0, 0, 0) 55%);
+}
+
+.spotlight-body {
+  position: absolute;
+  left: 18px;
+  right: 210px;
+  bottom: 12px;
+  min-width: 0;
+}
+
+.spotlight-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #fff;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.spotlight-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.spotlight-imdb {
+  color: var(--color-rating);
+  font-weight: 700;
+}
+
+.spotlight-blurb {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.8);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.spotlight-actions {
+  position: absolute;
+  right: 16px;
+  bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 5;
+}
+
+/* Skeleton hero block matching HeroCarousel dimensions */
+.dash-hero-skel {
+  width: 100%;
+  height: min(68vh, 620px);
+  min-height: 440px;
+}
+
+.collection-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--poster-w), 1fr));
+  gap: 30px 20px;
+}
+
+.collection-grid .shelf-card-wrap {
+  width: 100%;
 }

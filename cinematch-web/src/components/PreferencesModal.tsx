@@ -28,6 +28,8 @@ interface Props {
   mode?: "recommendations" | "onboarding";
 }
 
+
+
 const LANGUAGES = [
   { code: "en", label: "English" },
   { code: "te", label: "Telugu" },
@@ -41,18 +43,16 @@ const LANGUAGES = [
   { code: "de", label: "German" },
   { code: "it", label: "Italian" },
   { code: "pt", label: "Portuguese" },
-  { code: "ru", label: "Russian" },
   { code: "zh", label: "Mandarin" },
   { code: "tw", label: "Mandarin (Taiwan)" },  // UI-only: maps to zh + Taiwan production boost
   { code: "cn", label: "Cantonese" },
   { code: "ar", label: "Arabic" },
-  { code: "th", label: "Thai" },
 ];
 
 const GENRES = [
   "Action", "Adventure", "Animation", "Comedy", "Crime", "Documentary",
-  "Drama", "Family", "Fantasy", "History", "Horror", "Music", "Mystery",
-  "Romance", "Science Fiction", "Thriller", "War", "Western",
+  "Drama", "Family", "Fantasy", "Horror", "Mystery", "Romance",
+  "Science Fiction", "Thriller",
 ];
 
 
@@ -211,6 +211,8 @@ export default function PreferencesModal({ preferences, onUpdate, onClose, mode 
             Leave empty for all genres.
           </p>
         </Section>
+
+
 
         {/* Classics toggle — shown in recommendations mode or default (not onboarding) */}
         {mode !== "onboarding" && (

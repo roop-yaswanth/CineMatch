@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import dynamic from "next/dynamic";
 import {
   apiGetHistory,
+  isSessionExpiredError,
   languageLabel,
   apiRecommendationAction,
   readHistoryCache,
@@ -33,41 +34,27 @@ type HistoryListItem = HistoryItem & { genres?: string[] };
 
 const RATING_CONFIG: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
   like: {
-    label: "Liked",
-    color: "var(--color-like)",
-    icon: (
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
-      </svg>
-    ),
+    label: "Loved",
+    color: "#f59e0b",
+    icon: <span style={{ fontSize: "13px", lineHeight: 1 }}>😍</span>,
   },
   okay: {
-    label: "Okay",
-    color: "var(--color-okay)",
-    icon: (
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z" />
-        <path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" />
-      </svg>
-    ),
+    label: "Liked",
+    color: "#3b82f6",
+    icon: <span style={{ fontSize: "13px", lineHeight: 1 }}>😀</span>,
   },
   dislike: {
     label: "Disliked",
-    color: "var(--color-dislike)",
-    icon: (
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10z" />
-        <path d="M17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17" />
-      </svg>
-    ),
+    color: "#ef4444",
+    icon: <span style={{ fontSize: "13px", lineHeight: 1 }}>🙁</span>,
   },
   not_watched: {
     label: "Skipped",
     color: "var(--color-text-muted)",
     icon: (
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-        <polyline points="13 17 18 12 13 7" />
-        <polyline points="6 17 11 12 6 7" />
+        <polygon points="5 4 15 12 5 20 5 4" fill="currentColor" />
+        <line x1="19" y1="5" x2="19" y2="19" />
       </svg>
     ),
   },
@@ -76,8 +63,7 @@ const RATING_CONFIG: Record<string, { label: string; color: string; icon: React.
     color: "var(--color-accent)",
     icon: (
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-        <line x1="12" y1="5" x2="12" y2="19" />
-        <line x1="5" y1="12" x2="19" y2="12" />
+        <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
       </svg>
     ),
   },
@@ -85,8 +71,8 @@ const RATING_CONFIG: Record<string, { label: string; color: string; icon: React.
 
 const INTERACTION_FILTERS: Array<{ value: InteractionFilter; label: string }> = [
   { value: "all", label: "All" },
-  { value: "like", label: "Liked" },
-  { value: "okay", label: "Okay" },
+  { value: "like", label: "Loved" },
+  { value: "okay", label: "Liked" },
   { value: "dislike", label: "Disliked" },
   { value: "not_watched", label: "Skipped" },
   { value: "watchlist", label: "Watchlist" },
@@ -108,11 +94,6 @@ function toDetailMovie(item: HistoryListItem): DetailMovie {
 export default function YourLikesView({ sessionId, onClose, initialFilter = "all" }: Props) {
   const { logout } = useSession();
   const router = useRouter();
-  // Stale-while-revalidate: if we have ANY cached items at all, paint them
-  // immediately and skip the skeleton state. The background refetch below
-  // ALWAYS runs and reconciles silently. Only show skeletons when the user
-  // is genuinely cold (no cache) — that's the "slow first time" case we
-  // can't avoid without a server-side prefetch.
   const [cachedItems] = useState<HistoryListItem[]>(() => readHistoryCache<HistoryListItem>(sessionId) ?? []);
   const [items, setItems] = useState<HistoryListItem[]>(cachedItems);
   const [loading, setLoading] = useState(cachedItems.length === 0);
@@ -122,6 +103,7 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
   const [interactionFilter, setInteractionFilter] = useState<InteractionFilter>(initialFilter);
   const [genreFilter, setGenreFilter] = useState<string>("all");
   const [languageFilter, setLanguageFilter] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState<string>("");
 
   useEffect(() => {
     /* eslint-disable-next-line react-hooks/set-state-in-effect */
@@ -130,12 +112,6 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
   // We don't watch searchParams here since it's passed from parent as initialFilter
 
   useEffect(() => {
-    // Always reconcile against the server on mount. Skipping this when the
-    // cache looked "fresh" left movies added to the watchlist elsewhere
-    // (dashboard hero/card "+", search, detail modal) invisible here for up
-    // to 5 minutes — those surfaces mutate server-side history without
-    // touching this localStorage cache. With cached items painted above,
-    // the refetch is invisible (no skeleton flash).
     let cancelled = false;
     apiGetHistory(sessionId)
       .then((data) => {
@@ -143,12 +119,18 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
         setItems(data);
         writeHistoryCache(sessionId, data);
       })
-      .catch(console.error)
+      .catch((err) => {
+        if (isSessionExpiredError(err)) {
+          logout();
+          return;
+        }
+        console.error(err);
+      })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
-  }, [sessionId]);
+  }, [logout, sessionId]);
 
   // Extract unique genres and languages from items
   const { genres, languages } = useMemo(() => {
@@ -186,6 +168,18 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
       filtered = filtered.filter((item) => item.rating === interactionFilter);
     }
 
+    // Search query filter (scoped specifically to watchlist or current collection)
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      filtered = filtered.filter((item) => {
+        const titleMatch = item.title?.toLowerCase().includes(q);
+        const genreMatch =
+          item.genres?.some((g) => g.toLowerCase().includes(q)) ||
+          item.primary_genre?.toLowerCase().includes(q);
+        return Boolean(titleMatch || genreMatch);
+      });
+    }
+
     // Genre filter
     if (genreFilter !== "all") {
       filtered = filtered.filter((item) => {
@@ -205,7 +199,7 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
     }
 
     return filtered;
-  }, [items, interactionFilter, genreFilter, languageFilter]);
+  }, [items, interactionFilter, searchQuery, genreFilter, languageFilter]);
 
   return (
     <>
@@ -224,15 +218,145 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
           onBack={onClose}
           hideBackButton={!onClose}
           backAriaLabel="Go back"
+          showSearchButton={false}
           title={
             <span style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}>
-              Your Collection
+              {interactionFilter === "watchlist" ? "Watchlist" : "Your Collection"}
             </span>
           }
           rightSlot={
-            <MobileMenu onLogout={() => { logout(); router.replace("/login"); }} />
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              {/* Desktop In-Watchlist Search Input */}
+              <div
+                className="desktop-only"
+                style={{
+                  position: "relative",
+                  display: "flex",
+                  alignItems: "center",
+                  minWidth: "220px",
+                }}
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="rgba(255, 255, 255, 0.45)"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  style={{ position: "absolute", left: "12px", pointerEvents: "none" }}
+                  aria-hidden
+                >
+                  <circle cx="11" cy="11" r="8" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder={interactionFilter === "watchlist" ? "Search watchlist…" : "Search collection…"}
+                  className="dash-search"
+                  style={{
+                    width: "100%",
+                    padding: "8px 28px 8px 34px",
+                    borderRadius: "10px",
+                    border: searchQuery.trim() ? "1px solid rgba(255, 255, 255, 0.32)" : "1px solid rgba(255, 255, 255, 0.12)",
+                    background: searchQuery.trim() ? "rgba(255, 255, 255, 0.10)" : "rgba(255, 255, 255, 0.06)",
+                    color: "#ffffff",
+                    fontSize: "13px",
+                    outline: "none",
+                  }}
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    aria-label="Clear search"
+                    style={{
+                      position: "absolute",
+                      right: "8px",
+                      background: "transparent",
+                      border: "none",
+                      color: "rgba(255, 255, 255, 0.6)",
+                      cursor: "pointer",
+                      fontSize: "12px",
+                      padding: "2px 4px",
+                    }}
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+              <MobileMenu onLogout={() => { logout(); router.replace("/login"); }} />
+            </div>
           }
         />
+
+        {/* Mobile Search Input — Square shape, placed at the top */}
+        <div
+          className="mobile-only"
+          style={{
+            padding: "8px var(--s-header-x) 4px",
+            position: "relative",
+          }}
+        >
+          <div style={{ position: "relative", width: "100%" }}>
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="rgba(255, 255, 255, 0.45)"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}
+              aria-hidden
+            >
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={interactionFilter === "watchlist" ? "Search watchlist…" : "Search collection…"}
+              style={{
+                width: "100%",
+                padding: "8px 28px 8px 34px",
+                borderRadius: "10px",
+                border: searchQuery.trim() ? "1px solid rgba(255, 255, 255, 0.32)" : "1px solid rgba(255, 255, 255, 0.12)",
+                background: searchQuery.trim() ? "rgba(255, 255, 255, 0.10)" : "rgba(255, 255, 255, 0.06)",
+                color: "#ffffff",
+                fontSize: "13px",
+                outline: "none",
+                boxSizing: "border-box",
+              }}
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                aria-label="Clear search"
+                style={{
+                  position: "absolute",
+                  right: "8px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  background: "transparent",
+                  border: "none",
+                  color: "rgba(255, 255, 255, 0.6)",
+                  cursor: "pointer",
+                  fontSize: "12px",
+                  padding: "4px",
+                }}
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        </div>
 
         {/* Streamlined Filter Bar — Sleek horizontal scroll strip */}
         <div
@@ -248,6 +372,7 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
             background: "var(--color-bg)",
           }}
         >
+
           {/* Interaction filter pills */}
           <div
             className="interaction-pills"
@@ -393,6 +518,28 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
 
           {!loading && filteredItems.length === 0 && (
             (() => {
+              if (searchQuery.trim()) {
+                return (
+                  <EmptyState
+                    title="No matching movies"
+                    description={`No titles matching "${searchQuery}" found in your ${interactionFilter === "watchlist" ? "watchlist" : "collection"}.`}
+                    cta={{
+                      kind: "button",
+                      label: "Clear search",
+                      onClick: () => setSearchQuery(""),
+                    }}
+                  />
+                );
+              }
+              if (interactionFilter === "watchlist") {
+                return (
+                  <EmptyState
+                    title="Your watchlist is empty"
+                    description="Add movies to your watchlist from dashboard or explore to watch them later."
+                    cta={{ kind: "link", href: "/explore", label: "Browse Trending" }}
+                  />
+                );
+              }
               const hasFilters =
                 interactionFilter !== "all" ||
                 genreFilter !== "all" ||

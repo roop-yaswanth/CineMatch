@@ -12,7 +12,11 @@ export default function OnboardingPage() {
 
   useEffect(() => {
     if (!isLoading && !session) {
-      router.replace("/login");
+      if (typeof window !== "undefined") {
+        window.location.replace("/login");
+      } else {
+        router.replace("/login");
+      }
     }
   }, [session, isLoading, router]);
 
@@ -23,7 +27,6 @@ export default function OnboardingPage() {
 
   const handleLogout = () => {
     logout();
-    router.replace("/login");
   };
 
   if (isLoading || !session) return null;

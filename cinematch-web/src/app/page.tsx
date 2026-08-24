@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { useSession } from "@/context/SessionContext";
+import { useMounted } from "@/lib/useMounted";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
 import PosterMosaic from "@/components/PosterMosaic";
 import type { UserSession } from "@/lib/api";
@@ -35,12 +36,13 @@ const FEATURES = [
 export default function HomePage() {
   const router = useRouter();
   const { session, isLoading, updateSession } = useSession();
+  const mounted = useMounted();
 
   // Send already-logged-in users into the app; logged-out visitors stay here.
   useEffect(() => {
-    if (isLoading || !session) return;
+    if (!mounted || isLoading || !session) return;
     router.replace(session.is_returning && session.onboarding_complete ? "/dashboard" : "/onboarding");
-  }, [session, isLoading, router]);
+  }, [mounted, session, isLoading, router]);
 
   const handleLogin = (newSession: UserSession) => {
     updateSession(newSession);
@@ -48,7 +50,7 @@ export default function HomePage() {
   };
 
   // About to redirect — render nothing to avoid a flash of the landing page.
-  if (session) return null;
+  if (mounted && session) return null;
 
   return (
     <main

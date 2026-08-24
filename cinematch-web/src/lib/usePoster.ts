@@ -52,3 +52,71 @@ export function usePoster(
 
   return posterUrl(resolvedPath, size);
 }
+
+const backdropCache = new Map<number, string | null>();
+const backdropInflight = new Map<number, Promise<string | null>>();
+
+export function setBackdropCache(tmdbId: number, path: string | null): void {
+  backdropCache.set(tmdbId, path);
+}
+
+export function fetchBackdrop(tmdbId: number): Promise<string | null> {
+  const hit = backdropCache.get(tmdbId);
+  if (hit !== undefined) return Promise.resolve(hit);
+  const inflight = backdropInflight.get(tmdbId);
+  if (inflight) return inflight;
+  const p = fetch(`/api/tmdb?id=${tmdbId}`)
+    .then((res) => (res.ok ? res.json() : null))
+    .then((data): string | null => {
+      const path: string | null = data?.backdrop_path ?? null;
+      backdropCache.set(tmdbId, path);
+      return path;
+    })
+    .catch(() => {
+      // Don't poison the cache on transient failures — retry next mount.
+      return null;
+    })
+    .finally(() => backdropInflight.delete(tmdbId));
+  backdropInflight.set(tmdbId, p);
+  return p;
+}
+
+export async function prefetchBackdrops(
+  movies: Array<{ backdrop_path?: string; id: number; tmdb_id?: number }>
+): Promise<void> {
+  const missing = movies.filter((m) => !m.backdrop_path || !m.backdrop_path.trim());
+  await Promise.allSettled(
+    missing.map((m) => fetchBackdrop(m.tmdb_id ?? m.id))
+  );
+}
+
+export function useBackdrop(
+  backdropPath: string | null | undefined,
+  tmdbId: number,
+  size: "w780" | "w1280" | "original" = "original"
+): { src: string | null; loading: boolean } {
+  const initialPath = backdropPath && backdropPath.trim() ? backdropPath.trim() : null;
+  const [asyncPath, setAsyncPath] = useState<{ tmdbId: number; path: string | null }>({
+    tmdbId,
+    path: null,
+  });
+
+  const cached = backdropCache.get(tmdbId);
+  const effectivePath = initialPath || cached || (asyncPath.tmdbId === tmdbId ? asyncPath.path : null);
+
+  useEffect(() => {
+    if (initialPath || cached !== undefined) return;
+    let cancelled = false;
+    fetchBackdrop(tmdbId).then((path) => {
+      if (!cancelled) setAsyncPath({ tmdbId, path });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [initialPath, tmdbId, cached]);
+
+  return {
+    src: effectivePath ? posterUrl(effectivePath, size) : null,
+    loading: !initialPath && cached === undefined && asyncPath.tmdbId !== tmdbId,
+  };
+}

@@ -8,6 +8,8 @@ import { PersonDetailOverlay } from "./PersonDetailOverlay";
 import WatchProvidersPanel, { REGION_TO_COUNTRY } from "@/components/WatchProvidersPanel";
 import { pushBackHandler } from "@/lib/backStack";
 
+const NOW_MS = new Date().getTime();
+
 export interface DetailMovie {
   id: number;
   tmdb_id?: number;
@@ -15,6 +17,9 @@ export interface DetailMovie {
   poster_path?: string;
   backdrop_path?: string;
   year?: number | string;
+  release_date?: string | null;
+  status?: string | null;
+  certification?: string | null;
   original_language?: string;
   imdb_id?: string;
   imdb_rating?: number;
@@ -25,7 +30,7 @@ export interface DetailMovie {
   primary_genre?: string;
   overview?: string;
   director?: string;
-  runtime?: number;
+  runtime?: number | null;
   score?: number;
   reason?: string;
 }
@@ -50,6 +55,9 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
   const [writers, setWriters] = useState<CrewMember[]>([]);
   const [logoPath, setLogoPath] = useState<string | null>(null);
   const [englishPosterPath, setEnglishPosterPath] = useState<string | null>(null);
+  const [runtimeLive, setRuntimeLive] = useState<number | null>(null);
+  const [certificationLive, setCertificationLive] = useState<string | null>(null);
+  const [statusLive, setStatusLive] = useState<string | null>(null);
   const [creditsLoading, setCreditsLoading] = useState(false);
   const [trailerKey, setTrailerKey] = useState<string | null>(null);
   const [trailerLanguages, setTrailerLanguages] = useState<Array<{ lang: string; label: string; key: string }>>([]);
@@ -78,17 +86,20 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
     if (isOpen) {
       document.body.style.overflow = "hidden";
     } else {
-      document.body.style.overflow = "auto";
-      setTimeout(() => {
-        setSuccessAction(null);
-        setTrailerKey(null);
-        setTrailerLanguages([]);
-        setSelectedTrailerLang(null);
-        setTrailerFetched(false);
-        setShowTrailerPlayer(false);
-        setShowWatchProviders(false);
-        setLogoPath(null);
-      }, 0);
+      document.body.style.overflow = "";
+      /* eslint-disable react-hooks/set-state-in-effect */
+      setShowWatchProviders(false);
+      setShowTrailerPlayer(false);
+      setTrailerFetched(false);
+      setTrailerKey(null);
+      setSelectedTrailerLang(null);
+      setTrailerLanguages([]);
+      setActivePersonId(null);
+      setEnglishPosterPath(null);
+      setRuntimeLive(null);
+      setCertificationLive(null);
+      setStatusLive(null);
+      /* eslint-enable react-hooks/set-state-in-effect */
     }
     return () => {
       document.body.style.overflow = "auto";
@@ -97,7 +108,9 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
 
   // Keep a stable ref to onClose
   const onCloseRef = useRef(onClose);
-  useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   // PWA back-gesture
   useEffect(() => {
@@ -107,6 +120,7 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
   }, [isOpen]);
 
   // Fetch similar movies whenever the movie changes
+  const genresKey = Array.isArray(movie?.genres) ? movie.genres.join(",") : (movie?.primary_genre || "");
   useEffect(() => {
     const id = movie?.tmdb_id ?? movie?.id;
     if (!isOpen || !id) {
@@ -122,9 +136,6 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
     setSimilar([]);
 
     let cancelled = false;
-    // Pass seed metadata so titles that aren't in the backend catalog
-    // (Explore's live TMDB tabs, e.g. upcoming releases) still get
-    // "more like this" suggestions without a server-side TMDB lookup.
     const seedYear = movie?.year != null ? Number(movie.year) || undefined : undefined;
     apiSimilarMovies(id, sessionId ?? null, 20, {
       title: movie?.title,
@@ -133,15 +144,21 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
       lang: movie?.original_language,
       year: seedYear,
     })
-      .then((results) => { if (!cancelled) setSimilar(results); })
+      .then((results) => {
+        if (!cancelled) setSimilar(results);
+      })
       .catch((err) => {
         console.warn("Similar movies fetch failed:", err);
         if (!cancelled) setSimilar([]);
       })
-      .finally(() => { if (!cancelled) setSimilarLoading(false); });
+      .finally(() => {
+        if (!cancelled) setSimilarLoading(false);
+      });
 
-    return () => { cancelled = true; };
-  }, [movie?.id, movie?.tmdb_id, movie?.title, movie?.overview, movie?.genres, movie?.original_language, movie?.year, isOpen, sessionId]);
+    return () => {
+      cancelled = true;
+    };
+  }, [movie?.id, movie?.tmdb_id, movie?.title, movie?.overview, movie?.genres, genresKey, movie?.original_language, movie?.year, isOpen, sessionId]);
 
   // Fetch cast & crew whenever the movie changes.
   useEffect(() => {
@@ -152,12 +169,16 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
       setActivePersonId(null);
       setLogoPath(null);
       setEnglishPosterPath(null);
+      setRuntimeLive(null);
+      setCertificationLive(null);
+      setStatusLive(null);
       /* eslint-enable react-hooks/set-state-in-effect */
       return;
     }
     let cancelled = false;
     setCreditsLoading(true);
     setCast([]); setDirectors([]); setWriters([]); setLogoPath(null); setEnglishPosterPath(null);
+    setRuntimeLive(null); setCertificationLive(null); setStatusLive(null);
 
     apiCredits(id, "movie")
       .then((c) => {
@@ -167,6 +188,9 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
         setWriters(c.writers);
         setLogoPath(c.logo_path || null);
         setEnglishPosterPath(c.poster_path || null);
+        if (c.runtime) setRuntimeLive(c.runtime);
+        if (c.certification) setCertificationLive(c.certification);
+        if (c.status) setStatusLive(c.status);
       })
       .catch(() => { })
       .finally(() => { if (!cancelled) setCreditsLoading(false); });
@@ -227,15 +251,38 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
   if (!movie) return null;
 
   const preferredLanguages = session?.profile?.preferred_languages || [];
-  const filteredSimilar = similar.filter((m) => {
+
+  // Hardcoded filter logic for "More Like This" based on the current movie
+  let curatedSimilar = similar;
+  const currentRating = movie.imdb_rating || movie.vote_average || 0;
+  const isFamily = movie.genres?.some(g => g.toLowerCase() === 'family') || movie.primary_genre?.toLowerCase() === 'family';
+  const MIN_SIMILAR = 4;
+
+  if (currentRating >= 6.0) {
+    const minR = 6.0;
+    const rated = curatedSimilar.filter((m) => (m.imdb_rating || m.vote_average || 0) >= minR);
+    if (rated.length >= MIN_SIMILAR) {
+      curatedSimilar = rated;
+    }
+  }
+
+  if (isFamily) {
+    const familyPool = curatedSimilar.filter((m) => {
+      const g = m.genres || (m.primary_genre ? [m.primary_genre] : []);
+      return !g.some((x) => x.toLowerCase() === "horror");
+    });
+    if (familyPool.length >= MIN_SIMILAR) {
+      curatedSimilar = familyPool;
+    }
+  }
+
+  const filteredSimilar = curatedSimilar.filter((m) => {
     if (!filterSimilarByLang) return true;
     if (preferredLanguages.length === 0) return true;
     if (!m.original_language) return true;
     return preferredLanguages.includes(m.original_language);
   });
 
-  // English-preferred artwork once the credits payload arrives; falls back to
-  // the movie's own poster until/unless an 'en' variant exists.
   const poster = posterUrl(englishPosterPath || movie.poster_path, "w780");
   const bgImage = movie.backdrop_path
     ? `https://image.tmdb.org/t/p/w1280${movie.backdrop_path}`
@@ -249,7 +296,19 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
     : movie.imdb_rating ? movie.imdb_rating.toFixed(1)
       : movie.vote_average ? movie.vote_average.toFixed(1) : null;
   const overview = movie.overview || "No overview available.";
-  const runtime = movie.runtime ? `${Math.floor(movie.runtime / 60)}h ${movie.runtime % 60}m` : null;
+  
+  const effectiveMins =
+    movie.runtime ?? runtimeLive ?? (imdbLive?.runtime ? parseInt(imdbLive.runtime, 10) : null);
+  const runtime = effectiveMins && effectiveMins > 0 ? `${Math.floor(effectiveMins / 60)}h ${effectiveMins % 60}m` : null;
+  const certification = certificationLive || movie.certification || null;
+  const status = statusLive || movie.status || null;
+  const isUpcoming =
+    status === "Upcoming" ||
+    status === "Post Production" ||
+    status === "In Production" ||
+    status === "Planned" ||
+    (Boolean(movie.release_date) && new Date(movie.release_date!).getTime() > NOW_MS);
+
   const matchPct = movie.score !== undefined && movie.score >= 0.70 ? Math.round(movie.score * 100) : null;
   const matchColor = movie.score !== undefined && movie.score >= 0.85 ? "var(--color-success)" : "var(--color-yellow)";
   const guessedCountry = userRegion ? (REGION_TO_COUNTRY[userRegion] ?? "US") : "US";
@@ -266,16 +325,31 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
   /* ── Metadata & Title ── */
 
   const metaLine = (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", alignItems: "center", color: "rgba(255, 255, 255, 0.7)", fontSize: "14px", fontWeight: 500 }}>
-      {year && <span>{year}</span>}
-      {year && lang && <span style={{ opacity: 0.4 }}>•</span>}
+    <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", alignItems: "center", color: "rgba(255, 255, 255, 0.7)", fontSize: "13.5px", fontWeight: 500 }}>
+      {isUpcoming ? (
+        <span style={{ padding: "2px 8px", borderRadius: "999px", background: "rgba(99, 102, 241, 0.25)", border: "1px solid rgba(99, 102, 241, 0.45)", color: "#a5b4fc", fontSize: "11px", fontWeight: 700 }}>
+          Upcoming {year ? `(${year})` : ""}
+        </span>
+      ) : year ? (
+        <span>{year}</span>
+      ) : null}
+
+      {certification && (
+        <span style={{ padding: "1px 6px", borderRadius: "4px", border: "1px solid rgba(255, 255, 255, 0.25)", fontSize: "11px", fontWeight: 600, color: "rgba(255, 255, 255, 0.85)" }}>
+          {certification}
+        </span>
+      )}
+
+      {lang && <span style={{ opacity: 0.4 }}>•</span>}
       {lang && <span>{lang}</span>}
-      {(year || lang) && runtime && <span style={{ opacity: 0.4 }}>•</span>}
+
+      {runtime && <span style={{ opacity: 0.4 }}>•</span>}
       {runtime && <span>{runtime}</span>}
-      {(year || lang || runtime) && imdb && <span style={{ opacity: 0.4 }}>•</span>}
+
+      {imdb && <span style={{ opacity: 0.4 }}>•</span>}
       {imdb && (
         <span style={{ color: "#facc15", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: "4px" }}>
-          {movie.imdb_rating || imdbLive?.rating != null ? `IMDb ${imdb}` : `★ ${imdb}`}
+          ★ {imdb}
         </span>
       )}
     </div>
@@ -587,16 +661,16 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
         RATE THIS MOVIE
       </h4>
       <div style={{ display: "flex", gap: "8px" }}>
-        {rateCardButton("like", "Like", "#22c55e",
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" /></svg>)}
-        {rateCardButton("okay", "Okay", "#3b82f6",
-          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z" /><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" /></svg>)}
-        {rateCardButton("dislike", "Dislike", "#ef4444",
-          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10z" /><path d="M17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17" /></svg>)}
+        {rateCardButton("dislike", "Not for me", "#ef4444",
+          <span style={{ fontSize: "20px" }}>🙁</span>)}
+        {rateCardButton("okay", "Like", "#3b82f6",
+          <span style={{ fontSize: "20px" }}>😀</span>)}
+        {rateCardButton("like", "Love", "#f59e0b",
+          <span style={{ fontSize: "20px" }}>😍</span>)}
       </div>
       <div style={{ display: "flex", gap: "8px" }}>
         {pillAction("watchlist", "Add to Watchlist", "Added",
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /></svg>, 1.35)}
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" /></svg>, 1.35)}
         {pillAction("skip", "Skip", "Skipped",
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 4 15 12 5 20 5 4" fill="currentColor"></polygon><line x1="19" y1="5" x2="19" y2="19"></line></svg>, 1)}
       </div>

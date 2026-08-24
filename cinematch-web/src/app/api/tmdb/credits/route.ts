@@ -31,10 +31,10 @@ export async function GET(req: NextRequest) {
 
   try {
     const res = await fetch(
-      `https://api.themoviedb.org/3/${kind}/${id}?append_to_response=credits,images&include_image_language=en,null`,
+      `https://api.themoviedb.org/3/${kind}/${id}?append_to_response=credits,images,release_dates&include_image_language=en,null`,
       { headers: TMDB_HEADERS, next: { revalidate: 86400 } }
     );
-    if (!res.ok) return NextResponse.json({ cast: [], directors: [], writers: [], logo_path: null, poster_path: null });
+    if (!res.ok) return NextResponse.json({ cast: [], directors: [], writers: [], logo_path: null, poster_path: null, runtime: null, certification: null, status: null, tagline: null });
     const data = await res.json();
 
     const creditsData = data.credits || {};
@@ -67,11 +67,34 @@ export async function GET(req: NextRequest) {
     const englishPoster = posters.find((p) => p.iso_639_1 === "en") || null;
     const poster_path = englishPoster?.file_path || data.poster_path || null;
 
+    // Extract age rating / certification
+    const releaseDates = (data.release_dates?.results || []) as Array<{
+      iso_3166_1: string;
+      release_dates: Array<{ certification?: string }>;
+    }>;
+    const usRelease = releaseDates.find((r) => r.iso_3166_1 === "US") || releaseDates[0];
+    const certification = usRelease?.release_dates?.find((d) => d.certification?.trim())?.certification?.trim() || null;
+
+    const runtime = typeof data.runtime === "number" && data.runtime > 0 ? data.runtime : null;
+    const status = data.status || null;
+    const tagline = data.tagline || null;
+
     return NextResponse.json(
-      { cast, directors, writers, logo_path, logo_aspect_ratio, poster_path },
+      {
+        cast,
+        directors,
+        writers,
+        logo_path,
+        logo_aspect_ratio,
+        poster_path,
+        runtime,
+        certification,
+        status,
+        tagline,
+      },
       { headers: tmdbCacheHeaders(86400) }
     );
   } catch {
-    return NextResponse.json({ cast: [], directors: [], writers: [], logo_path: null, poster_path: null });
+    return NextResponse.json({ cast: [], directors: [], writers: [], logo_path: null, poster_path: null, runtime: null, certification: null, status: null, tagline: null });
   }
 }

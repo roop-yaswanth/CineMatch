@@ -15,6 +15,32 @@ export class ServerSleepingError extends Error {
   }
 }
 
+export class SessionExpiredError extends Error {
+  isSessionExpired = true;
+  constructor(message = "Your session has expired. Please sign in again.") {
+    super(message);
+    this.name = "SessionExpiredError";
+    Object.setPrototypeOf(this, SessionExpiredError.prototype);
+  }
+}
+
+/** Robust session-expired error checker matching typed errors, duck-typed properties, and error message patterns. */
+export function isSessionExpiredError(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const e = err as Record<string, unknown>;
+  if (e.isSessionExpired === true) return true;
+  if (typeof e.name === "string" && e.name === "SessionExpiredError") return true;
+  const msg = typeof e.message === "string" ? e.message : "";
+  return (
+    msg.includes("Session not found") ||
+    msg.includes("session not found") ||
+    msg.includes("Session expired") ||
+    msg.includes("session has expired") ||
+    msg.includes("session expired") ||
+    msg.includes("Invalid session")
+  );
+}
+
 export interface RequestOptions extends RequestInit {
   retries?: number;
   retryDelay?: number;
@@ -63,6 +89,31 @@ async function request<T>(
           }
           throw new ServerSleepingError();
         }
+
+        const isSessionDead =
+          (res.status === 404 && (
+            text.includes("Session not found") ||
+            text.includes("session not found") ||
+            text.includes("Session expired") ||
+            text.includes("session expired")
+          )) ||
+          (res.status === 401 && (
+            text.includes("Session expired") ||
+            text.includes("session expired") ||
+            text.includes("Invalid Google credential") ||
+            text.includes("Invalid token issuer") ||
+            text.includes("Unauthorized") ||
+            text.includes("Not authenticated")
+          ));
+
+        if (isSessionDead) {
+          if (typeof window !== "undefined") {
+            try {
+              window.dispatchEvent(new CustomEvent("cinematch:session_expired"));
+            } catch { /* ignore */ }
+          }
+          throw new SessionExpiredError(`API ${res.status}: ${text}`);
+        }
         throw new Error(`API ${res.status}: ${text}`);
       }
       return res.json();
@@ -74,7 +125,10 @@ async function request<T>(
         continue;
       }
 
-      if (err instanceof ServerSleepingError) {
+      if (err instanceof ServerSleepingError || (err && typeof err === "object" && "isServerSleeping" in err)) {
+        throw err;
+      }
+      if (isSessionExpiredError(err)) {
         throw err;
       }
       if (err instanceof DOMException && err.name === "AbortError") {
@@ -107,6 +161,9 @@ export interface Movie {
   imdb_rating?: number;
   imdb_id?: string;
   runtime?: number;
+  release_date?: string | null;
+  status?: string | null;
+  certification?: string | null;
 }
 
 export interface UserProfile {
@@ -116,12 +173,15 @@ export interface UserProfile {
   include_classics?: boolean;
   age_group?: string;
   region?: string;
+  name?: string;
 }
 
 export interface UserSession {
   session_id: string;
   user_id: string;
   identifier: string;
+  name?: string;
+  picture?: string;
   is_returning: boolean;
   profile: UserProfile;
   onboarding_complete: boolean;
@@ -130,9 +190,6 @@ export interface UserSession {
   onboarding_likes: number;
   min_likes_needed: number;
   has_recommendations: boolean;
-  // Server-signed, expiring token used to re-establish this session on later
-  // visits (see apiAuthRefresh) — issued by Google sign-in, not forgeable from
-  // a bare email. Persisted with the session; never sent anywhere but our API.
   auth_token?: string;
 }
 
@@ -163,6 +220,9 @@ export interface Recommendation {
   vote_count?: number;
   runtime?: number;
   primary_genre?: string;
+  release_date?: string | null;
+  status?: string | null;
+  certification?: string | null;
 }
 
 export interface RecommendationPage {
@@ -668,7 +728,7 @@ export async function apiSimilarMovies(
 ): Promise<Recommendation[]> {
   const key = `${tmdbId}:${sessionId ?? "anon"}:${n}`;
   const cached = similarCache.get(key);
-  if (cached) return cached;
+  if (cached && cached.length > 0) return cached;
   const inflight = similarInflight.get(key);
   if (inflight) return inflight;
   const p = (async () => {
@@ -680,14 +740,36 @@ export async function apiSimilarMovies(
       if (meta?.genres?.length) params.set("genres", meta.genres.join(","));
       if (meta?.lang) params.set("lang", meta.lang);
       if (meta?.year) params.set("year", String(meta.year));
-      const data = await request<{ results: Recommendation[] }>(
-        `/api/movies/similar?${params.toString()}`
-      );
-      const results = data.results ?? [];
-      similarCache.set(key, results);
-      if (similarCache.size > SIMILAR_CACHE_MAX) {
-        const oldest = similarCache.keys().next().value;
-        if (oldest !== undefined) similarCache.delete(oldest);
+
+      let results: Recommendation[] = [];
+      try {
+        const data = await request<{ results: Recommendation[] }>(
+          `/api/movies/similar?${params.toString()}`
+        );
+        results = data.results ?? [];
+      } catch {
+        /* Fall back to live TMDB recommendations below */
+      }
+
+      // If backend returned empty (e.g. newly announced 2026 title, uncataloged Explore movie, or timeout):
+      if (results.length === 0 && tmdbId) {
+        try {
+          const tmdbRes = await fetch(`/api/tmdb/recommendations?id=${tmdbId}`);
+          if (tmdbRes.ok) {
+            const tmdbData = await tmdbRes.json();
+            results = tmdbData.results ?? [];
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+
+      if (results.length > 0) {
+        similarCache.set(key, results);
+        if (similarCache.size > SIMILAR_CACHE_MAX) {
+          const oldest = similarCache.keys().next().value;
+          if (oldest !== undefined) similarCache.delete(oldest);
+        }
       }
       return results;
     } finally {
@@ -713,6 +795,9 @@ export interface ExploreMovie {
   original_title?: string;
   year?: number;
   release_date?: string | null;
+  status?: string | null;
+  runtime?: number | null;
+  certification?: string | null;
   poster_path?: string;
   backdrop_path?: string;
   overview?: string;
@@ -787,6 +872,10 @@ export interface CreditsResponse {
   logo_aspect_ratio?: number | null;
   /** English-preferred poster path (falls back to the default primary poster). */
   poster_path?: string | null;
+  runtime?: number | null;
+  certification?: string | null;
+  status?: string | null;
+  tagline?: string | null;
 }
 
 export interface PersonCredit {
@@ -865,11 +954,11 @@ export async function apiCredits(tmdbId: number, kind: "movie" | "tv" = "movie")
  * so the modal opens with data ready. Safe to call repeatedly — both targets
  * dedupe in-flight requests.
  */
-export function prefetchMovieDetails(tmdbId: number): void {
+export function prefetchMovieDetails(tmdbId: number, meta?: SimilarSeedMeta): void {
   if (!tmdbId) return;
   // No await: we just want the underlying cache to fill in the background.
   void apiCredits(tmdbId, "movie").catch(() => { });
-  void apiSimilarMovies(tmdbId, null, 20).catch(() => { });
+  void apiSimilarMovies(tmdbId, null, 20, meta).catch(() => { });
 }
 
 export interface TmdbGenre { id: number; name: string }

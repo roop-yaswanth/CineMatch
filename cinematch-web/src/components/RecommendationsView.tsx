@@ -3,38 +3,31 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
-  useSyncExternalStore,
 } from "react";
 import { useRouter } from "next/navigation";
-
-function useMounted(): boolean {
-  return useSyncExternalStore(
-    () => () => { },
-    () => true,
-    () => false
-  );
-}
 
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 
-
-
-import BackButton from "@/components/ui/BackButton";
-import HeroFeature from "@/components/dashboard/HeroFeature";
-import { PosterInfo, PosterRatingBadge } from "@/components/MovieCard";
-import AppFooter from "@/components/AppFooter";
+import HeroCarousel from "@/components/dashboard/HeroCarousel";
+import { ShelfRow, type QuickAction } from "@/components/dashboard/ShelfRow";
+import CollectionOverlay, { type Collection } from "@/components/dashboard/CollectionOverlay";
+import { buildShelves, type Shelf } from "@/components/dashboard/shelves";
+import EmptyState from "@/components/ui/EmptyState";
 import { toast } from "@/components/ui/Toast";
 import { useSession } from "@/context/SessionContext";
 import type { DetailMovie } from "@/components/modals/MovieDetailModal";
+import { prefetchBackdrops } from "@/lib/usePoster";
 
 import MobileMenu, { DesktopNavTabs } from "@/components/MobileMenu";
 import {
   apiMultiRecommendations,
   apiRecommendationAction,
   invalidateHistoryCache,
+  isSessionExpiredError,
   languageLabel,
   prefetchPosters,
   preferencesFromProfile,
@@ -44,8 +37,7 @@ import {
   type RecommendationPreferences,
   type UserSession,
 } from "@/lib/api";
-import { usePoster } from "@/lib/usePoster";
-import { pushBackHandler } from "@/lib/backStack";
+import { useMounted } from "@/lib/useMounted";
 import MovieDetailModal from "@/components/modals/MovieDetailModal";
 
 interface Props {
@@ -113,7 +105,7 @@ function partitionFromBuckets(
     result.push({
       id: "matched",
       label: matchedLabel ? `${matchedLabel} Cinema` : "Regional Favorites",
-      subtitle: "Best from your preferred languages.",
+      subtitle: "",
       movies,
     });
   }
@@ -122,7 +114,7 @@ function partitionFromBuckets(
     result.push({
       id: "hollywood",
       label: "Hollywood",
-      subtitle: "Handpicked from your taste profile.",
+      subtitle: "",
       movies: english || [],
     });
   }
@@ -131,7 +123,7 @@ function partitionFromBuckets(
     result.push({
       id: "other",
       label: "Global Cinema",
-      subtitle: "Hidden gems across cultures — curated by plot similarity.",
+      subtitle: "",
       movies: globalMovies || [],
     });
   }
@@ -206,11 +198,11 @@ export default function RecommendationsView({
   const [loading, setLoading] = useState(!hadCache);
   const [initialLoad, setInitialLoad] = useState(!hadCache);
 
-  const [activeStack, setActiveStack] = useState<StackId | null>(null);
-  // Seeded from the session profile at mount, then kept in sync by the
-  // preference-change effect below: when the user saves new preferences in
-  // the overlay modal (SessionContext updates session.profile optimistically),
-  // this view regenerates the whole slate against the new taste profile.
+  // Track the OPEN shelf by id, not by snapshot: the collection is derived
+  // from live shelves below, so a skip/like inside the detail modal (which
+  // removes the movie from stacks) updates the overlay grid in real time
+  const [activeCollectionId, setActiveCollectionId] = useState<string | null>(null);
+
   const [preferences, setPreferences] = useState<RecommendationPreferences>(
     () => preferencesFromProfile(session.profile)
   );
@@ -227,6 +219,7 @@ export default function RecommendationsView({
 
   const [isUpdating, setIsUpdating] = useState(false);
   const [headerHidden, setHeaderHidden] = useState(false);
+  const [scrollProgress, setScrollProgress] = useState(0);
 
   useEffect(() => {
     let lastY = window.scrollY;
@@ -237,6 +230,8 @@ export default function RecommendationsView({
       requestAnimationFrame(() => {
         const y = window.scrollY;
         const dy = y - lastY;
+        const max = document.documentElement.scrollHeight - window.innerHeight;
+        setScrollProgress(max > 40 ? Math.min(y / max, 1) : 0);
         if (Math.abs(dy) > 6) {
           if (y < 60) setHeaderHidden(false);
           else if (dy > 0) setHeaderHidden(true);
@@ -352,11 +347,7 @@ export default function RecommendationsView({
   );
 
   const silentRefreshInFlight = useRef(false);
-  // Monotonically increasing token stamped on every silentRefresh call.
-  // The handler discards a response whose token is older than the current
-  // value — without this guard, a slow batch landing after the user has
-  // already kept tapping (which advances stacks state) silently overwrites
-  // the fresher state with stale data.
+
   const silentRefreshToken = useRef(0);
   const silentRefresh = useCallback(async (prefs: RecommendationPreferences) => {
     if (silentRefreshInFlight.current) return;
@@ -400,11 +391,15 @@ export default function RecommendationsView({
       applyBucketResponse(resp, prefs);
       if (resp.session) onSessionUpdate(resp.session);
     } catch (err) {
+      if (isSessionExpiredError(err)) {
+        onLogout();
+        return;
+      }
       console.error("[silentRefresh] Failed:", err);
     } finally {
       silentRefreshInFlight.current = false;
     }
-  }, [applyBucketResponse, onSessionUpdate, session.session_id]);
+  }, [applyBucketResponse, onLogout, onSessionUpdate, session.session_id]);
 
   // Monotonic token for generate(). Preference saves can now trigger a
   // regeneration while a previous one is still in flight; without this
@@ -421,7 +416,7 @@ export default function RecommendationsView({
         setIsUpdating(true);
       } else {
         setLoading(true);
-        setActiveStack(null);
+        setActiveCollectionId(null);
         setStacks([]);
         setMovies([]);
         bucketCacheRef.current = EMPTY_CACHE();
@@ -457,10 +452,6 @@ export default function RecommendationsView({
         if (myToken !== generateTokenRef.current) return;
 
         if (autoRerun) {
-          // Keep current stacks visible — the user may still be browsing
-          // movies they haven't acted on. Replace the cache entirely with
-          // fresh taste-profile-aware results so the NEXT movie pulled in
-          // after a swipe comes from the updated batch.
           const filterFresh = (arr: Recommendation[]) =>
             applyFilters(
               arr.filter((m) => !seenIdsRef.current.has(recommendationId(m))),
@@ -486,21 +477,12 @@ export default function RecommendationsView({
             }
           }
           const newReg = filterFresh(regionalMerged);
-
-          // REPLACE cache with fresh taste-profile-aware results.
-          // Old cache items were ranked by the pre-rerun taste profile
-          // and sat at the front of the queue — new items were stuck at
-          // the back and never reached the user. Now fresh results go
-          // directly to the front.
           bucketCacheRef.current = {
             hollywood: newEn,
             matched: newReg,
             other: newGlob,
           };
 
-          // Persist to localStorage so a dashboard remount doesn't lose
-          // the freshly-fetched recs (the write effect only fires on
-          // stacks/movies changes, not cache-only mutations).
           writeRecsCache(session.user_id, {
             stacks: stacksRef.current,
             movies: moviesRef.current,
@@ -515,6 +497,10 @@ export default function RecommendationsView({
           if (resp.session) onSessionUpdate(resp.session);
         }
       } catch (err) {
+        if (isSessionExpiredError(err)) {
+          onLogout();
+          return;
+        }
         console.error(err);
         const msg = err instanceof Error ? err.message : "";
         if (
@@ -541,6 +527,7 @@ export default function RecommendationsView({
     [
       applyBucketResponse,
       applyFilters,
+      onLogout,
       onSessionUpdate,
       preferences,
       session.session_id,
@@ -572,12 +559,7 @@ export default function RecommendationsView({
     });
   }, [stacks, movies, session.user_id]);
 
-  // Undo for a freshly added watchlist entry. Sends "clear", which erases the
-  // stored feedback server-side instead of overwriting it — the old approach
-  // ("remove") left an entry behind that resurfaced in Your Collection as a
-  // phantom "Skipped" row. When the original card object + its stack are
-  // provided, the card is also restored to the front of its rail, undoing the
-  // optimistic removal instead of silently losing the recommendation.
+
   const undoWatchlistAdd = useCallback(
     (tmdbId: number, opts?: { movie?: Recommendation | null; stackId?: StackId | null }) => {
       apiRecommendationAction(session.session_id, tmdbId, "clear")
@@ -597,9 +579,12 @@ export default function RecommendationsView({
             );
           }
         })
-        .catch((err) => console.error("Undo watchlist failed:", err));
+        .catch((err) => {
+          if (isSessionExpiredError(err)) { onLogout(); return; }
+          console.error("Undo watchlist failed:", err);
+        });
     },
-    [onSessionUpdate, session.session_id]
+    [onLogout, onSessionUpdate, session.session_id]
   );
 
   const handleAction = useCallback(
@@ -631,11 +616,7 @@ export default function RecommendationsView({
         })
       );
 
-      // Per-movie dedup of the rerun counters. Re-rating the same movie
-      // (like → dislike → like) used to bump `total` three times even
-      // though it represents one piece of feedback. Track the set of
-      // tmdb_ids already counted in this refresh window — only the first
-      // action per movie contributes.
+
       const counted = countedActionsRef.current;
       const isFirstForMovie = !counted.has(tmdbId);
       if (isFirstForMovie) {
@@ -647,18 +628,13 @@ export default function RecommendationsView({
       }
 
       const { positive, negative, total } = actionCountRef.current;
-      // Match the backend thresholds (all 30). Was 10/10/10, which fired
-      // the profile rebuild after a third of the documented count.
       const shouldAutoRerun = negative >= 30 || total >= 30 || positive >= 30;
 
       if (shouldAutoRerun) {
         actionCountRef.current = { positive: 0, negative: 0, total: 0 }; countedActionsRef.current = new Set();
         setIsUpdating(true);
         try {
-          // Fire action and rerun in parallel — the action is a write
-          // that also triggers a backend pool rebuild; we don't need its
-          // response before fetching fresh multi-bucket recs. Running
-          // them concurrently halves the wall-clock wait.
+
           const actionPromise = apiRecommendationAction(session.session_id, tmdbId, action)
             .then((result) => {
               invalidateHistoryCache(session.session_id);
@@ -674,10 +650,14 @@ export default function RecommendationsView({
               }
               onSessionUpdate(result.session);
             })
-            .catch((err) => console.error("Action during rerun failed:", err));
+            .catch((err) => {
+              if (isSessionExpiredError(err)) { onLogout(); return; }
+              console.error("Action during rerun failed:", err);
+            });
           await generate(preferences, { autoRerun: true });
           await actionPromise;
         } catch (err) {
+          if (isSessionExpiredError(err)) { onLogout(); return; }
           console.error("Taste profile update failed:", err);
           try { await generate(preferences, { autoRerun: true }); } catch { setIsUpdating(false); }
         }
@@ -687,9 +667,6 @@ export default function RecommendationsView({
       apiRecommendationAction(session.session_id, tmdbId, action)
         .then((result) => {
           onSessionUpdate(result.session);
-          // This write just changed server-side history (rating or watchlist
-          // add). Drop Your Collection's cache so its next mount refetches
-          // instead of painting a snapshot that predates this action.
           invalidateHistoryCache(session.session_id);
           if (action === "watchlist") {
             toast({
@@ -701,9 +678,7 @@ export default function RecommendationsView({
               },
             });
           }
-          // Refill check. Read committed state from stacksRef instead of
-          // running side effects inside a setState updater — StrictMode can
-          // invoke updaters twice, double-firing silentRefresh.
+
           if (targetStackId) {
             const st = stacksRef.current.find(s => s.id === targetStackId);
             const cacheRemaining = bucketCacheRef.current[targetStackId]?.length || 0;
@@ -712,21 +687,14 @@ export default function RecommendationsView({
             }
           }
         })
-        .catch((err) => console.error("Recommendation action failed:", err));
+        .catch((err) => {
+          if (isSessionExpiredError(err)) { onLogout(); return; }
+          console.error("Recommendation action failed:", err);
+        });
     },
-    [generate, onSessionUpdate, preferences, session.session_id, silentRefresh, undoWatchlistAdd]
+    [generate, onLogout, onSessionUpdate, preferences, session.session_id, silentRefresh, undoWatchlistAdd]
   );
 
-  // ─── Live preference changes → regenerate with a visible loading state ───
-  // Saving in the overlay PreferencesModal updates session.profile
-  // optimistically (SessionContext), which flows back into this view as a new
-  // prop. Whenever the derived recommendation prefs differ from what this view
-  // last rendered, rebuild the entire slate against them: generate() with
-  // autoRerun=false clears stacks/movies first, so the dashboard's skeleton
-  // shimmer plays while the new slate loads. This restores the feedback loop
-  // that vanished when the old custom-event relay was removed — before this,
-  // saving preferences left the mounted dashboard showing stale rails until a
-  // manual navigate-away-and-back.
   const appliedPrefsKeyRef = useRef<string>(JSON.stringify(preferences));
   useEffect(() => {
     const nextPrefs = preferencesFromProfile(session.profile);
@@ -737,985 +705,275 @@ export default function RecommendationsView({
     void generate(nextPrefs);
   }, [session.profile, generate]);
 
+
+  const { shelves, heroMovies } = useMemo(() => buildShelves(stacks, preferences), [stacks, preferences]);
+
+  // Eagerly prefetch horizontal backdrops for the Hero Carousel
+  useEffect(() => {
+    if (heroMovies.length) {
+      prefetchBackdrops(heroMovies);
+    }
+  }, [heroMovies]);
+
+  const openMovieDetail = useCallback(
+    (m: Recommendation) => setActiveMovie(toDetailMovie(m)),
+    []
+  );
+
+  const activeCollection = useMemo<Collection | null>(() => {
+    if (!activeCollectionId) return null;
+    const shelf = shelves.find((s) => s.id === activeCollectionId);
+    if (!shelf || shelf.movies.length === 0) return null;
+    return {
+      id: shelf.id,
+      title: shelf.title,
+      subtitle: shelf.subtitle,
+      movies: shelf.fullMovies ?? shelf.movies,
+    };
+  }, [activeCollectionId, shelves]);
+
+  const openShelfCollection = useCallback((shelf: Shelf) => {
+    setActiveCollectionId(shelf.id);
+  }, []);
+
+  // Shelf cards expose only like/watchlist; the wider RecommendationAction
+  // union on handleAction makes it directly assignable here.
+  const handleQuickAction = useCallback(
+    (movie: Recommendation, action: QuickAction) => {
+      void handleAction(movie, action);
+    },
+    [handleAction]
+  );
+
+
+  const showSkeleton = loading && movies.length === 0;
+  const showEmpty = !loading && movies.length === 0;
+  const scrolled = scrollProgress > 0.002;
+
+  const accountMenu = (
+    <MobileMenu
+      onLogout={onLogout}
+      onReset={onBackToOnboarding}
+      onPreferences={openPrefs}
+      onYourLikes={openYourLikes}
+      onWatchlist={openWatchlist}
+    />
+  );
+
   return (
     <div
+      className="dash-root"
       style={{
-        // Fill the viewport exactly and own scroll inside this container.
-        // Body scroll is locked at the dashboard page level (so the global
-        // footer can't slide up *behind* the fixed swipe cards), so all
-        // vertical scrolling for rails / extra content has to happen in
-        // here instead.
-        height: "100dvh",
+        minHeight: "100dvh",
         display: "flex",
         flexDirection: "column",
         fontFamily: "var(--font-sans)",
-        width: "100%",
-        // Note: don't use 100vw here — vw units don't scale with html { zoom },
-        // so on desktop the page would only fill 85% of physical viewport.
-        // width: 100% inherits correctly from the zoomed html element.
-        maxWidth: "100%",
-        overflowX: "hidden",
-        overflowY: "auto",
-        WebkitOverflowScrolling: "touch",
-        position: "relative",
-        background: "var(--color-bg)",
       }}
     >
-      <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", minHeight: "100dvh" }}>
-        {/* Main Page Content Wrapper — Fades out when Detail View opens */}
+      <header
+        className={`dash-topbar${scrolled ? " is-scrolled" : ""}`}
+        style={{
+          transform: headerHidden ? "translateY(-110%)" : "translateY(0)",
+        }}
+      >
         <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            flex: 1,
-            opacity: activeStack ? 0 : 1,
-            transition: "opacity 0.25s ease",
-            pointerEvents: activeStack ? "none" : "auto",
-          }}
-        >
-
-
-
-          {/* Header (Desktop only) */}
-          <header
-            className="glass dashboard-header"
-            style={{
-              position: "sticky",
-              top: 0,
-              zIndex: 40,
-              transform: headerHidden ? "translateY(-105%)" : "translateY(0)",
-              transition: "transform 280ms cubic-bezier(0.4, 0, 0.2, 1)",
-            }}
+          className="dash-topbar-progress"
+          style={{ transform: `scaleX(${scrollProgress})` }}
+          aria-hidden
+        />
+        <div className="dash-topbar-inner">
+          <h1
+            className="heading-display dash-brand"
+            onClick={() => router.push("/dashboard")}
           >
-            <div
-              className="dashboard-header-bar"
-              style={{
-                width: "100%",
-                padding: "12px 16px 12px",
-                display: "flex",
-                alignItems: "center",
-                position: "relative",   // needed for absolute title centering
-              }}
+            CineMatch
+          </h1>
+
+          <span className="desktop-only dash-topbar-nav">
+            <DesktopNavTabs onPreferences={openPrefs} onWatchlist={openWatchlist} />
+          </span>
+
+          <div className="dash-topbar-right">
+            <button
+              type="button"
+              className="dash-search desktop-only"
+              onClick={() => router.push("/search")}
             >
-              {/* Left: Brand logo title */}
-              <div style={{ flex: 1, display: "flex", alignItems: "center" }}>
-                <h1
-                  className="heading-display header-title-brand"
-                  style={{
-                    fontSize: "21px",
-                    fontWeight: 700,
-                    letterSpacing: "-0.035em",
-                    background: "linear-gradient(180deg, #ffffff 0%, #a0a0a0 100%)",
-                    WebkitBackgroundClip: "text",
-                    WebkitTextFillColor: "transparent",
-                    backgroundClip: "text",
-                    margin: 0,
-                    whiteSpace: "nowrap",
-                    cursor: "pointer",
-                  }}
-                  onClick={() => router.push("/dashboard")}
-                >
-                  CineMatch
-                </h1>
-              </div>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              Search movies…
+            </button>
+            {accountMenu}
+          </div>
+        </div>
+      </header>
 
-              {/* Center: Desktop Navigation Bar */}
-              <DesktopNavTabs onPreferences={openPrefs} onWatchlist={openWatchlist} />
-
-              {/* Right: search + user account menu */}
-              <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "8px" }}>
-                {/* Desktop mini search box */}
-                <button
-                  className="header-search-box"
-                  onClick={() => router.push("/search")}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    padding: "8px 14px 8px 12px",
-                    borderRadius: "10px",
-                    border: "1px solid rgba(255,255,255,0.12)",
-                    background: "rgba(255,255,255,0.06)",
-                    color: "rgba(255,255,255,0.45)",
-                    fontSize: "13px",
-                    cursor: "pointer",
-                    minWidth: "220px",
-                    textAlign: "left",
-                  }}
-                >
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="11" cy="11" r="8" />
-                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                  </svg>
-                  Search…
-                </button>
-
-                {/* Account menu */}
-                <MobileMenu
-                  onLogout={onLogout}
-                  onReset={onBackToOnboarding}
-                  onPreferences={openPrefs}
-                  onYourLikes={openYourLikes}
-                  onWatchlist={openWatchlist}
-                />
-              </div>
-            </div>
-            <style>{`
-              @media (max-width: 899px) {
-                .dashboard-header { display: none !important; }
-              }
-              @media (min-width: 900px) {
-                .mobile-floating-hero-menu { display: none !important; }
-              }
-            `}</style>
-          </header>
-
-          {/* Content */}
-          <div className="app-container" style={{ flex: 1, width: "100%", padding: 0 }}>
-
-            {/* Loading skeleton */}
-            {loading && movies.length === 0 && (
-              <div style={{ display: "grid", gap: "48px", padding: "24px 20px 0", position: "relative" }}>
-                <div
-                  className="mobile-floating-hero-menu"
-                  style={{
-                    position: "absolute",
-                    top: "max(14px, calc(env(safe-area-inset-top) + 12px))",
-                    right: "16px",
-                    zIndex: 35,
-                  }}
-                >
-                  <MobileMenu
-                    onLogout={onLogout}
-                    onReset={onBackToOnboarding}
-                    onPreferences={openPrefs}
-                    onYourLikes={openYourLikes}
-                    onWatchlist={openWatchlist}
-                  />
+      {showSkeleton ? (
+        /* ── Loading skeleton — mirrors the real layout so the swap-in
+              doesn't shift the eye. ── */
+        <div aria-busy="true" aria-label="Loading recommendations">
+          <div className="skeleton-shimmer dash-hero-skel" />
+          {[0, 1, 2, 3].map((i) => (
+            <section key={i} className="shelf-section">
+              <div className="shelf-header">
+                <div>
+                  <div className="skeleton-shimmer" style={{ height: 11, width: 110, borderRadius: 999, marginBottom: 8 }} />
+                  <div className="skeleton-shimmer" style={{ height: 22, width: i === 0 ? 210 : i === 1 ? 180 : 160, borderRadius: 999 }} />
                 </div>
-                {[0, 1, 2].map((i) => (
-                  <div key={i}>
-                    <div
-                      className="skeleton-shimmer"
-                      style={{
-                        height: "18px",
-                        width: i === 0 ? "240px" : "200px",
-                        borderRadius: "999px",
-                        marginBottom: "14px",
-                      }}
-                    />
-                    <div
-                      className="hide-scrollbar"
-                      style={{
-                        display: "flex",
-                        gap: "var(--s-card-gap, 16px)",
-                        overflow: "hidden",
-                        padding: "8px 20px",
-                      }}
-                    >
-                      {Array.from({ length: 6 }).map((_, j) => (
-                        <div key={j} className="dash-skel-card">
-                          <div
-                            className="skeleton-shimmer skeleton-grain"
-                            style={{
-                              aspectRatio: "2 / 3",
-                              borderRadius: "var(--radius-poster, 14px)",
-                              marginBottom: "12px"
-                            }}
-                          />
-                          <div
-                            className="skeleton-shimmer"
-                            style={{
-                              height: "10px",
-                              width: "85%",
-                              borderRadius: "4px",
-                              marginBottom: "6px"
-                            }}
-                          />
-                          <div
-                            className="skeleton-shimmer"
-                            style={{
-                              height: "8px",
-                              width: "55%",
-                              borderRadius: "4px"
-                            }}
-                          />
-                        </div>
-                      ))}
+              </div>
+              <div className="hide-scrollbar" style={{ display: "flex", gap: "var(--s-card-gap)", overflow: "hidden", padding: "6px var(--rail-x) 16px" }}>
+                {Array.from({ length: 9 }).map((_, j) => (
+                  <div key={j} className="dash-skel-card" style={{ width: "var(--poster-w)" }}>
+                    <div className="skeleton-shimmer skeleton-grain" style={{ aspectRatio: "2 / 3", borderRadius: "var(--radius-poster)" }} />
+                    <div style={{ marginTop: 14 }}>
+                      <div className="skeleton-shimmer" style={{ height: 14, width: "85%", borderRadius: 4, marginBottom: 6 }} />
+                      <div className="skeleton-shimmer" style={{ height: 11, width: "55%", borderRadius: 4 }} />
                     </div>
                   </div>
                 ))}
               </div>
-            )}
-
-            {/* Featured hero — drawn from the top of the user's most-targeted
-                bucket (Matched if present, else Hollywood, else Global). */}
-            {!loading && stacks.length > 0 && (() => {
-              const heroStack =
-                stacks.find((s) => s.id === "matched") ??
-                stacks.find((s) => s.id === "hollywood") ??
-                stacks[0];
-              if (!heroStack || heroStack.movies.length === 0) return null;
-              return (
-                <div style={{ position: "relative", marginBottom: 8 }}>
-                  {/* Mobile floating glassy menu directly on hero banner */}
-                  <div
-                    className="mobile-floating-hero-menu"
-                    style={{
-                      position: "absolute",
-                      top: "max(14px, calc(env(safe-area-inset-top) + 12px))",
-                      right: "16px",
-                      zIndex: 35,
-                    }}
-                  >
-                    <MobileMenu
-                      onLogout={onLogout}
-                      onReset={onBackToOnboarding}
-                      onPreferences={openPrefs}
-                      onYourLikes={openYourLikes}
-                      onWatchlist={openWatchlist}
-                    />
-                  </div>
-
-                  <HeroFeature
-                    movies={heroStack.movies}
-                    onOpenDetail={(m) => setActiveMovie(toDetailMovie(m))}
-                    // Toast + Undo live inside handleAction so every watchlist
-                    // surface (hero, card "+", detail modal) behaves alike.
-                    onWatchlist={(m) => handleAction(m, "watchlist")}
-                  />
-                </div>
-              );
-            })()}
-
-            {/* Stacks
-                - "matched" stays as the big-card swipeable carousel (StackRow).
-                - "hollywood" / "other" become compact rails so users can
-                  passively browse without committing to ratings on every card. */}
-            {!loading && (
-              <div
-                style={{
-                  display: "grid",
-                  gap: "var(--s-section-gap, 36px)",
-                  paddingBottom: "var(--s-bottom-clearance)",
-                }}
-              >
-                {stacks.map((stack) => (
-                  <StackRow
-                    key={stack.id}
-                    stack={stack}
-                    disabled={loading}
-                    onAction={handleAction}
-                    onOpenDetail={() => setActiveStack(stack.id)}
-                    onMovieClick={(m) => setActiveMovie(toDetailMovie(m))}
-                  />
-                ))}
-                <AppFooter />
-              </div>
-            )}
-
-
-          </div>
-        </div>
-
-        {/* Stack detail overlay */}
-        <AnimatePresence>
-          {activeStack && stacks.find((s) => s.id === activeStack) && (
-            <StackDetailView
-              key={"detail-view-" + activeStack}
-              stack={stacks.find((s) => s.id === activeStack)!}
-              onBack={() => setActiveStack(null)}
-              onAction={handleAction}
-              onMovieClick={(m) => setActiveMovie(toDetailMovie(m))}
-              disabled={loading}
-            />
-          )}
-        </AnimatePresence>
-
-
-        {/* Updating-taste-profile indicator. Used to be a full-screen
-            blackout with a giant popcorn — that blocked the user from
-            doing anything (swipe, tap, watchlist) while a 1–3 second
-            rebuild was running. Now it's a small glass pill in the
-            bottom-left corner; the rest of the dashboard stays
-            interactive throughout the rerun. */}
-        {mounted && createPortal(
-          <AnimatePresence>
-            {isUpdating && (
-              <motion.div
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 16 }}
-                transition={{ duration: 0.22, ease: "easeOut" }}
-                role="status"
-                aria-live="polite"
-                style={{
-                  position: "fixed",
-                  // Sit in the bottom-left, well clear of the bottom-nav
-                  // pill on the right and the iOS home indicator below.
-                  left: "calc(16px + env(safe-area-inset-left))",
-                  bottom: "calc(96px + env(safe-area-inset-bottom))",
-                  zIndex: 90,
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "10px",
-                  padding: "10px 14px 10px 12px",
-                  borderRadius: "999px",
-                  background: "rgba(20, 22, 28, 0.78)",
-                  backdropFilter: "blur(28px) saturate(1.6)",
-                  WebkitBackdropFilter: "blur(28px) saturate(1.6)",
-                  border: "1px solid rgba(255,255,255,0.10)",
-                  boxShadow: "0 12px 36px rgba(0,0,0,0.45), 0 1px 0 rgba(255,255,255,0.10) inset",
-                  pointerEvents: "none",  // explicitly never block interaction
-                }}
-              >
-                <motion.span
-                  animate={{ y: [0, -3, 0] }}
-                  transition={{ repeat: Infinity, duration: 0.9, ease: "easeInOut" }}
-                  style={{ fontSize: "18px", display: "inline-flex" }}
-                >
-                  🍿
-                </motion.span>
-                <span
-                  style={{
-                    color: "white",
-                    fontSize: "13px",
-                    fontWeight: 500,
-                    letterSpacing: "-0.01em",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  Updating taste profile…
-                </span>
-              </motion.div>
-            )}
-          </AnimatePresence>,
-          document.body
-        )}
-
-
-
-        {/* Movie Details Modal */}
-        <MovieDetailModal
-          isOpen={!!activeMovie}
-          onClose={() => setActiveMovie(null)}
-          movie={activeMovie}
-          sessionId={session.session_id}
-          userRegion={session.profile?.region ?? null}
-          onAction={(action) => {
-            if (activeMovie) {
-              handleAction(activeMovie, action);
-            }
-          }}
-          onMovieSelect={(m) => setActiveMovie(m)}
-        />
-      </div>
-    </div>
-  );
-}
-
-/* ─── Stack Detail (Full-Screen Grid) ──────────── */
-
-function StackDetailView({
-  stack,
-  onBack,
-  onAction,
-  onMovieClick,
-  disabled,
-}: {
-  stack: Stack;
-  onBack: () => void;
-  onAction: (movie: Recommendation, action: RecommendationAction) => void;
-  onMovieClick: (movie: Recommendation) => void;
-  disabled: boolean;
-}) {
-  useEffect(() => {
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = originalOverflow;
-    };
-  }, []);
-
-  // Centralized back-handler: back swipe/button closes this overlay without
-  // conflicting with MovieDetailModal's own handler (they share one listener).
-  useEffect(() => {
-    const cleanup = pushBackHandler(onBack);
-    return cleanup;
-  }, [onBack]);
-
-  const content = (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: 20 }}
-      transition={{ duration: 0.25 }}
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 50,
-
-        background: "var(--color-bg)",
-        overflowY: "auto",
-        overflowX: "hidden",
-        overscrollBehavior: "none",   // prevent iOS rubber-band bounce to top pill
-      }}
-    >
-      {/* Detail header */}
-      <div
-        className="glass"
-        style={{
-          position: "sticky",
-          top: 0,
-          zIndex: 10,
-          padding: "calc(18px + env(safe-area-inset-top, 0px)) clamp(20px, 4vw, 40px) 14px",
-          display: "flex",
-          alignItems: "center",
-          gap: "14px",
-        }}
-      >
-        <BackButton onClick={onBack} />
-        <div style={{ minWidth: 0 }}>
-          <h2
-            className="heading-section"
-            style={{
-              fontSize: "20px",
-              fontWeight: 700,
-              letterSpacing: "-0.03em",
-              margin: 0,
-              color: "var(--color-text-primary)",
-            }}
-          >
-            {stack.label}
-          </h2>
-          <p style={{ fontSize: "12px", color: "var(--color-text-muted)", marginTop: "3px", fontWeight: 500, letterSpacing: "-0.005em" }}>
-            {stack.movies.length > 50
-              ? `Top 50 of ${stack.movies.length} movies`
-              : `${stack.movies.length} movie${stack.movies.length !== 1 ? "s" : ""}`}
-          </p>
-        </div>
-      </div>
-
-      {/* Grid */}
-      <div
-        className="stack-detail-grid app-container"
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))",
-          gap: "40px 20px",
-          padding: "24px clamp(20px, 4vw, 40px) 80px",
-        }}
-      >
-        <AnimatePresence initial={false}>
-          {stack.movies.slice(0, 50).map((movie, index) => (
-            <PosterCard
-              key={recommendationId(movie)}
-              movie={movie}
-              disabled={disabled}
-              onAction={onAction}
-              onClick={() => onMovieClick(movie)}
-              priority={index < 4}
-              showFullInfo
-            />
+            </section>
           ))}
-        </AnimatePresence>
-        {stack.movies.length === 0 && (
-          <p style={{ fontSize: "13px", color: "var(--color-text-muted)", gridColumn: "1 / -1" }}>
-            No movies in this category yet.
-          </p>
-        )}
-      </div>
-    </motion.div>
-  );
-
-  const mounted = useMounted();
-
-  if (!mounted) return null;
-  return createPortal(content, document.body);
-}
-
-/* ─── Stack Row — Paged Carousel ───────────────── */
-
-function StackRow({
-  stack,
-  disabled,
-  onAction,
-  onOpenDetail,
-  onMovieClick,
-}: {
-  stack: Stack;
-  disabled: boolean;
-  onAction: (movie: Recommendation, action: RecommendationAction) => void;
-  onOpenDetail: () => void;
-  onMovieClick: (movie: Recommendation) => void;
-}) {
-  const trackRef = useRef<HTMLDivElement>(null);
-  const [scrollInfo, setScrollInfo] = useState({ canLeft: false, canRight: false });
-
-  const updateScroll = useCallback(() => {
-    const t = trackRef.current;
-    if (!t) return;
-    const { scrollLeft, scrollWidth, clientWidth } = t;
-    setScrollInfo({
-      canLeft: scrollLeft > 2,
-      canRight: scrollLeft < scrollWidth - clientWidth - 2,
-    });
-  }, []);
-
-  useEffect(() => {
-    const t = trackRef.current;
-    if (!t) return;
-    t.addEventListener("scroll", updateScroll, { passive: true });
-    const ro = new ResizeObserver(updateScroll);
-    ro.observe(t);
-    updateScroll();
-    return () => {
-      t.removeEventListener("scroll", updateScroll);
-      ro.disconnect();
-    };
-  }, [updateScroll, stack.movies.length]);
-
-  const scrollBy = (dir: "left" | "right") => {
-    const t = trackRef.current;
-    if (!t) return;
-    const amount = t.clientWidth * 0.82;
-    t.scrollBy({ left: dir === "right" ? amount : -amount, behavior: "smooth" });
-  };
-
-  const { canLeft, canRight } = scrollInfo;
-
-  return (
-    <section className="stack-section" style={{ width: "100%", overflow: "hidden", position: "relative" }}>
-      {/* Stack header */}
-      <div
-        style={{
-          padding: "0 20px",
-          marginBottom: "14px",
-          display: "flex",
-          alignItems: "flex-end",
-          justifyContent: "space-between",
-          gap: "12px",
-          position: "relative",
-          zIndex: 3,
-          pointerEvents: "auto",
-        }}
-      >
-        <div
-          className="stack-name-btn"
-          onClick={(e) => { e.stopPropagation(); onOpenDetail(); }}
-          role="button"
-          tabIndex={0}
-          style={{
-            cursor: "pointer",
-            textAlign: "left",
-            padding: "4px 8px 4px 0",
-            minWidth: 0,
-            flex: 1,
-            margin: "-4px 0 -4px -4px",
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "center",
-            position: "relative",
-            zIndex: 3,
-          }}
-        >
-          <h3
-            className="heading-section"
-            style={{
-              fontSize: "clamp(1.1rem, 2.4vw, 1.35rem)",
-              fontWeight: 600,
-              letterSpacing: "-0.025em",
-              color: "var(--color-text-primary)",
-              margin: 0,
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              textTransform: "none",
-            }}
-          >
-            {stack.label}
-            <svg
-              className="chevron-icon"
-              width="14"
-              height="14"
-              viewBox="0 0 14 14"
-              fill="none"
-              aria-hidden="true"
-            >
-              <path d="M5 3L9 7L5 11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </h3>
-          {stack.subtitle && (
-            <p style={{
-              margin: "2px 0 0",
-              fontSize: "12px",
-              fontWeight: 500,
-              color: "var(--color-text-muted)",
-              letterSpacing: "-0.005em",
-            }}>
-              {stack.subtitle}
-            </p>
+        </div>
+      ) : (
+        <>
+          {!showEmpty && (
+            <HeroCarousel
+              movies={heroMovies}
+              onOpenDetail={openMovieDetail}
+              onWatchlist={(m) => handleAction(m, "watchlist")}
+              onLike={(m) => handleAction(m, "okay")}
+              onAction={(m, action) => handleAction(m, action)}
+            />
           )}
-        </div>
 
-        <button
-          type="button"
-          className="glass-pill stack-view-all-btn"
-          onClick={(e) => { e.stopPropagation(); onOpenDetail(); }}
-          style={{
-            cursor: "pointer",
-            fontSize: "12px",
-            fontWeight: 600,
-            padding: "6px 12px",
-            letterSpacing: "-0.005em",
-            flexShrink: 0,
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "4px",
-            position: "relative",
-            zIndex: 3,
-          }}
-        >
-          View All
-          <svg width="11" height="11" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-            <path d="M5 3L9 7L5 11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </button>
-      </div>
-
-      {/* Empty state */}
-      {stack.movies.length === 0 && (
-        <div style={{ padding: "32px 20px", textAlign: "center", color: "var(--color-text-muted)", fontSize: "13px" }}>
-          No movies in this category yet.
-        </div>
-      )}
-
-      {/* Carousel */}
-      {stack.movies.length > 0 && (
-        <div style={{ position: "relative" }}>
-          {/* Edge scrims */}
-          {canLeft && <div className="carousel-scrim left" />}
-          {canRight && <div className="carousel-scrim right" />}
-
-          {/* Desktop-only left chevron — hidden on touch via CSS */}
-          <button
-            className="carousel-btn carousel-btn-left"
-            onClick={() => scrollBy("left")}
-            aria-label="Previous"
-            style={{ opacity: canLeft ? 1 : 0, pointerEvents: canLeft ? "auto" : "none" }}
-          >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="15 18 9 12 15 6" />
-            </svg>
-          </button>
-
-          {/* Desktop-only right chevron */}
-          <button
-            className="carousel-btn carousel-btn-right"
-            onClick={() => scrollBy("right")}
-            aria-label="Next"
-            style={{ opacity: canRight ? 1 : 0, pointerEvents: canRight ? "auto" : "none" }}
-          >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="9 18 15 12 9 6" />
-            </svg>
-          </button>
-
-          {/* Native-scroll track */}
-          <div ref={trackRef} className="hide-scrollbar carousel-track">
-            <AnimatePresence initial={false}>
-              {stack.movies.map((movie, index) => (
-                <PosterCard
-                  key={recommendationId(movie)}
-                  movie={movie}
-                  disabled={disabled}
-                  onAction={onAction}
-                  onClick={() => onMovieClick(movie)}
-                  priority={index === 0}
-                />
-              ))}
-            </AnimatePresence>
-          </div>
-        </div>
-      )}
-    </section>
-  );
-}
-
-
-
-
-
-
-
-export function PosterCard({
-  movie,
-  disabled,
-  onAction,
-  priority = false,
-  showFullInfo = false,
-  onClick,
-}: {
-  movie: Recommendation;
-  disabled: boolean;
-  onAction: (movie: Recommendation, action: RecommendationAction) => void;
-  priority?: boolean;
-  showFullInfo?: boolean;
-  onClick?: () => void;
-}) {
-  const poster = usePoster(movie.poster_path, recommendationId(movie), "w342");
-  const backdrop = usePoster(movie.backdrop_path || movie.poster_path, recommendationId(movie), "w500");
-  const hasBackdrop = !!movie.backdrop_path;
-
-  // Expanded Hover State
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [expandPos, setExpandPos] = useState<DOMRect | null>(null);
-
-  const cardRef = useRef<HTMLDivElement>(null); // For outer article
-  const posterRef = useRef<HTMLDivElement>(null); // For the poster itself
-
-  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const hoverCloseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  const isDesktopHoverEnabled = useCallback(() => {
-    if (typeof window === "undefined") return false;
-    return window.matchMedia("(min-width: 1024px) and (hover: hover) and (pointer: fine)").matches;
-  }, []);
-
-  const measureAndExpand = useCallback(() => {
-    if (!posterRef.current) return;
-    // Anchor purely to the poster image, not the title below it
-    const rect = posterRef.current.getBoundingClientRect();
-    setExpandPos(rect);
-    setIsExpanded(true);
-  }, []);
-
-  const scheduleHoverOpen = useCallback(() => {
-    if (disabled || !isDesktopHoverEnabled()) return;
-    if (hoverCloseTimeoutRef.current) {
-      clearTimeout(hoverCloseTimeoutRef.current);
-      hoverCloseTimeoutRef.current = null;
-    }
-    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-    hoverTimeoutRef.current = setTimeout(() => {
-      measureAndExpand();
-    }, 280);
-  }, [disabled, isDesktopHoverEnabled, measureAndExpand]);
-
-  const scheduleHoverClose = useCallback((delay = 120) => {
-    if (hoverTimeoutRef.current) {
-      clearTimeout(hoverTimeoutRef.current);
-      hoverTimeoutRef.current = null;
-    }
-    if (hoverCloseTimeoutRef.current) clearTimeout(hoverCloseTimeoutRef.current);
-    hoverCloseTimeoutRef.current = setTimeout(() => {
-      setIsExpanded(false);
-      setTimeout(() => setExpandPos(null), 300);
-    }, delay);
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-      if (hoverCloseTimeoutRef.current) clearTimeout(hoverCloseTimeoutRef.current);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!isExpanded) return;
-    const hide = () => { setIsExpanded(false); setExpandPos(null); };
-    window.addEventListener("scroll", hide, true);
-    window.addEventListener("resize", hide);
-    return () => {
-      window.removeEventListener("scroll", hide, true);
-      window.removeEventListener("resize", hide);
-    };
-  }, [isExpanded]);
-
-  const lang = languageLabel(movie.original_language || "");
-  const imdb = movie.imdb_rating ? movie.imdb_rating.toFixed(1) : movie.vote_average ? movie.vote_average.toFixed(1) : null;
-  const genreList = (movie.genres && movie.genres.length > 0) ? movie.genres.slice(0, 3) : (movie.primary_genre ? [movie.primary_genre] : []);
-
-  const isActuallyExpanded = isExpanded && expandPos && isDesktopHoverEnabled();
-
-  // Portal render logic
-  let portalElement = null;
-  if (isActuallyExpanded && expandPos && typeof document !== "undefined") {
-    const zoom = parseFloat(getComputedStyle(document.documentElement).zoom || "1");
-    const s = {
-      top: expandPos.top / zoom,
-      left: expandPos.left / zoom,
-      width: expandPos.width / zoom,
-      height: expandPos.height / zoom
-    };
-
-    // Compute bounds checking limits with inverted zoom too
-    const vw = window.innerWidth / zoom;
-    const vh = window.innerHeight / zoom;
-
-    const forceHorizontal = showFullInfo;
-    const useHorizontal = forceHorizontal || hasBackdrop;
-
-    // Scale wider for aesthetic 
-    const scaleFactor = useHorizontal ? 2.0 : 1.65;
-
-    const expandedWidth = Math.max(280, s.width * scaleFactor);
-    const expandedImgHeight = useHorizontal ? (expandedWidth * 9 / 16) : (expandedWidth * 1.5);
-    const detailsHeight = 180; // Adjusted for overlap
-    const targetHeight = expandedImgHeight + detailsHeight;
-
-    // tLeft centers the width
-    let tLeft = s.left - (expandedWidth - s.width) / 2;
-    // tTop centers the ENTIRE card vertically so it doesn't hang completely down below the row!
-    let tTop = s.top - (targetHeight - s.height) / 2;
-
-    // Bounds check to keep entirely within screen
-    if (tLeft < 25) tLeft = 25;
-    if (tLeft + expandedWidth > vw - 25) tLeft = vw - expandedWidth - 25;
-    if (tTop < 25) tTop = 25;
-    if (tTop + targetHeight > vh - 25) tTop = vh - targetHeight - 25;
-
-    portalElement = createPortal(
-      <AnimatePresence>
-        {isExpanded && (
-          <motion.div
-            initial={{
-              opacity: 0,
-              top: s.top,
-              left: s.left,
-              width: s.width,
-              height: s.height,
-              borderRadius: "8px"
-            }}
-            animate={{
-              opacity: 1,
-              top: tTop,
-              left: tLeft,
-              width: expandedWidth,
-              height: targetHeight,
-              borderRadius: "16px"
-            }}
-            exit={{
-              opacity: 0,
-              top: s.top,
-              left: s.left,
-              width: s.width,
-              height: s.height,
-              borderRadius: "8px",
-              transition: { duration: 0.2, ease: "easeIn" }
-            }}
-            transition={{ type: "spring", stiffness: 380, damping: 30, mass: 0.8 }}
+          <main
+            className="app-container"
             style={{
-              position: "fixed",
-              zIndex: 999999,
-              background: "rgba(22, 22, 28, 0.85)", // Solid Frosted Glass Base
-              backdropFilter: "blur(24px) saturate(120%)", // Beautiful Blur
-              WebkitBackdropFilter: "blur(24px) saturate(120%)",
-              boxShadow: "0 30px 60px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.08) inset",
-              overflow: "hidden",
-              display: "flex",
-              flexDirection: "column",
-              cursor: "pointer",
-              pointerEvents: "auto",
+              width: "100%",
+              paddingBottom: 16,
+              position: "relative",
+              zIndex: 1,
             }}
-            onMouseEnter={() => {
-              if (hoverCloseTimeoutRef.current) clearTimeout(hoverCloseTimeoutRef.current);
-            }}
-            onMouseLeave={() => scheduleHoverClose(80)}
-            onClick={(e) => { e.stopPropagation(); setIsExpanded(false); if (onClick) onClick(); }}
           >
-            {/* The Image Header (Poster or Backdrop) */}
-            <div style={{ position: "relative", width: "100%", height: expandedImgHeight, flexShrink: 0 }}>
-              <img src={useHorizontal ? backdrop : poster} alt={movie.title} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 20%" }} />
-              <div style={{ position: "absolute", bottom: -2, left: 0, right: 0, height: "65%", background: "linear-gradient(to top, #18191c 0%, rgba(24,25,28,0.95) 20%, rgba(24,25,28,0.6) 50%, rgba(24,25,28,0) 100%)", pointerEvents: "none" }} />
-              {imdb && (
-                <div style={{ position: "absolute", top: "12px", right: "12px", padding: "4px 8px", borderRadius: "8px", background: "rgba(0,0,0,0.7)", fontSize: "11px", fontWeight: 700, color: "var(--color-rating)", display: "flex", alignItems: "center", gap: "4px", boxShadow: "0 4px 12px rgba(0,0,0,0.4)" }}>
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>
-                  {imdb}
-                </div>
-              )}
-            </div>
+            {shelves.map((shelf, i) => (
+              <ShelfRow
+                key={shelf.id}
+                shelf={shelf}
+                index={i}
+                priority={i === 0}
+                onOpenMovie={openMovieDetail}
+                onOpenShelf={openShelfCollection}
+                onQuickAction={handleQuickAction}
+              />
+            ))}
 
-            {/* The Extra Info Panel under the Image */}
-            <div style={{ marginTop: "-40px", padding: "0 18px 20px 18px", flex: 1, display: "flex", flexDirection: "column", gap: "8px", zIndex: 2, background: "transparent", overflow: "hidden" }}>
-              <h3 style={{ fontSize: "18px", fontWeight: 700, color: "#fff", margin: 0, lineHeight: 1.2, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{movie.title}</h3>
-              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", alignItems: "center" }}>
-                  <span style={{ color: "rgba(255,255,255,0.9)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "6px", padding: "2px 6px", fontSize: "10px", fontWeight: 600 }}>{movie.year || "--"}</span>
-                  <span style={{ color: "rgba(255,255,255,0.9)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "6px", padding: "2px 6px", fontSize: "10px", fontWeight: 600 }}>{lang || "Global"}</span>
-                </div>
-                {genreList.length > 0 && (
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-                    {genreList.map((g) => (
-                      <span key={g} style={{ color: "rgba(255,255,255,0.75)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "6px", padding: "2px 6px", fontSize: "10px", fontWeight: 600 }}>{g}</span>
-                    ))}
-                  </div>
-                )}
+            {showEmpty && (
+              <div style={{ padding: "10dvh var(--rail-x)" }}>
+                <EmptyState
+                  title={initialLoad ? "Warming up your slate…" : "Nothing to show right now"}
+                  description={
+                    initialLoad
+                      ? "We're assembling recommendations tuned to your taste."
+                      : "Your rails ran dry or something hiccuped upstream. A retry usually fixes it."
+                  }
+                  cta={{
+                    kind: "button",
+                    label: "Reload recommendations",
+                    onClick: () => void generate(preferences),
+                  }}
+                />
               </div>
-              {movie.overview && (
-                <p style={{ margin: "2px 0 0", fontSize: "11px", color: "rgba(255,255,255,0.65)", lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{movie.overview}</p>
-              )}
-              <div style={{ marginTop: "auto", marginBottom: "4px", display: "flex", gap: "10px", alignItems: "center" }}>
-                <button onClick={(e) => { e.stopPropagation(); if (onClick) onClick(); setIsExpanded(false); }} style={{ background: "#fff", color: "#000", border: "none", borderRadius: "100px", padding: "6px 14px", fontSize: "12px", fontWeight: 700, display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", flex: 1, justifyContent: "center" }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg> View
-                </button>
-                <button onClick={(e) => { e.stopPropagation(); onAction(movie, "watchlist"); setIsExpanded(false); }} title="Add to watchlist" aria-label="Add to watchlist" style={{ background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "50%", width: "32px", height: "32px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" /></svg>
-                </button>
-                <button onClick={(e) => { e.stopPropagation(); onAction(movie, "dislike"); setIsExpanded(false); }} title="Show me less of this" aria-label="Show me less of this" style={{ background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "50%", width: "32px", height: "32px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
-                </button>
-              </div>
-            </div>
-          </motion.div>
+            )}
+
+          </main>
+        </>
+      )}
+
+      {/* See-all overlay */}
+      <AnimatePresence>
+        {activeCollection && (
+          <CollectionOverlay
+            key={"collection-" + activeCollection.id}
+            collection={activeCollection}
+            onBack={() => setActiveCollectionId(null)}
+            onMovieClick={openMovieDetail}
+            onQuickAction={handleAction}
+          />
         )}
-      </AnimatePresence>,
-      document.body
-    );
-  }
+      </AnimatePresence>
 
+      {/* Updating-taste-profile indicator — small non-blocking glass pill;
+          the dashboard stays fully interactive during a rebuild. */}
+      {mounted && createPortal(
+        <AnimatePresence>
+          {isUpdating && (
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 16 }}
+              transition={{ duration: 0.22, ease: "easeOut" }}
+              role="status"
+              aria-live="polite"
+              style={{
+                position: "fixed",
+                left: "50%",
+                bottom: "calc(96px + env(safe-area-inset-bottom))",
+                translate: "-50% 0",
+                zIndex: 90,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "10px",
+                padding: "10px 14px 10px 12px",
+                borderRadius: "999px",
+                background: "rgba(20, 22, 28, 0.78)",
+                backdropFilter: "blur(28px) saturate(1.6)",
+                WebkitBackdropFilter: "blur(28px) saturate(1.6)",
+                border: "1px solid rgba(255,255,255,0.10)",
+                boxShadow: "0 12px 36px rgba(0,0,0,0.45), 0 1px 0 rgba(255,255,255,0.10) inset",
+                pointerEvents: "none", // explicitly never block interaction
+              }}
+            >
+              <motion.span
+                animate={{ y: [0, -3, 0] }}
+                transition={{ repeat: Infinity, duration: 0.9, ease: "easeInOut" }}
+                style={{ fontSize: "18px", display: "inline-flex" }}
+              >
+                🍿
+              </motion.span>
+              <span
+                style={{
+                  color: "white",
+                  fontSize: "13px",
+                  fontWeight: 500,
+                  letterSpacing: "-0.01em",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Updating taste profile…
+              </span>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
 
-
-  return (
-    <motion.article
-      ref={cardRef}
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.88, transition: { duration: 0.2, ease: "easeIn" } }}
-      className="poster-card"
-      style={{
-        width: "min(42vw, 165px)",
-        minWidth: "130px",
-        flexShrink: 0,
-        scrollSnapAlign: "start",
-        paddingBottom: "8px",
-        position: "relative",
-      }}
-      onMouseEnter={scheduleHoverOpen}
-      onMouseLeave={() => scheduleHoverClose(100)}
-    >
-      <div
-        style={{
-          opacity: isActuallyExpanded ? 0 : 1,
-          transition: "opacity 0.15s ease"
+      {/* Movie Details Modal */}
+      <MovieDetailModal
+        isOpen={!!activeMovie}
+        onClose={() => setActiveMovie(null)}
+        movie={activeMovie}
+        sessionId={session.session_id}
+        userRegion={session.profile?.region ?? null}
+        onAction={(action) => {
+          if (activeMovie) {
+            handleAction(activeMovie, action);
+          }
         }}
-      >
-        <div
-          ref={posterRef}
-          onClick={(e) => { e.stopPropagation(); if (onClick) onClick(); }}
-          className="poster-container"
-          style={{ position: "relative", aspectRatio: "2 / 3", borderRadius: "12px", overflow: "hidden", background: "transparent", cursor: "pointer", border: "1px solid transparent", transition: "border-color 0.22s ease" }}
-        >
-          <img src={poster} alt={movie.title} loading={priority ? "eager" : "lazy"} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
-          <PosterRatingBadge movie={movie} />
-        </div>
-        <div onClick={(e) => { e.stopPropagation(); if (onClick) onClick(); }} style={{ padding: "0 6px 12px", cursor: "pointer" }}>
-          {/* The single global under-poster treatment — same title + meta
-              block the explore grid and compact rails render. */}
-          <PosterInfo movie={movie} />
-        </div>
-      </div>
-      {portalElement}
-    </motion.article>
+        onMovieSelect={(m) => setActiveMovie(m)}
+      />
+    </div>
   );
 }

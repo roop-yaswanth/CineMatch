@@ -10,6 +10,7 @@ import {
   apiRateOnboarding,
   apiUndoOnboarding,
   apiEscapeObscure,
+  isSessionExpiredError,
   REGION_OPTIONS,
   AGE_GROUP_OPTIONS,
   preferencesFromProfile,
@@ -159,9 +160,6 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
     }
   }, []);
 
-
-
-
   const handleBuildSlate = useCallback(async () => {
     setLoading(true);
     try {
@@ -187,11 +185,15 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
         setHasInteracted(true); // suppress the in-card static hint
       }
     } catch (err) {
+      if (isSessionExpiredError(err)) {
+        onLogout();
+        return;
+      }
       console.error("Failed to build slate:", err);
     } finally {
       setLoading(false);
     }
-  }, [session.session_id, preferences]);
+  }, [onLogout, preferences, session.session_id]);
 
   const handleRate = useCallback(
     async (rating: string) => {
@@ -219,6 +221,10 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
           onComplete(result.session);
         }
       } catch (err) {
+        if (isSessionExpiredError(err)) {
+          onLogout();
+          return;
+        }
         console.error("Rating failed:", err);
       } finally {
         inFlightRef.current = false;
@@ -226,7 +232,7 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
         setOptimisticRemoved(false); // Reset to allow next card
       }
     },
-    [state, session.session_id, loading, onComplete, ratingDirection]
+    [state, session.session_id, loading, onComplete, onLogout, ratingDirection]
   );
 
   // Reset the dwell-time stopwatch each time a new card becomes visible.
@@ -243,6 +249,10 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
       const result = await apiEscapeObscure(session.session_id);
       setState(result);
     } catch (err) {
+      if (isSessionExpiredError(err)) {
+        onLogout();
+        return;
+      }
       console.error("Escape obscure failed:", err);
       setEscapeUsed(false); // allow retry on error
     } finally {
@@ -250,7 +260,7 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
       setLoading(false);
       setOptimisticRemoved(false);
     }
-  }, [loading, escapeUsed, session.session_id]);
+  }, [loading, escapeUsed, onLogout, session.session_id]);
 
   const handleUndo = useCallback(async () => {
     // Only allow undo when at least one rating has been recorded.
@@ -263,13 +273,17 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
       const result = await apiUndoOnboarding(session.session_id);
       setState(result);
     } catch (err) {
+      if (isSessionExpiredError(err)) {
+        onLogout();
+        return;
+      }
       console.error("Undo failed:", err);
     } finally {
       inFlightRef.current = false;
       setLoading(false);
       setOptimisticRemoved(false);
     }
-  }, [state?.session?.onboarding_index, loading, session.session_id]);
+  }, [state?.session?.onboarding_index, loading, onLogout, session.session_id]);
 
   useEffect(() => {
     const handleKeyboard = (e: KeyboardEvent) => {
@@ -448,7 +462,7 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
                     if (ax < 16 && ay < 16) { setCardGlow("none"); return; }
                     const op = Math.min(1, (Math.max(ax, ay) - 16) / 80);
                     const c = ax >= ay
-                      ? (x > 0 ? "48,209,88" : "255,69,58")
+                      ? (x > 0 ? "255,45,85" : "255,69,58")
                       : (y > 0 ? "245,158,11" : "148,163,184");
                     setCardGlow(`0 0 ${44 * op}px ${14 * op}px rgba(${c},${0.7 * op})`);
                   }}
@@ -499,7 +513,7 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
                           transition={{ delay: 1.2, type: "spring", stiffness: 200, damping: 20 }}
                           style={{ display: "flex", alignItems: "center", gap: "8px" }}
                         >
-                          <span style={{ fontSize: "22px" }}>👉</span>
+                          <span style={{ fontSize: "20px" }}>😀</span>
                           <span style={{ color: "var(--color-like)", fontSize: "13px", fontWeight: 600 }}>Like</span>
                         </motion.div>
 
@@ -675,10 +689,17 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
                       padding: "12px 8px",
                       fontSize: "13px",
                       fontWeight: 600,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "6px",
                     }}
                     title={`${opt.label} (${opt.shortcut})`}
                   >
-                    {opt.label}
+                    {opt.value === "like" && (
+                      <span style={{ fontSize: "15px" }}>😀</span>
+                    )}
+                    <span>{opt.label}</span>
                   </motion.button>
                 ))}
               </div>
@@ -797,7 +818,7 @@ import type { MotionValue } from "framer-motion";
 import { useMotionValueEvent } from "framer-motion";
 
 const SWIPE_CONFIGS = {
-  right: { label: "LIKE", color: "#30d158", stampTop: "28px", stampLeft: "18px", stampRotate: "-22deg" },
+  right: { label: "LIKE", color: "#ff2d55", stampTop: "28px", stampLeft: "18px", stampRotate: "-22deg" },
   left: { label: "NOPE", color: "#ff453a", stampTop: "28px", stampRight: "18px", stampRotate: "22deg" },
   down: { label: "OKAY", color: "#0a84ff", stampTop: "28px", stampLeft: "50%", stampRotate: "-8deg", stampTranslateX: "-50%" },
   up: { label: "SKIP", color: "#8e8e93", stampBottom: "90px", stampLeft: "50%", stampRotate: "8deg", stampTranslateX: "-50%" },
@@ -881,7 +902,7 @@ const SWIPE_STEPS = [
   // Colors mirror the global rating palette (--color-like / --color-dislike /
   // --color-okay / --color-skip) as literals so framer-motion can interpolate
   // them in the tint/dot animations.
-  { dir: "right", label: "LIKE", sub: "You loved it or would watch it", color: "#30d158", exitX: 320, exitY: 0, rot: 15, hand: "👉", gesture: "Swipe right" },
+  { dir: "right", label: "LIKE", sub: "You loved it or would watch it", color: "#ff2d55", exitX: 320, exitY: 0, rot: 15, hand: "❤️", gesture: "Swipe right" },
   { dir: "left", label: "NOPE", sub: "Not your thing at all", color: "#ff453a", exitX: -320, exitY: 0, rot: -15, hand: "👈", gesture: "Swipe left" },
   { dir: "down", label: "OKAY", sub: "Seen it — it was fine", color: "#0a84ff", exitX: 0, exitY: 320, rot: -4, hand: "👇", gesture: "Swipe down" },
   { dir: "up", label: "SKIP", sub: "Haven't seen it yet", color: "#8e8e93", exitX: 0, exitY: -320, rot: 4, hand: "👆", gesture: "Swipe up" },

@@ -16,14 +16,19 @@ import {
   apiDiscover,
   apiExplore,
   apiGenres,
+  apiRecommendationAction,
   LANGUAGE_LABELS,
   languageLabel,
   type DiscoverFilters,
   type DiscoverSort,
   type ExploreCategory,
   type ExploreMovie,
+  type Movie,
+  type Recommendation,
   type TmdbGenre,
 } from "@/lib/api";
+
+type MovieLike = Movie | Recommendation | ExploreMovie;
 
 interface CategoryDef {
   id: ExploreCategory;
@@ -62,7 +67,11 @@ const SORT_OPTIONS: Array<{ value: DiscoverSort; label: string }> = [
 const LANGUAGE_OPTIONS = ["", "en", "te", "hi", "ta", "ml", "kn", "ja", "ko", "zh", "es", "fr", "de", "it", "pt", "ru"];
 
 function toDetailMovie(m: ExploreMovie): DetailMovie {
-  return { ...m, id: m.tmdb_id };
+  return {
+    ...m,
+    id: m.tmdb_id,
+    runtime: m.runtime ?? undefined,
+  };
 }
 
 export default function ExplorePage() {
@@ -226,6 +235,19 @@ function ExplorePageInner() {
     finally { setGridLoading(false); }
   }, [tab, gridPage, gridTotalPages, gridLoading, region, selectedLanguage, selectedGenre, sortByFilter]);
 
+  const handleQuickAction = useCallback(
+    async (m: MovieLike, action: "like" | "okay" | "dislike" | "watchlist") => {
+      if (!session) return;
+      const targetId = ("tmdb_id" in m && m.tmdb_id) ? m.tmdb_id : m.id;
+      try {
+        await apiRecommendationAction(session.session_id, targetId, action);
+      } catch {
+        /* ignore */
+      }
+    },
+    [session]
+  );
+
   if (isLoading || !session) {
     return <div style={{ minHeight: "100dvh", background: "var(--color-bg)" }} />;
   }
@@ -251,27 +273,36 @@ function ExplorePageInner() {
         <div
           style={{
             display: "flex",
+            alignItems: "center",
             gap: "8px",
+            padding: "0 var(--s-header-x) 10px",
             overflowX: "auto",
             scrollbarWidth: "none",
-            padding: "4px var(--s-header-x) 10px",
-            alignItems: "center",
           }}
         >
           {TAB_OPTIONS.map((t) => {
-            const isActive = tab === t.id;
+            const active = tab === t.id;
             return (
               <button
                 key={t.id}
+                type="button"
                 onClick={() => setTab(t.id)}
-                className={`tab-pill ${isActive ? "glass-pill-active active" : "glass-pill"}`}
                 style={{
-                  padding: "7px 16px",
+                  padding: "6px 14px",
                   borderRadius: "999px",
-                  fontSize: "13px",
-                  fontWeight: isActive ? 600 : 500,
+                  background: active
+                    ? "rgba(var(--rgb-accent), 0.18)"
+                    : "rgba(255, 255, 255, 0.04)",
+                  border: active
+                    ? "1px solid rgba(var(--rgb-accent), 0.55)"
+                    : "1px solid var(--hairline)",
+                  color: active ? "#ffffff" : "var(--color-text-secondary)",
+                  fontWeight: active ? 700 : 500,
+                  fontSize: "12.5px",
+                  cursor: "pointer",
                   whiteSpace: "nowrap",
                   flexShrink: 0,
+                  transition: "all var(--dur-base) var(--ease-out)",
                 }}
               >
                 {t.label}
@@ -280,60 +311,61 @@ function ExplorePageInner() {
           })}
         </div>
 
-        {/* Filter Bar — Sleek compact single horizontal scroll strip */}
+        {/* Global Explore Filters — only shown for standard Category tabs */}
         {!isDiscover && (
           <div
             style={{
               display: "flex",
               alignItems: "center",
               gap: "8px",
+              padding: "0 var(--s-header-x) 12px",
               overflowX: "auto",
               scrollbarWidth: "none",
-              padding: "8px var(--s-header-x) 12px",
-              borderTop: "1px solid rgba(255, 255, 255, 0.06)",
             }}
           >
+            {/* Language filter */}
             <PillSelect
               value={selectedLanguage}
-              onChange={(v) => setSelectedLanguage(v)}
-              options={[
-                { value: "", label: "All Languages" },
-                ...LANGUAGE_OPTIONS.filter((c) => c !== "").map((c) => ({
-                  value: c,
-                  label: LANGUAGE_LABELS[c] || languageLabel(c),
-                })),
-              ]}
+              onChange={setSelectedLanguage}
+              options={LANGUAGE_OPTIONS.map((code) => ({
+                value: code,
+                label: code ? `${languageLabel(code)}` : "All Languages",
+              }))}
             />
 
+            {/* Genre filter */}
             <PillSelect
               value={selectedGenre}
-              onChange={(v) => setSelectedGenre(v)}
+              onChange={setSelectedGenre}
               options={[
                 { value: "", label: "All Genres" },
                 ...genresList.map((g) => ({ value: String(g.id), label: g.name })),
               ]}
             />
 
+            {/* Sort by filter */}
             <PillSelect
               value={sortByFilter}
               onChange={(v) => setSortByFilter(v as DiscoverSort)}
+              options={SORT_OPTIONS}
               active={sortByFilter !== "popularity.desc"}
-              options={SORT_OPTIONS.map((s) => ({ value: s.value, label: s.label }))}
             />
 
+            {/* Clear button if any filter is set */}
             {hasActiveFilters && (
               <button
+                type="button"
                 onClick={() => {
                   setSelectedLanguage("");
                   setSelectedGenre("");
                   setSortByFilter("popularity.desc");
                 }}
                 style={{
-                  background: "rgba(239, 68, 68, 0.12)",
-                  border: "1px solid rgba(239, 68, 68, 0.3)",
-                  color: "#ef4444",
-                  borderRadius: "999px",
-                  padding: "6px 14px",
+                  background: "rgba(255, 255, 255, 0.08)",
+                  border: "1px solid var(--hairline)",
+                  borderRadius: "var(--radius-pill)",
+                  color: "var(--color-text-secondary)",
+                  padding: "7px 12px",
                   fontSize: "12px",
                   fontWeight: 500,
                   cursor: "pointer",
@@ -360,6 +392,7 @@ function ExplorePageInner() {
           <Discover
             region={region}
             onSelect={(m) => setActive(toDetailMovie(m))}
+            onQuickAction={handleQuickAction}
           />
         ) : (
           <Grid
@@ -368,6 +401,7 @@ function ExplorePageInner() {
             canLoadMore={gridPage < gridTotalPages}
             onLoadMore={loadMore}
             onSelect={(m) => setActive(toDetailMovie(m))}
+            onQuickAction={handleQuickAction}
             categoryId={tab}
           />
         )}
@@ -392,6 +426,7 @@ function Grid({
   canLoadMore,
   onLoadMore,
   onSelect,
+  onQuickAction,
   categoryId,
 }: {
   movies: ExploreMovie[];
@@ -399,6 +434,7 @@ function Grid({
   canLoadMore: boolean;
   onLoadMore: () => void;
   onSelect: (m: ExploreMovie) => void;
+  onQuickAction?: (movie: MovieLike, action: "like" | "okay" | "dislike" | "watchlist") => void;
   categoryId: ExploreCategory;
 }) {
   const cat = CATEGORIES.find((c) => c.id === categoryId);
@@ -429,7 +465,7 @@ function Grid({
           >
             {movies.map((m) => (
               <div key={m.tmdb_id} style={{ cursor: "pointer" }} onClick={() => onSelect(m)}>
-                <MovieCard movie={m} />
+                <MovieCard movie={m} onQuickAction={onQuickAction} />
               </div>
             ))}
           </div>
@@ -462,9 +498,11 @@ const CURRENT_YEAR = new Date().getFullYear();
 function Discover({
   region,
   onSelect,
+  onQuickAction,
 }: {
   region?: string;
   onSelect: (m: ExploreMovie) => void;
+  onQuickAction?: (movie: MovieLike, action: "like" | "okay" | "dislike" | "watchlist") => void;
 }) {
   const [genres, setGenres] = useState<TmdbGenre[]>([]);
   const [filters, setFilters] = useState<DiscoverFilters>({
@@ -693,7 +731,7 @@ function Discover({
           >
             {results.map((m) => (
               <div key={m.tmdb_id} style={{ cursor: "pointer" }} onClick={() => onSelect(m)}>
-                <MovieCard movie={m} />
+                <MovieCard movie={m} onQuickAction={onQuickAction} />
               </div>
             ))}
           </div>

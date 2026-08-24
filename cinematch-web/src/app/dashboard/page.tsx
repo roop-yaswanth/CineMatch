@@ -4,19 +4,13 @@ import { useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import RecommendationsView from "@/components/RecommendationsView";
 import { useSession } from "@/context/SessionContext";
+import { useMounted } from "@/lib/useMounted";
 
 export default function DashboardPage() {
   const router = useRouter();
   const { session, isLoading, logout, updateSession } = useSession();
 
-  // Route protection — one-shot. We only check `onboarding_complete` on the
-  // initial gate. Once the user is on the dashboard, we DO NOT bounce them
-  // back to /onboarding for any subsequent session update — even if the
-  // backend's flag transiently flips false (which used to happen after
-  // re-rating a movie because the dedup logic shrank onboarding_feedback
-  // below threshold). The "you must finish onboarding" check belongs at
-  // the entrance, not on every state change. Logout still bounces to
-  // /login since that requires the user to be unauthenticated entirely.
+  const mounted = useMounted();
   const onboardingGateChecked = useRef(false);
   useEffect(() => {
     if (isLoading) return;
@@ -36,36 +30,8 @@ export default function DashboardPage() {
     }
   }, [session, isLoading, router]);
 
-  // Lock the *outer* body scroll while the dashboard is mounted. The swipe
-  // stack uses `position: fixed` cards, so when the body scrolls the
-  // global footer (which lives below children in normal flow) slides up
-  // *behind* the fixed cards — that's the "footer on the back of movie
-  // posters" leak.
-  //
-  // We DON'T want to kill scrolling though — rails and the rest of the
-  // dashboard content do need vertical scroll. The fix is two-part:
-  //   (1) here: lock body overflow so the footer can never enter view; the
-  //       footer still renders on every other route normally because we
-  //       restore the prior overflow on unmount.
-  //   (2) RecommendationsView root carries its own `overflow-y: auto` and
-  //       fills the viewport, so all dashboard scrolling happens inside
-  //       that container instead of on the body.
-  useEffect(() => {
-    const html = document.documentElement;
-    const body = document.body;
-    const prevHtml = html.style.overflow;
-    const prevBody = body.style.overflow;
-    html.style.overflow = "hidden";
-    body.style.overflow = "hidden";
-    return () => {
-      html.style.overflow = prevHtml;
-      body.style.overflow = prevBody;
-    };
-  }, []);
-
   const handleLogout = () => {
     logout();
-    router.replace("/login");
   };
 
   const handleBackToOnboarding = useCallback(async () => {
@@ -86,8 +52,50 @@ export default function DashboardPage() {
   }, [session, updateSession, router]);
 
 
-  if (isLoading || !session) {
-    return <div style={{ minHeight: "100dvh", background: "var(--color-bg)" }} />;
+  if (!mounted || isLoading || !session) {
+    return (
+      <div
+        className="dash-root"
+        suppressHydrationWarning
+        style={{
+          minHeight: "100dvh",
+          display: "flex",
+          flexDirection: "column",
+          fontFamily: "var(--font-sans)",
+          background: "var(--color-bg)",
+        }}
+      >
+        <header className="dash-topbar">
+          <div className="dash-topbar-inner">
+            <h1 className="heading-display dash-brand">CineMatch</h1>
+          </div>
+        </header>
+        <div aria-busy="true" aria-label="Loading recommendations">
+          <div className="skeleton-shimmer dash-hero-skel" />
+          {[0, 1, 2].map((i) => (
+            <section key={i} className="shelf-section">
+              <div className="shelf-header">
+                <div>
+                  <div className="skeleton-shimmer" style={{ height: 11, width: 110, borderRadius: 999, marginBottom: 8 }} />
+                  <div className="skeleton-shimmer" style={{ height: 22, width: i === 0 ? 210 : 170, borderRadius: 999 }} />
+                </div>
+              </div>
+              <div className="hide-scrollbar" style={{ display: "flex", gap: "var(--s-card-gap)", overflow: "hidden", padding: "6px var(--rail-x) 16px" }}>
+                {Array.from({ length: 9 }).map((_, j) => (
+                  <div key={j} className="dash-skel-card" style={{ width: "var(--poster-w)" }}>
+                    <div className="skeleton-shimmer skeleton-grain" style={{ aspectRatio: "2 / 3", borderRadius: "var(--radius-poster)" }} />
+                    <div style={{ marginTop: 14 }}>
+                      <div className="skeleton-shimmer" style={{ height: 14, width: "85%", borderRadius: 4, marginBottom: 6 }} />
+                      <div className="skeleton-shimmer" style={{ height: 11, width: "55%", borderRadius: 4 }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
+      </div>
+    );
   }
 
   return (

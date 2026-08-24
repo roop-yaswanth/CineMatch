@@ -50,6 +50,28 @@ export default function GoogleSignInButton({
       setError("");
       setLoading(true);
       try {
+        try {
+          const parts = credential.split(".");
+          if (parts[1]) {
+            const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+            const jsonPayload = decodeURIComponent(
+              atob(base64)
+                .split("")
+                .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+                .join("")
+            );
+            const data = JSON.parse(jsonPayload);
+            const name = data.name || data.given_name || "";
+            if (name) {
+              localStorage.setItem("cinematch_user_name", name);
+            }
+            if (data.picture) {
+              localStorage.setItem("cinematch_user_picture", data.picture);
+            }
+          }
+        } catch {
+        }
+
         const session = await apiGoogleLogin(credential);
         onLogin(session);
       } catch (err) {

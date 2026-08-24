@@ -6,8 +6,6 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 
-import { useSession } from "@/context/SessionContext";
-
 interface NavItem {
   href: string;
   label: string;
@@ -38,7 +36,7 @@ const IconBookmark: React.FC<{ active: boolean }> = ({ active }) => (
 
 const IconHeart: React.FC<{ active: boolean }> = ({ active }) => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
+    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
   </svg>
 );
 
@@ -79,8 +77,6 @@ export default function AppBottomNav() {
   const pathname = usePathname() ?? "/";
   const searchParams = useSearchParams();
   const filterParam = searchParams?.get("filter") ?? null;
-  const { session } = useSession();
-  const [hidden, setHidden] = useState(false);
   const [optimisticId, setOptimisticId] = useState<NavItem["id"] | null>(null);
 
   const [mounted, setMounted] = useState(false);
@@ -101,35 +97,12 @@ export default function AppBottomNav() {
 
   const displayedActiveId = optimisticId ?? activeId;
 
-  useEffect(() => {
-    let lastY = window.scrollY;
-    let ticking = false;
-    const onScroll = () => {
-      if (ticking) return;
-      ticking = true;
-      requestAnimationFrame(() => {
-        const y = window.scrollY;
-        const dy = y - lastY;
-        if (Math.abs(dy) > 6) {
-          if (y < 80) setHidden(false);
-          else if (dy > 0) setHidden(true);
-          else setHidden(false);
-          lastY = y;
-        }
-        ticking = false;
-      });
-    };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
-  if (!mounted || !session) return null;
+  if (!mounted) return null;
   if (HIDDEN_ROUTES.some((m) => m(pathname))) return null;
 
   return (
     <div
       className="app-bottom-nav"
-      aria-hidden={hidden}
       style={{
         position: "fixed",
         left: 0,
@@ -139,10 +112,8 @@ export default function AppBottomNav() {
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
-        padding: "0 16px calc(20px + env(safe-area-inset-bottom, 0px))",
-        pointerEvents: hidden ? "none" : "auto",
-        transform: hidden ? "translateY(140%)" : "translateY(0)",
-        transition: "transform 280ms cubic-bezier(0.4, 0, 0.2, 1)",
+        padding: "0 16px calc(14px + env(safe-area-inset-bottom, 0px))",
+        pointerEvents: "auto",
       }}
     >
       <nav

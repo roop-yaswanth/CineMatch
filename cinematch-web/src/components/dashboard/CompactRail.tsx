@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Netflix-style horizontal rail of compact posters. Used for the secondary
+ * horizontal rail of compact posters. Used for the secondary
  * dashboard buckets (Hollywood / Global) so they don't compete with the
  * primary swipeable Matched stack — small posters mean ~3 visible per phone
  * viewport instead of 2, and the user can passively scroll without committing

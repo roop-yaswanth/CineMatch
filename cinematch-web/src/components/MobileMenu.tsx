@@ -175,18 +175,19 @@ export default function MobileMenu({
     if (action) action();
   };
 
-  const { openPreferences } = useSession();
+  const { openPreferences, session } = useSession();
+  const storedName = typeof window !== "undefined" ? localStorage.getItem("cinematch_user_name") : null;
+  const displayName =
+    session?.name ||
+    (session?.profile as Record<string, unknown> | undefined)?.name as string ||
+    storedName ||
+    (session?.identifier ? session.identifier.split("@")[0] : "Account");
 
   const handlePreferences = () => {
     setIsOpen(false);
     setShowResetConfirm(false);
     if (onPreferences) onPreferences();
     else openPreferences();
-  };
-
-  const handleClose = () => {
-    setIsOpen(false);
-    setShowResetConfirm(false);
   };
 
   return (
@@ -201,7 +202,9 @@ export default function MobileMenu({
         aria-label="Account settings"
       >
         <span className="desktop-account-icon"><IconUser /></span>
-        <span>Account</span>
+        <span style={{ maxWidth: "120px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {displayName}
+        </span>
         <span className={`desktop-account-chevron ${isOpen ? "open" : ""}`}>
           <IconChevronDown />
         </span>
@@ -261,100 +264,95 @@ export default function MobileMenu({
         </AnimatePresence>
       </button>
 
-      {/* DROPDOWN CARD (Shared between desktop account button & mobile menu trigger) */}
+      {/* FLOATING GLASS MENU DROPDOWN */}
       <AnimatePresence>
         {isOpen && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              style={{
-                position: "fixed",
-                inset: 0,
-                background: "rgba(0,0,0,0.35)",
-                backdropFilter: "blur(6px)",
-                WebkitBackdropFilter: "blur(6px)",
-                zIndex: 99,
-              }}
-              onClick={handleClose}
-            />
-
-            <motion.div
-              initial={{ opacity: 0, scale: 0.72, y: -16, filter: "blur(6px)" }}
-              animate={{ opacity: 1, scale: 1, y: 0, filter: "blur(0px)" }}
-              exit={{ opacity: 0, scale: 0.72, y: -16, filter: "blur(6px)" }}
-              transition={{ type: "spring", damping: 24, stiffness: 380, mass: 0.8 }}
-              style={{
-                position: "absolute",
-                top: "52px",
-                right: "0",
-                width: "240px",
-                padding: "6px",
-                overflow: "hidden",
-                zIndex: 100,
-                transformOrigin: "top right",
-                display: "flex",
-                flexDirection: "column",
-                gap: "2px",
-                background: "linear-gradient(145deg, rgba(22, 24, 32, 0.96) 0%, rgba(10, 11, 16, 0.98) 100%)",
-                backdropFilter: "blur(40px) saturate(2.0)",
-                WebkitBackdropFilter: "blur(40px) saturate(2.0)",
-                borderRadius: "18px",
-                boxShadow: `
-                  0 20px 50px -10px rgba(0,0,0,0.8),
-                  0 0 0 1px rgba(255,255,255,0.1) inset,
-                  0 1px 0 0 rgba(255,255,255,0.2) inset
-                `,
-              }}
-            >
-              {/* Preferences (Mobile only: on desktop it is already in center nav tabs) */}
-              <button className="menu-btn mobile-only-menu-item" onClick={handlePreferences}>
-                <span className="menu-btn-icon"><IconPreferences /></span>
-                <span>Preferences</span>
-              </button>
-
-              {onReset && !showResetConfirm && (
-                <button className="menu-btn" onClick={() => setShowResetConfirm(true)}>
-                  <span className="menu-btn-icon"><IconReset /></span>
-                  <span>Reset Algorithm</span>
-                </button>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: -6 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: -6 }}
+            transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+            style={{
+              position: "absolute",
+              top: "calc(100% + 8px)",
+              right: "0",
+              width: "240px",
+              padding: "6px",
+              overflow: "hidden",
+              zIndex: 100,
+              transformOrigin: "top right",
+              display: "flex",
+              flexDirection: "column",
+              gap: "2px",
+              background: "linear-gradient(145deg, rgba(22, 24, 32, 0.96) 0%, rgba(10, 11, 16, 0.98) 100%)",
+              backdropFilter: "blur(40px) saturate(2.0)",
+              WebkitBackdropFilter: "blur(40px) saturate(2.0)",
+              borderRadius: "18px",
+              boxShadow: `
+                0 20px 50px -10px rgba(0,0,0,0.8),
+                0 0 0 1px rgba(255,255,255,0.1) inset,
+                0 1px 0 0 rgba(255,255,255,0.2) inset
+              `,
+            }}
+          >
+            {/* User Info Header */}
+            <div style={{ padding: "10px 12px 8px", borderBottom: "1px solid rgba(255, 255, 255, 0.08)", marginBottom: "4px" }}>
+              <p style={{ margin: 0, fontSize: "13px", fontWeight: 700, color: "#ffffff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {displayName}
+              </p>
+              {session?.identifier && (
+                <p style={{ margin: "2px 0 0", fontSize: "11px", color: "var(--color-text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {session.identifier}
+                </p>
               )}
+            </div>
 
-              {showResetConfirm && (
-                <div style={{ padding: "12px 14px" }}>
-                  <p style={{ fontSize: "12px", color: "var(--color-text-secondary)", marginBottom: "10px", lineHeight: 1.4 }}>
-                    This resets your taste profile and restarts onboarding. Continue?
-                  </p>
-                  <div style={{ display: "flex", gap: "6px" }}>
-                    <button
-                      className="menu-confirm-btn menu-confirm-danger"
-                      onClick={() => onReset && handleAction(onReset)}
-                    >
-                      Yes, reset
-                    </button>
-                    <button
-                      className="menu-confirm-btn menu-confirm-cancel"
-                      onClick={() => setShowResetConfirm(false)}
-                    >
-                      Cancel
-                    </button>
-                  </div>
+            {/* Preferences (Mobile only: on desktop it is already in center nav tabs) */}
+            <button className="menu-btn mobile-only-menu-item" onClick={handlePreferences}>
+              <span className="menu-btn-icon"><IconPreferences /></span>
+              <span>Preferences</span>
+            </button>
+
+            {onReset && !showResetConfirm && (
+              <button className="menu-btn" onClick={() => setShowResetConfirm(true)}>
+                <span className="menu-btn-icon"><IconReset /></span>
+                <span>Reset Algorithm</span>
+              </button>
+            )}
+
+            {showResetConfirm && (
+              <div style={{ padding: "12px 14px" }}>
+                <p style={{ fontSize: "12px", color: "var(--color-text-secondary)", marginBottom: "10px", lineHeight: 1.4 }}>
+                  This resets your taste profile and restarts onboarding. Continue?
+                </p>
+                <div style={{ display: "flex", gap: "6px" }}>
+                  <button
+                    className="menu-confirm-btn menu-confirm-danger"
+                    onClick={() => onReset && handleAction(onReset)}
+                  >
+                    Yes, reset
+                  </button>
+                  <button
+                    className="menu-confirm-btn menu-confirm-cancel"
+                    onClick={() => setShowResetConfirm(false)}
+                  >
+                    Cancel
+                  </button>
                 </div>
-              )}
+              </div>
+            )}
 
-              <div className="menu-divider mobile-only-menu-item" />
-              {onReset && <div className="menu-divider desktop-only-menu-divider" />}
+            <div className="menu-divider mobile-only-menu-item" />
+            {onReset && <div className="menu-divider desktop-only-menu-divider" />}
 
-              <button
-                className="menu-btn menu-btn-danger"
-                onClick={() => handleAction(onLogout)}
-              >
-                <span className="menu-btn-icon menu-btn-icon-danger"><IconLogOut /></span>
-                <span>Sign out</span>
-              </button>
-            </motion.div>
-          </>
+            <button
+              className="menu-btn menu-btn-danger"
+              onClick={() => handleAction(onLogout)}
+            >
+              <span className="menu-btn-icon menu-btn-icon-danger"><IconLogOut /></span>
+              <span>Sign out</span>
+            </button>
+          </motion.div>
         )}
       </AnimatePresence>
 

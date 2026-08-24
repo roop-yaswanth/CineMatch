@@ -51,11 +51,17 @@ export async function GET(req: NextRequest) {
     const englishPoster = posters.find((p) => p.iso_639_1 === "en") || null;
     const poster_path = englishPoster?.file_path || data.poster_path || null;
 
+    const backdrops: Array<{ file_path: string; iso_639_1?: string | null; width?: number }> = data.images?.backdrops || [];
+    // Prioritize highest resolution (4K / 3840px+) backdrops with clean or English art
+    const sortedBackdrops = [...backdrops].sort((a, b) => (b.width || 0) - (a.width || 0));
+    const bestBackdrop = sortedBackdrops.find((b) => b.iso_639_1 === null || b.iso_639_1 === "en") || sortedBackdrops[0];
+    const backdrop_path = bestBackdrop?.file_path || data.backdrop_path || null;
+
     return NextResponse.json(
       {
         poster_path,
         poster_is_english: Boolean(englishPoster),
-        backdrop_path: data.backdrop_path || null,
+        backdrop_path,
         logo_path,
         overview: data.overview || null,
         original_language: data.original_language || null,

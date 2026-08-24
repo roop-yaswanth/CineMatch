@@ -35,13 +35,13 @@ export default function AppFooter() {
   return (
     <footer
       style={{
-        marginTop: 32,
-        padding: "32px 24px calc(64px + env(safe-area-inset-bottom)) 24px",
+        marginTop: 16,
+        padding: "24px 24px calc(92px + env(safe-area-inset-bottom, 0px)) 24px",
         borderTop: "1px solid rgba(255,255,255,0.06)",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        gap: 18,
+        gap: 14,
         textAlign: "center",
       }}
     >

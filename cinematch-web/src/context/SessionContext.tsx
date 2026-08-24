@@ -6,6 +6,7 @@ import {
   apiAuthRefresh,
   apiLogout,
   apiUpdatePreferences,
+  isSessionExpiredError,
   preferencesFromProfile,
   type UserSession,
   type RecommendationPreferences,
@@ -62,10 +63,12 @@ function isValidUserSession(s: unknown): s is UserSession {
 // logged-out visitors away from app routes before any page JS loads.
 function setAuthHintCookie(on: boolean) {
   try {
+    if (typeof document === "undefined") return;
     if (on) {
-      document.cookie = `cm_auth=1; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax${location.protocol === "https:" ? "; Secure" : ""}`;
+      document.cookie = `cm_auth=1; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax${typeof location !== "undefined" && location.protocol === "https:" ? "; Secure" : ""}`;
     } else {
-      document.cookie = "cm_auth=; path=/; max-age=0; SameSite=Lax";
+      document.cookie = "cm_auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; max-age=0; SameSite=Lax";
+      document.cookie = "cm_auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; max-age=0; SameSite=Lax; Secure";
     }
   } catch { /* ignore */ }
 }
@@ -80,10 +83,18 @@ function persistSession(s: UserSession) {
 }
 
 function clearStoredSession() {
-  localStorage.removeItem(STORAGE_KEY);
-  localStorage.removeItem(SESSION_CACHE_KEY);
-  localStorage.removeItem(ACTIVITY_KEY);
-  localStorage.removeItem(PROFILE_OPTIMISTIC_KEY);
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(SESSION_CACHE_KEY);
+    localStorage.removeItem(ACTIVITY_KEY);
+    localStorage.removeItem(PROFILE_OPTIMISTIC_KEY);
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const key = localStorage.key(i);
+      if (key && (key.startsWith("cinematch_recs_cache_") || key.startsWith("cinematch_history_cache_"))) {
+        localStorage.removeItem(key);
+      }
+    }
+  } catch { /* ignore */ }
   setAuthHintCookie(false);
 }
 
@@ -134,6 +145,26 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     clearStoredSession();
     setSession(null);
   }, []);
+
+  const logout = useCallback(() => {
+    const sid = session?.session_id;
+    clearSession();
+    if (sid) void apiLogout(sid).catch(() => { /* non-fatal */ });
+    if (typeof window !== "undefined") {
+      window.location.replace("/login");
+    }
+  }, [clearSession, session]);
+
+  // Listen for global session expiration dispatched by API client (e.g. 404 Session not found)
+  useEffect(() => {
+    const handleExpired = () => {
+      logout();
+    };
+    window.addEventListener("cinematch:session_expired", handleExpired);
+    return () => {
+      window.removeEventListener("cinematch:session_expired", handleExpired);
+    };
+  }, [logout]);
 
   const restoreSession = useCallback(async () => {
     if (inactivityExpired()) {
@@ -189,9 +220,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             }
             return;
           }
-          if (msg.includes("401")) {
+          if (isSessionExpiredError(err) || msg.includes("401") || msg.includes("Session not found")) {
             clearStoredSession();
             setSession(null);
+            if (typeof window !== "undefined") {
+              window.location.replace("/login");
+            }
           } else {
             console.warn("[SessionProvider] Token refresh failed; keeping cached session.");
           }
@@ -210,12 +244,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const t = setTimeout(() => void restoreSession(), 0);
     return () => clearTimeout(t);
   }, [restoreSession]);
-
-  const logout = useCallback(() => {
-    const sid = session?.session_id;
-    clearSession();
-    if (sid) void apiLogout(sid).catch(() => { /* non-fatal */ });
-  }, [clearSession, session]);
 
   const updateSession = useCallback((newSession: UserSession) => {
     if (!isValidUserSession(newSession)) {
