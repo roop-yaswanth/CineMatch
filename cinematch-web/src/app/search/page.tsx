@@ -13,7 +13,6 @@ import type { DetailMovie } from "@/components/modals/MovieDetailModal";
 import { useSession } from "@/context/SessionContext";
 
 const MovieDetailModal = dynamic(() => import("@/components/modals/MovieDetailModal"), { ssr: false });
-import { toast } from "@/components/ui/Toast";
 import {
   apiSearchMulti,
   languageLabel,
@@ -161,22 +160,6 @@ function SearchPage() {
       try {
         await apiRecommendationAction(session.session_id, active.id, action);
         invalidateHistoryCache(session.session_id);
-        if (action === "like") {
-          toast({
-            message: `Liked "${active.title}"`,
-            tone: "success",
-          });
-        } else if (action === "okay") {
-          toast({
-            message: `Rated "${active.title}" as Okay`,
-            tone: "success",
-          });
-        } else if (action === "dislike") {
-          toast({
-            message: `Disliked "${active.title}"`,
-            tone: "neutral",
-          });
-        }
       } catch (err) {
         console.error("Action failed:", err);
       }

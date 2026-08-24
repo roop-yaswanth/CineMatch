@@ -2,7 +2,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState, useRef } from "react";
 
 import { createPortal } from "react-dom";
-import { useSession } from "@/context/SessionContext";
 import { posterUrl, languageLabel, apiSimilarMovies, apiCredits, apiImdbTitle, type Recommendation, type CastMember, type CrewMember, type ImdbTitle } from "@/lib/api";
 import { PersonDetailOverlay } from "./PersonDetailOverlay";
 import WatchProvidersPanel, { REGION_TO_COUNTRY, fetchWatchProviders } from "@/components/WatchProvidersPanel";
@@ -68,8 +67,6 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
   const [activePersonId, setActivePersonId] = useState<number | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [imdbLive, setImdbLive] = useState<ImdbTitle | null>(null);
-  const { session } = useSession();
-  const [filterSimilarByLang, setFilterSimilarByLang] = useState(false);
   const similarRowRef = useRef<HTMLDivElement>(null);
   const castRowRef = useRef<HTMLDivElement>(null);
 
@@ -121,6 +118,7 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
 
   // Fetch similar movies whenever the movie changes
   const genresKey = Array.isArray(movie?.genres) ? movie.genres.join(",") : (movie?.primary_genre || "");
+
   useEffect(() => {
     const id = movie?.tmdb_id ?? movie?.id;
     if (!isOpen || !id) {
@@ -131,10 +129,7 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
       return;
     }
 
-    setFilterSimilarByLang(false);
     setSimilarLoading(true);
-    setSimilar([]);
-
     let cancelled = false;
     const seedYear = movie?.year != null ? Number(movie.year) || undefined : undefined;
     apiSimilarMovies(id, sessionId ?? null, 20, {
@@ -257,8 +252,6 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
 
   if (!movie) return null;
 
-  const preferredLanguages = session?.profile?.preferred_languages || [];
-
   // Hardcoded filter logic for "More Like This" based on the current movie
   let curatedSimilar = similar;
   const currentRating = movie.imdb_rating || movie.vote_average || 0;
@@ -283,12 +276,7 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
     }
   }
 
-  const filteredSimilar = curatedSimilar.filter((m) => {
-    if (!filterSimilarByLang) return true;
-    if (preferredLanguages.length === 0) return true;
-    if (!m.original_language) return true;
-    return preferredLanguages.includes(m.original_language);
-  });
+  const filteredSimilar = curatedSimilar;
 
   const poster = posterUrl(englishPosterPath || movie.poster_path, "w780");
   const bgImage = movie.backdrop_path
@@ -782,25 +770,9 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
   const similarSection = (similarLoading || similar.length > 0) ? (
     <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          <h4 style={{ margin: 0, fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(255, 255, 255, 0.5)" }}>
-            MORE LIKE THIS
-          </h4>
-          {preferredLanguages.length > 0 && (
-            <label style={{
-              display: "flex", alignItems: "center", gap: "6px",
-              fontSize: "11px", color: "rgba(255, 255, 255, 0.6)", cursor: "pointer",
-            }}>
-              <input
-                type="checkbox"
-                checked={filterSimilarByLang}
-                onChange={(e) => setFilterSimilarByLang(e.target.checked)}
-                style={{ margin: 0, accentColor: "var(--color-accent)" }}
-              />
-              Selected languages only
-            </label>
-          )}
-        </div>
+        <h4 style={{ margin: 0, fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(255, 255, 255, 0.5)" }}>
+          MORE LIKE THIS
+        </h4>
         {!similarLoading && filteredSimilar.length > 0 && (
           <div style={{ display: "flex", gap: "6px" }}>
             <button

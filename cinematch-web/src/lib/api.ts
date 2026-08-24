@@ -718,6 +718,8 @@ export interface SimilarSeedMeta {
   genres?: string[];
   lang?: string;
   year?: number;
+  preferredLanguages?: string[];
+  selectedLanguagesOnly?: boolean;
 }
 
 export async function apiSimilarMovies(
@@ -726,7 +728,9 @@ export async function apiSimilarMovies(
   n = 10,
   meta?: SimilarSeedMeta
 ): Promise<Recommendation[]> {
-  const key = `${tmdbId}:${sessionId ?? "anon"}:${n}`;
+  const prefLangsKey = meta?.preferredLanguages?.slice().sort().join(",") ?? "";
+  const langOnlyKey = meta?.selectedLanguagesOnly ? "1" : "0";
+  const key = `${tmdbId}:${sessionId ?? "anon"}:${n}:${prefLangsKey}:${langOnlyKey}`;
   const cached = similarCache.get(key);
   if (cached && cached.length > 0) return cached;
   const inflight = similarInflight.get(key);
@@ -740,6 +744,12 @@ export async function apiSimilarMovies(
       if (meta?.genres?.length) params.set("genres", meta.genres.join(","));
       if (meta?.lang) params.set("lang", meta.lang);
       if (meta?.year) params.set("year", String(meta.year));
+      if (meta?.preferredLanguages?.length) {
+        params.set("preferred_languages", meta.preferredLanguages.join(","));
+      }
+      if (meta?.selectedLanguagesOnly) {
+        params.set("selected_languages_only", "true");
+      }
 
       let results: Recommendation[] = [];
       try {
@@ -758,6 +768,10 @@ export async function apiSimilarMovies(
           if (tmdbRes.ok) {
             const tmdbData = await tmdbRes.json();
             results = tmdbData.results ?? [];
+            if (results.length > 0 && meta?.selectedLanguagesOnly && meta?.preferredLanguages?.length) {
+              const allowed = new Set(meta.preferredLanguages.map((l) => l.toLowerCase()));
+              results = results.filter((m) => !m.original_language || allowed.has(m.original_language.toLowerCase()));
+            }
           }
         } catch {
           /* ignore */
