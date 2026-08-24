@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const res = await fetch(
-      `https://api.themoviedb.org/3/${kind}/${id}?append_to_response=credits,images,release_dates&include_image_language=en,null`,
+      `https://api.themoviedb.org/3/${kind}/${id}?append_to_response=credits,images,release_dates,content_ratings&include_image_language=en,null`,
       { headers: TMDB_HEADERS, next: { revalidate: 86400 } }
     );
     if (!res.ok) return NextResponse.json({ cast: [], directors: [], writers: [], logo_path: null, poster_path: null, runtime: null, certification: null, status: null, tagline: null });
@@ -67,13 +67,49 @@ export async function GET(req: NextRequest) {
     const englishPoster = posters.find((p) => p.iso_639_1 === "en") || null;
     const poster_path = englishPoster?.file_path || data.poster_path || null;
 
-    // Extract age rating / certification
+    // Extract age rating / certification (movies: release_dates, TV: content_ratings)
     const releaseDates = (data.release_dates?.results || []) as Array<{
       iso_3166_1: string;
       release_dates: Array<{ certification?: string }>;
     }>;
-    const usRelease = releaseDates.find((r) => r.iso_3166_1 === "US") || releaseDates[0];
-    const certification = usRelease?.release_dates?.find((d) => d.certification?.trim())?.certification?.trim() || null;
+    const tvRatings = (data.content_ratings?.results || []) as Array<{
+      iso_3166_1: string;
+      rating?: string;
+    }>;
+
+    let cert: string | null = null;
+
+    if (kind === "tv" && tvRatings.length > 0) {
+      cert =
+        tvRatings.find((r) => r.iso_3166_1 === "US")?.rating?.trim() ||
+        tvRatings.find((r) => r.iso_3166_1 === "GB")?.rating?.trim() ||
+        tvRatings.find((r) => r.iso_3166_1 === "IN")?.rating?.trim() ||
+        tvRatings.find((r) => r.rating?.trim())?.rating?.trim() ||
+        null;
+    } else if (releaseDates.length > 0) {
+      // 1. Try US release date certifications
+      cert = releaseDates.find((r) => r.iso_3166_1 === "US")?.release_dates?.find((d) => d.certification?.trim())?.certification?.trim() || null;
+      // 2. Try GB (e.g. Harry Potter, UK productions)
+      if (!cert) {
+        cert = releaseDates.find((r) => r.iso_3166_1 === "GB")?.release_dates?.find((d) => d.certification?.trim())?.certification?.trim() || null;
+      }
+      // 3. Try IN (e.g. Indian cinema like Ala Vaikunthapurramuloo, RRR, etc.)
+      if (!cert) {
+        cert = releaseDates.find((r) => r.iso_3166_1 === "IN")?.release_dates?.find((d) => d.certification?.trim())?.certification?.trim() || null;
+      }
+      // 4. Fallback: Search all countries for any non-empty certification
+      if (!cert) {
+        for (const r of releaseDates) {
+          const found = r.release_dates?.find((d) => d.certification?.trim())?.certification?.trim();
+          if (found) {
+            cert = found;
+            break;
+          }
+        }
+      }
+    }
+
+    const certification = cert || null;
 
     const runtime = typeof data.runtime === "number" && data.runtime > 0 ? data.runtime : null;
     const status = data.status || null;

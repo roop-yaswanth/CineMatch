@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
 import dynamic from "next/dynamic";
@@ -14,6 +14,8 @@ const MovieDetailModal = dynamic(() => import("@/components/modals/MovieDetailMo
 import { useSession } from "@/context/SessionContext";
 import {
   apiPerson,
+  apiRecommendationAction,
+  invalidateHistoryCache,
   type PersonCredit,
   type PersonDetail,
 } from "@/lib/api";
@@ -92,6 +94,20 @@ export default function PersonPage() {
     }
   };
 
+  const handleAction = useCallback(
+    async (action: "like" | "okay" | "dislike" | "watchlist" | "skip") => {
+      if (!session || !active) return;
+      const targetId = active.tmdb_id ?? active.id;
+      try {
+        await apiRecommendationAction(session.session_id, targetId, action);
+        invalidateHistoryCache(session.session_id);
+      } catch {
+        /* ignore */
+      }
+    },
+    [session, active]
+  );
+
   return (
     <div style={{ minHeight: "100dvh", background: "var(--color-bg)", display: "flex", flexDirection: "column" }}>
       {/* Header — shared <PageHeader>. Title truncates with ellipsis when
@@ -140,6 +156,7 @@ export default function PersonPage() {
         onClose={() => setActive(null)}
         movie={active}
         onMovieSelect={(m) => setActive(m)}
+        onAction={handleAction}
         sessionId={session?.session_id ?? null}
         userRegion={session?.profile?.region ?? null}
       />

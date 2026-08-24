@@ -638,16 +638,6 @@ export default function RecommendationsView({
           const actionPromise = apiRecommendationAction(session.session_id, tmdbId, action)
             .then((result) => {
               invalidateHistoryCache(session.session_id);
-              if (action === "watchlist") {
-                toast({
-                  message: `Added "${movie.title}" to your watchlist`,
-                  tone: "success",
-                  action: {
-                    label: "Undo",
-                    onClick: () => undoWatchlistAdd(tmdbId, { movie: originalMovie, stackId: targetStackId }),
-                  },
-                });
-              }
               onSessionUpdate(result.session);
             })
             .catch((err) => {
@@ -668,16 +658,6 @@ export default function RecommendationsView({
         .then((result) => {
           onSessionUpdate(result.session);
           invalidateHistoryCache(session.session_id);
-          if (action === "watchlist") {
-            toast({
-              message: `Added "${movie.title}" to your watchlist`,
-              tone: "success",
-              action: {
-                label: "Undo",
-                onClick: () => undoWatchlistAdd(tmdbId, { movie: originalMovie, stackId: targetStackId }),
-              },
-            });
-          }
 
           if (targetStackId) {
             const st = stacksRef.current.find(s => s.id === targetStackId);

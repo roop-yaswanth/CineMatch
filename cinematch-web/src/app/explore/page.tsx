@@ -17,6 +17,7 @@ import {
   apiExplore,
   apiGenres,
   apiRecommendationAction,
+  invalidateHistoryCache,
   LANGUAGE_LABELS,
   languageLabel,
   type DiscoverFilters,
@@ -241,11 +242,26 @@ function ExplorePageInner() {
       const targetId = ("tmdb_id" in m && m.tmdb_id) ? m.tmdb_id : m.id;
       try {
         await apiRecommendationAction(session.session_id, targetId, action);
+        invalidateHistoryCache(session.session_id);
       } catch {
         /* ignore */
       }
     },
     [session]
+  );
+
+  const handleAction = useCallback(
+    async (action: "like" | "okay" | "dislike" | "watchlist" | "skip") => {
+      if (!session || !active) return;
+      const targetId = active.tmdb_id ?? active.id;
+      try {
+        await apiRecommendationAction(session.session_id, targetId, action);
+        invalidateHistoryCache(session.session_id);
+      } catch {
+        /* ignore */
+      }
+    },
+    [session, active]
   );
 
   if (isLoading || !session) {
@@ -412,6 +428,7 @@ function ExplorePageInner() {
         onClose={() => setActive(null)}
         movie={active}
         onMovieSelect={(m) => setActive(m)}
+        onAction={handleAction}
         sessionId={session?.session_id ?? null}
         userRegion={session?.profile?.region ?? null}
       />

@@ -160,15 +160,8 @@ function SearchPage() {
       if (!session || !active) return;
       try {
         await apiRecommendationAction(session.session_id, active.id, action);
-        // The write just changed server-side history — drop Your Collection's
-        // cache so it refetches on next mount instead of showing a stale list.
         invalidateHistoryCache(session.session_id);
-        if (action === "watchlist") {
-          toast({
-            message: `Added "${active.title}" to your watchlist`,
-            tone: "success",
-          });
-        } else if (action === "like") {
+        if (action === "like") {
           toast({
             message: `Liked "${active.title}"`,
             tone: "success",
