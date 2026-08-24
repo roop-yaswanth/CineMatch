@@ -20,6 +20,7 @@ import { useRouter } from "next/navigation";
 import MobileMenu from "@/components/MobileMenu";
 import { useSession } from "@/context/SessionContext";
 import type { DetailMovie } from "@/components/modals/MovieDetailModal";
+import { hapticTap, hapticSelection } from "@/lib/haptics";
 
 const MovieDetailModal = dynamic(() => import("@/components/modals/MovieDetailModal"), { ssr: false });
 
@@ -29,18 +30,18 @@ interface Props {
   initialFilter?: InteractionFilter;
 }
 
-type InteractionFilter = "all" | "like" | "okay" | "dislike" | "not_watched" | "watchlist";
+type InteractionFilter = "all" | "love" | "like" | "dislike" | "not_watched" | "watchlist";
 type HistoryListItem = HistoryItem & { genres?: string[] };
 
 const RATING_CONFIG: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
-  like: {
+  love: {
     label: "Loved",
-    color: "#f59e0b",
+    color: "#30d158",
     icon: <span style={{ fontSize: "13px", lineHeight: 1 }}>😍</span>,
   },
-  okay: {
+  like: {
     label: "Liked",
-    color: "#3b82f6",
+    color: "#facc15",
     icon: <span style={{ fontSize: "13px", lineHeight: 1 }}>😀</span>,
   },
   dislike: {
@@ -49,6 +50,16 @@ const RATING_CONFIG: Record<string, { label: string; color: string; icon: React.
     icon: <span style={{ fontSize: "13px", lineHeight: 1 }}>🙁</span>,
   },
   not_watched: {
+    label: "Skipped",
+    color: "var(--color-text-muted)",
+    icon: (
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <polygon points="5 4 15 12 5 20 5 4" fill="currentColor" />
+        <line x1="19" y1="5" x2="19" y2="19" />
+      </svg>
+    ),
+  },
+  skip: {
     label: "Skipped",
     color: "var(--color-text-muted)",
     icon: (
@@ -71,8 +82,8 @@ const RATING_CONFIG: Record<string, { label: string; color: string; icon: React.
 
 const INTERACTION_FILTERS: Array<{ value: InteractionFilter; label: string }> = [
   { value: "all", label: "All Reactions" },
-  { value: "like", label: "Loved" },
-  { value: "okay", label: "Liked" },
+  { value: "love", label: "Loved" },
+  { value: "like", label: "Liked" },
   { value: "dislike", label: "Disliked" },
   { value: "not_watched", label: "Skipped" },
   { value: "watchlist", label: "Watchlist" },
@@ -390,7 +401,10 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
           {/* Reaction / Interaction Filter Dropdown */}
           <select
             value={interactionFilter}
-            onChange={(e) => setInteractionFilter(e.target.value as InteractionFilter)}
+            onChange={(e) => {
+              hapticSelection();
+              setInteractionFilter(e.target.value as InteractionFilter);
+            }}
             className="filter-select"
             data-active={interactionFilter !== "all" ? "true" : undefined}
           >
@@ -537,7 +551,10 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
                     key={`${item.tmdb_id}-${idx}`}
                     item={item}
                     idx={idx}
-                    onClick={() => setActiveMovie(toDetailMovie(item))}
+                    onClick={() => {
+                      hapticTap();
+                      setActiveMovie(toDetailMovie(item));
+                    }}
                   />
                 ))}
               </div>

@@ -6,6 +6,7 @@ import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 
 import { posterUrl, languageLabel, recommendationId, type Recommendation } from "@/lib/api";
 import { useBackdrop, usePoster } from "@/lib/usePoster";
+import { triggerHaptic, hapticTap, hapticWatchlist } from "@/lib/haptics";
 
 const ROTATE_MS = 8000;
 const MAX_ITEMS = 5;
@@ -28,7 +29,7 @@ interface Props {
   onOpenDetail: (movie: Recommendation) => void;
   onWatchlist?: (movie: Recommendation) => void;
   onLike?: (movie: Recommendation) => void;
-  onAction?: (movie: Recommendation, action: "dislike" | "okay" | "like" | "watchlist") => void;
+  onAction?: (movie: Recommendation, action: "dislike" | "like" | "love" | "watchlist") => void;
 }
 
 export default function HeroCarousel({ movies, onOpenDetail, onWatchlist, onLike, onAction }: Props) {
@@ -69,10 +70,14 @@ export default function HeroCarousel({ movies, onOpenDetail, onWatchlist, onLike
     return () => clearInterval(t);
   }, [items.length, paused]);
 
-  const goTo = useCallback((i: number) => {
-    wasInteractedRef.current = true;
-    setIndex(((i % items.length) + items.length) % items.length);
-  }, [items.length]);
+  const goTo = useCallback(
+    (targetIndex: number) => {
+      hapticTap();
+      wasInteractedRef.current = true;
+      setIndex(((targetIndex % items.length) + items.length) % items.length);
+    },
+    [items.length]
+  );
 
   // Parallax: translate the backdrop at a fraction of scroll. rAF-throttled,
   // transform-only, skipped once the hero is off-screen.
@@ -245,7 +250,7 @@ function HeroSlide({
   onOpenDetail: (m: Recommendation) => void;
   onWatchlist?: (m: Recommendation) => void;
   onLike?: (m: Recommendation) => void;
-  onAction?: (m: Recommendation, action: "dislike" | "okay" | "like" | "watchlist") => void;
+  onAction?: (m: Recommendation, action: "dislike" | "like" | "love" | "watchlist") => void;
 }) {
   const tmdbId = recommendationId(movie);
   const backdrop = useBackdrop(movie.backdrop_path, tmdbId, "original");
@@ -395,7 +400,10 @@ function HeroSlide({
               type="button"
               className="btn btn-primary"
               style={{ minHeight: 44, padding: "0 clamp(12px, 3vw, 20px)", whiteSpace: "nowrap" }}
-              onClick={() => onOpenDetail(movie)}
+              onClick={() => {
+                hapticTap();
+                onOpenDetail(movie);
+              }}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
                 <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="2" />
@@ -409,7 +417,10 @@ function HeroSlide({
                 type="button"
                 className="btn btn-secondary"
                 style={{ minHeight: 44, padding: "0 clamp(12px, 2.5vw, 18px)", whiteSpace: "nowrap" }}
-                onClick={() => onWatchlist(movie)}
+                onClick={() => {
+                  hapticWatchlist();
+                  onWatchlist(movie);
+                }}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                   <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
@@ -437,7 +448,7 @@ function HeroReactionButton({
   onLike,
 }: {
   movie: Recommendation;
-  onAction?: (movie: Recommendation, action: "dislike" | "okay" | "like" | "watchlist") => void;
+  onAction?: (movie: Recommendation, action: "dislike" | "like" | "love" | "watchlist") => void;
   onLike?: (movie: Recommendation) => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -471,7 +482,8 @@ function HeroReactionButton({
     };
   }, [isOpen]);
 
-  const handleSelect = (action: "dislike" | "okay" | "like") => {
+  const handleSelect = (action: "dislike" | "like" | "love") => {
+    triggerHaptic(action);
     setIsOpen(false);
     if (onAction) onAction(movie, action);
     else if (onLike) onLike(movie);
@@ -537,7 +549,7 @@ function HeroReactionButton({
               aria-label={`Like ${movie.title}`}
               onClick={(e) => {
                 e.stopPropagation();
-                handleSelect("okay");
+                handleSelect("like");
               }}
               style={{ width: 36, height: 36, fontSize: 20 }}
             >
@@ -550,7 +562,7 @@ function HeroReactionButton({
               aria-label={`Love ${movie.title}`}
               onClick={(e) => {
                 e.stopPropagation();
-                handleSelect("like");
+                handleSelect("love");
               }}
               style={{ width: 36, height: 36, fontSize: 20 }}
             >

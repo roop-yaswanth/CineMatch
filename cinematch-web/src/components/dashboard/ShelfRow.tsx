@@ -8,12 +8,13 @@ import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { createPortal } from "react-dom";
 import { useMounted } from "@/lib/useMounted";
+import { triggerHaptic, hapticTap } from "@/lib/haptics";
 
 import { languageLabel, recommendationId, type Recommendation } from "@/lib/api";
 import { usePoster, useBackdrop, prefetchBackdrops } from "@/lib/usePoster";
 import type { Shelf } from "./shelves";
 
-export type QuickAction = "dislike" | "okay" | "like" | "watchlist";
+export type QuickAction = "dislike" | "like" | "love" | "watchlist";
 
 const NOW_MS = new Date().getTime();
 
@@ -182,10 +183,15 @@ function PosterCard({
     return () => window.removeEventListener("scroll", handleScroll);
   }, [isHovered]);
 
+  const handleOpen = () => {
+    hapticTap();
+    onOpen();
+  };
+
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
-      onOpen();
+      handleOpen();
     }
   };
 
@@ -203,7 +209,7 @@ function PosterCard({
         role="button"
         tabIndex={0}
         aria-label={`${movie.title}${yearLabel(movie) ? ` (${yearLabel(movie)})` : ""} — open details`}
-        onClick={onOpen}
+        onClick={handleOpen}
         onKeyDown={onKeyDown}
         className="shelf-card"
       >
@@ -234,7 +240,7 @@ function PosterCard({
                     type="button"
                     className="shelf-reaction-item"
                     aria-label={`Dislike ${movie.title}`}
-                    onClick={(e) => { e.stopPropagation(); onQuickAction(movie, "dislike"); }}
+                    onClick={(e) => { e.stopPropagation(); triggerHaptic("dislike"); onQuickAction(movie, "dislike"); }}
                   >
                     <span aria-hidden>🙁</span>
                     <span className="shelf-tooltip">Not for me</span>
@@ -243,7 +249,7 @@ function PosterCard({
                     type="button"
                     className="shelf-reaction-item"
                     aria-label={`Like ${movie.title}`}
-                    onClick={(e) => { e.stopPropagation(); onQuickAction(movie, "okay"); }}
+                    onClick={(e) => { e.stopPropagation(); triggerHaptic("like"); onQuickAction(movie, "like"); }}
                   >
                     <span aria-hidden>😀</span>
                     <span className="shelf-tooltip">I like this</span>
@@ -252,7 +258,7 @@ function PosterCard({
                     type="button"
                     className="shelf-reaction-item"
                     aria-label={`Love ${movie.title}`}
-                    onClick={(e) => { e.stopPropagation(); onQuickAction(movie, "like"); }}
+                    onClick={(e) => { e.stopPropagation(); triggerHaptic("love"); onQuickAction(movie, "love"); }}
                   >
                     <span aria-hidden>😍</span>
                     <span className="shelf-tooltip">Love this!</span>
@@ -263,7 +269,7 @@ function PosterCard({
                   type="button"
                   className="shelf-action-btn shelf-action-btn--reaction"
                   aria-label={`Rate ${movie.title}`}
-                  onClick={(e) => { e.stopPropagation(); onQuickAction(movie, "okay"); }}
+                  onClick={(e) => { e.stopPropagation(); onQuickAction(movie, "like"); }}
                 >
                   <span aria-hidden style={{ fontSize: 16 }}>😀</span>
                   <span className="shelf-tooltip">Rate</span>
@@ -274,7 +280,7 @@ function PosterCard({
                 type="button"
                 className="shelf-action-btn shelf-action-btn--watchlist"
                 aria-label={`Add ${movie.title} to watchlist`}
-                onClick={(e) => { e.stopPropagation(); onQuickAction(movie, "watchlist"); }}
+                onClick={(e) => { e.stopPropagation(); triggerHaptic("watchlist"); onQuickAction(movie, "watchlist"); }}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                   <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
@@ -599,7 +605,7 @@ function PosterCard({
                           type="button"
                           className="shelf-reaction-item"
                           aria-label={`Like ${movie.title}`}
-                          onClick={() => onQuickAction(movie, "okay")}
+                          onClick={() => onQuickAction(movie, "like")}
                         >
                           <span aria-hidden>😀</span>
                           <span className="shelf-tooltip">I like this</span>
@@ -608,7 +614,7 @@ function PosterCard({
                           type="button"
                           className="shelf-reaction-item"
                           aria-label={`Love ${movie.title}`}
-                          onClick={() => onQuickAction(movie, "like")}
+                          onClick={() => onQuickAction(movie, "love")}
                         >
                           <span aria-hidden>😍</span>
                           <span className="shelf-tooltip">Love this!</span>
@@ -632,7 +638,7 @@ function PosterCard({
                         onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255, 255, 255, 0.20)"; e.currentTarget.style.transform = "scale(1.05)"; }}
                         onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255, 255, 255, 0.10)"; e.currentTarget.style.transform = "none"; }}
                         aria-label={`Rate ${movie.title}`}
-                        onClick={() => onQuickAction(movie, "okay")}
+                        onClick={() => onQuickAction(movie, "like")}
                       >
                         <span aria-hidden style={{ fontSize: 16 }}>😀</span>
                       </button>
@@ -755,7 +761,7 @@ function SpotlightCard({
               type="button"
               className="shelf-reaction-item"
               aria-label={`Like ${movie.title}`}
-              onClick={(e) => { e.stopPropagation(); onQuickAction(movie, "okay"); }}
+              onClick={(e) => { e.stopPropagation(); onQuickAction(movie, "like"); }}
             >
               <span aria-hidden>😀</span>
               <span className="shelf-tooltip">I like this</span>
@@ -764,7 +770,7 @@ function SpotlightCard({
               type="button"
               className="shelf-reaction-item"
               aria-label={`Love ${movie.title}`}
-              onClick={(e) => { e.stopPropagation(); onQuickAction(movie, "like"); }}
+              onClick={(e) => { e.stopPropagation(); onQuickAction(movie, "love"); }}
             >
               <span aria-hidden>😍</span>
               <span className="shelf-tooltip">Love this!</span>
@@ -776,7 +782,7 @@ function SpotlightCard({
             className="glass-pill"
             style={{ fontSize: 12, fontWeight: 600, padding: "7px 14px", cursor: "pointer", color: "#fff", background: "rgba(255,255,255,0.14)", display: "inline-flex", alignItems: "center", gap: "6px", whiteSpace: "nowrap" }}
             aria-label={`Rate ${movie.title}`}
-            onClick={(e) => { e.stopPropagation(); onQuickAction(movie, "okay"); }}
+            onClick={(e) => { e.stopPropagation(); onQuickAction(movie, "like"); }}
           >
             <span>😀</span> Rate
           </button>

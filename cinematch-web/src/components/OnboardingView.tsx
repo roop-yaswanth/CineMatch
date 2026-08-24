@@ -5,6 +5,7 @@ import { motion, AnimatePresence, useMotionValue } from "framer-motion";
 import MovieCard from "@/components/MovieCard";
 import PreferencesModal from "@/components/PreferencesModal";
 import MobileMenu from "@/components/MobileMenu";
+import { useMounted } from "@/lib/useMounted";
 import {
   apiBuildSlate,
   apiRateOnboarding,
@@ -26,30 +27,13 @@ interface Props {
   forcePreferences?: boolean;
 }
 
-// Haptic feedback patterns for each rating action. The Vibration API silently
-// no-ops on devices without vibrators (e.g. desktops, iOS Safari), so this is
-// safe to call unconditionally.
-function triggerHaptic(action: string): void {
-  if (typeof navigator === "undefined") return;
-  const nav = navigator as Navigator & { vibrate?: (p: number | number[]) => boolean };
-  if (typeof nav.vibrate !== "function") return;
-  switch (action) {
-    case "like": nav.vibrate(15); break;
-    case "okay": nav.vibrate(20); break;
-    case "dislike": nav.vibrate([20, 10, 20]); break;
-    case "not_watched": nav.vibrate(8); break;
-    case "not_interested": nav.vibrate([10, 20, 10]); break;
-    case "undo": nav.vibrate([8, 30, 8]); break;
-    default: nav.vibrate(10);
-  }
-}
+import { triggerHaptic, hapticTap, hapticSelection, hapticSuccess, hapticUndo } from "@/lib/haptics";
 
 const RATING_OPTIONS = [
-  { value: "like", label: "Like", shortcut: "L", color: "var(--color-like)", variant: "like" },
-  { value: "okay", label: "Okay", shortcut: "O", color: "var(--color-okay)", variant: "okay" },
-  { value: "dislike", label: "Dislike", shortcut: "D", color: "var(--color-dislike)", variant: "dislike" },
-  { value: "not_watched", label: "Haven't Seen", shortcut: "S", color: "var(--color-skip)", variant: "skip" },
-  { value: "not_interested", label: "Not For Me", shortcut: "N", color: "var(--color-skip)", variant: "skip" },
+  { value: "love", label: "Love", emoji: "😍", isSkip: false, shortcut: "O", color: "var(--color-love, #30d158)", variant: "love" },
+  { value: "like", label: "Like", emoji: "😀", isSkip: false, shortcut: "L", color: "var(--color-like, #facc15)", variant: "like" },
+  { value: "dislike", label: "Dislike", emoji: "🙁", isSkip: false, shortcut: "D", color: "var(--color-dislike, #ef4444)", variant: "dislike" },
+  { value: "not_watched", label: "Haven't Seen", emoji: "", isSkip: true, shortcut: "S", color: "var(--color-skip, #8e8e93)", variant: "skip" },
 ] as const;
 
 const ease = [0.25, 0.1, 0.25, 1] as [number, number, number, number];
@@ -136,11 +120,11 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
   const [hasInteracted, setHasInteracted] = useState(false);
   const [loadingVariantIdx, setLoadingVariantIdx] = useState(0);
   const [showTutorial, setShowTutorial] = useState(false);
+  const mounted = useMounted();
 
   const inFlightRef = useRef(false);
   const cardShownAtRef = useRef<number>(0);
   const [escapeUsed, setEscapeUsed] = useState(false);
-  const [nudgeDismissed, setNudgeDismissed] = useState(false);
 
   const dragX = useMotionValue(0);
   const dragY = useMotionValue(0);
@@ -148,15 +132,16 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
 
   const ratingDirection = useCallback((rating: string): SwipeDirection => {
     switch (rating) {
+      case "love":
+        return "up";
       case "like":
         return "right";
       case "dislike":
         return "left";
-      case "okay":
-        return "down";
       case "not_watched":
+      case "skip":
       default:
-        return "up";
+        return "down";
     }
   }, []);
 
@@ -267,7 +252,7 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
     const idx = state?.session?.onboarding_index ?? 0;
     if (loading || inFlightRef.current || idx <= 0) return;
     inFlightRef.current = true;
-    triggerHaptic("undo");
+    hapticUndo();
     setLoading(true);
     try {
       const result = await apiUndoOnboarding(session.session_id);
@@ -285,19 +270,52 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
     }
   }, [state?.session?.onboarding_index, loading, onLogout, session.session_id]);
 
+  const handlePreferencesUpdate = useCallback(
+    async (newPrefs: ReturnType<typeof preferencesFromProfile>) => {
+      setPreferences(newPrefs);
+      setLoading(true);
+      try {
+        const { regionLanguages } = await import("@/lib/api");
+        const regionDefaults = regionLanguages(newPrefs.region);
+        const userLangs = newPrefs.languages;
+        const regionMatchesFully = regionDefaults.every((l) => userLangs.includes(l));
+        const effectiveRegion =
+          userLangs.length === 0 || regionMatchesFully ? newPrefs.region : "Other";
+
+        const result = await apiBuildSlate(session.session_id, {
+          languages: userLangs,
+          genres: newPrefs.genres,
+          semantic_index: newPrefs.semantic_index,
+          include_classics: newPrefs.include_classics,
+          age_group: newPrefs.age_group,
+          region: effectiveRegion,
+        });
+        setState(result);
+      } catch (err) {
+        if (isSessionExpiredError(err)) {
+          onLogout();
+          return;
+        }
+        console.error("Failed to refresh slate after preferences change:", err);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [session.session_id, onLogout]
+  );
+
   useEffect(() => {
     const handleKeyboard = (e: KeyboardEvent) => {
       if (!state?.movie || loading) return;
       if (e.key === "l" || e.key === "L") handleRate("like");
-      else if (e.key === "o" || e.key === "O") handleRate("okay");
+      else if (e.key === "o" || e.key === "O" || e.key === "v" || e.key === "V") handleRate("love");
       else if (e.key === "d" || e.key === "D") handleRate("dislike");
       else if (e.key === "s" || e.key === "S") handleRate("not_watched");
-      else if (e.key === "n" || e.key === "N") handleRate("not_interested");
       else if (e.key === "u" || e.key === "U") handleUndo();
       else if (e.key === "ArrowLeft") handleRate("dislike");
       else if (e.key === "ArrowRight") handleRate("like");
-      else if (e.key === "ArrowUp") handleRate("not_watched");
-      else if (e.key === "ArrowDown") handleRate("okay");
+      else if (e.key === "ArrowUp") handleRate("love");
+      else if (e.key === "ArrowDown") handleRate("not_watched");
     };
     window.addEventListener("keydown", handleKeyboard);
     return () => window.removeEventListener("keydown", handleKeyboard);
@@ -312,7 +330,7 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
       if (offset.x > 0) handleRate("like");
       else handleRate("dislike");
     } else if (Math.abs(offset.y) > threshold) {
-      if (offset.y > 0) handleRate("okay");
+      if (offset.y < 0) handleRate("love");
       else handleRate("not_watched");
     }
   };
@@ -342,7 +360,7 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
     <>
       {/* Mobile swipe tutorial overlay — shown every time slate is built on mobile */}
       <AnimatePresence>
-        {showTutorial && (
+        {mounted && showTutorial && (
           <MobileSwipeTutorial
             onDismiss={() => {
               setShowTutorial(false);
@@ -463,8 +481,8 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
                     if (ax < 16 && ay < 16) { setCardGlow("none"); return; }
                     const op = Math.min(1, (Math.max(ax, ay) - 16) / 80);
                     const c = ax >= ay
-                      ? (x > 0 ? "255,45,85" : "255,69,58")
-                      : (y > 0 ? "245,158,11" : "148,163,184");
+                      ? (x > 0 ? "250,204,21" : "255,69,58")
+                      : (y < 0 ? "48,209,88" : "142,142,147");
                     setCardGlow(`0 0 ${44 * op}px ${14 * op}px rgba(${c},${0.7 * op})`);
                   }}
                   onDragEnd={(e, info) => { dragX.set(0); dragY.set(0); setCardGlow("none"); handleDragEnd(e, info); }}
@@ -507,6 +525,17 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
 
                       {/* 4-direction guide */}
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px 24px", width: "100%", maxWidth: "240px", marginBottom: "32px" }}>
+                        {/* Up = Love */}
+                        <motion.div
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 1.0, type: "spring", stiffness: 200, damping: 20 }}
+                          style={{ display: "flex", alignItems: "center", gap: "8px" }}
+                        >
+                          <span style={{ fontSize: "20px" }}>😍</span>
+                          <span style={{ color: "var(--color-love)", fontSize: "13px", fontWeight: 600 }}>Love (Up)</span>
+                        </motion.div>
+
                         {/* Right = Like */}
                         <motion.div
                           initial={{ opacity: 0, x: -10 }}
@@ -515,7 +544,7 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
                           style={{ display: "flex", alignItems: "center", gap: "8px" }}
                         >
                           <span style={{ fontSize: "20px" }}>😀</span>
-                          <span style={{ color: "var(--color-like)", fontSize: "13px", fontWeight: 600 }}>Like</span>
+                          <span style={{ color: "var(--color-like)", fontSize: "13px", fontWeight: 600 }}>Like (Right)</span>
                         </motion.div>
 
                         {/* Left = Dislike */}
@@ -525,30 +554,22 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
                           transition={{ delay: 1.4, type: "spring", stiffness: 200, damping: 20 }}
                           style={{ display: "flex", alignItems: "center", gap: "8px" }}
                         >
-                          <span style={{ fontSize: "22px" }}>👈</span>
-                          <span style={{ color: "var(--color-dislike)", fontSize: "13px", fontWeight: 600 }}>Dislike</span>
-                        </motion.div>
-
-                        {/* Up = Okay */}
-                        <motion.div
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: 1.6, type: "spring", stiffness: 200, damping: 20 }}
-                          style={{ display: "flex", alignItems: "center", gap: "8px" }}
-                        >
-                          <span style={{ fontSize: "22px" }}>👆</span>
-                          <span style={{ color: "var(--color-okay)", fontSize: "13px", fontWeight: 600 }}>Okay</span>
+                          <span style={{ fontSize: "20px" }}>🙁</span>
+                          <span style={{ color: "var(--color-dislike)", fontSize: "13px", fontWeight: 600 }}>Dislike (Left)</span>
                         </motion.div>
 
                         {/* Down = Skip */}
                         <motion.div
                           initial={{ opacity: 0, y: -10 }}
                           animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: 1.8, type: "spring", stiffness: 200, damping: 20 }}
+                          transition={{ delay: 1.6, type: "spring", stiffness: 200, damping: 20 }}
                           style={{ display: "flex", alignItems: "center", gap: "8px" }}
                         >
-                          <span style={{ fontSize: "22px" }}>👇</span>
-                          <span style={{ color: "var(--color-skip)", fontSize: "13px", fontWeight: 600 }}>Skip</span>
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--color-skip)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                            <polygon points="5 4 15 12 5 20 5 4" fill="var(--color-skip)" />
+                            <line x1="19" y1="5" x2="19" y2="19" />
+                          </svg>
+                          <span style={{ color: "var(--color-skip)", fontSize: "13px", fontWeight: 600 }}>Skip (Down)</span>
                         </motion.div>
                       </div>
 
@@ -615,67 +636,7 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
         <div className="onboarding-actions" style={{ width: "100%", maxWidth: "700px", flexShrink: 0, paddingTop: "4px", paddingBottom: "2px" }}>
           {state?.movie && (
             <>
-              {(() => {
-                const idx = state?.session?.onboarding_index ?? 0;
-                const likes = state?.session?.onboarding_likes ?? 0;
-                const minLikes = state?.session?.min_likes_needed ?? 10;
-                const showNudge = !nudgeDismissed && idx >= 15 && likes < minLikes && !state?.is_ready;
-                if (!showNudge) return null;
-                return (
-                  <motion.div
-                    initial={{ opacity: 0, y: -6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="glass-card"
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "10px",
-                      padding: "10px 12px",
-                      marginBottom: "8px",
-                      borderRadius: "10px",
-                      fontSize: "12px",
-                      color: "var(--color-text-primary)",
-                    }}
-                  >
-                    <span style={{ fontSize: "16px", lineHeight: 1 }}>👋</span>
-                    <span style={{ flex: 1, lineHeight: 1.4 }}>
-                      Not finding your style? Adjusting your genres or region might help.
-                    </span>
-                    <button
-                      onClick={() => setShowPrefs(true)}
-                      style={{
-                        background: "rgba(255,255,255,0.10)",
-                        border: "1px solid rgba(255,255,255,0.15)",
-                        color: "var(--color-text-primary)",
-                        borderRadius: "var(--radius-pill)",
-                        padding: "5px 12px",
-                        fontSize: "11px",
-                        fontWeight: 600,
-                        cursor: "pointer",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      Adjust
-                    </button>
-                    <button
-                      onClick={() => setNudgeDismissed(true)}
-                      aria-label="Dismiss"
-                      style={{
-                        background: "transparent",
-                        border: "none",
-                        color: "var(--color-text-muted)",
-                        fontSize: "16px",
-                        cursor: "pointer",
-                        padding: "0 4px",
-                        lineHeight: 1,
-                      }}
-                    >
-                      ×
-                    </button>
-                  </motion.div>
-                );
-              })()}
-              {/* Top row: judgement ratings (rated movies you've seen) */}
+              {/* Top row: 3 judgement ratings (Face emojis for Love, Like, Dislike) */}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "8px" }}>
                 {RATING_OPTIONS.slice(0, 3).map((opt) => (
                   <motion.button
@@ -697,15 +658,14 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
                     }}
                     title={`${opt.label} (${opt.shortcut})`}
                   >
-                    {opt.value === "like" && (
-                      <span style={{ fontSize: "15px" }}>😀</span>
-                    )}
+                    <span style={{ fontSize: "18px" }}>{opt.emoji}</span>
                     <span>{opt.label}</span>
                   </motion.button>
                 ))}
               </div>
-              {/* Bottom row: skip variants (haven't seen / not for me) */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "8px", marginTop: "8px" }}>
+
+              {/* Bottom row: Haven't Seen / Skip with skip SVG icon */}
+              <div style={{ marginTop: "8px" }}>
                 {RATING_OPTIONS.slice(3).map((opt) => (
                   <motion.button
                     key={opt.value}
@@ -714,15 +674,24 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
                     disabled={loading}
                     className={`rating-btn rating-btn--${opt.variant}`}
                     style={{
+                      width: "100%",
                       cursor: loading ? "not-allowed" : "pointer",
                       opacity: loading ? 0.4 : 1,
                       padding: "11px 8px",
-                      fontSize: "12px",
+                      fontSize: "13px",
                       fontWeight: 500,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "7px",
                     }}
                     title={`${opt.label} (${opt.shortcut})`}
                   >
-                    {opt.label}
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <polygon points="5 4 15 12 5 20 5 4" fill="currentColor" />
+                      <line x1="19" y1="5" x2="19" y2="19" />
+                    </svg>
+                    <span>{opt.label}</span>
                   </motion.button>
                 ))}
               </div>
@@ -807,7 +776,7 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
         </div>
 
         {showPrefs && (
-          <PreferencesModal preferences={preferences} onUpdate={setPreferences}
+          <PreferencesModal preferences={preferences} onUpdate={handlePreferencesUpdate}
             onClose={() => setShowPrefs(false)} mode="onboarding" />
         )}
       </div>
@@ -819,10 +788,10 @@ import type { MotionValue } from "framer-motion";
 import { useMotionValueEvent } from "framer-motion";
 
 const SWIPE_CONFIGS = {
-  right: { label: "LIKE", color: "#ff2d55", stampTop: "28px", stampLeft: "18px", stampRotate: "-22deg" },
-  left: { label: "NOPE", color: "#ff453a", stampTop: "28px", stampRight: "18px", stampRotate: "22deg" },
-  down: { label: "OKAY", color: "#0a84ff", stampTop: "28px", stampLeft: "50%", stampRotate: "-8deg", stampTranslateX: "-50%" },
-  up: { label: "SKIP", color: "#8e8e93", stampBottom: "90px", stampLeft: "50%", stampRotate: "8deg", stampTranslateX: "-50%" },
+  up: { label: "LOVE", emoji: "😍", isSkip: false, color: "#30d158", stampTop: "28px", stampLeft: "50%", stampRotate: "-8deg", stampTranslateX: "-50%" },
+  right: { label: "LIKE", emoji: "😀", isSkip: false, color: "#facc15", stampTop: "28px", stampLeft: "18px", stampRotate: "-22deg" },
+  left: { label: "DISLIKE", emoji: "🙁", isSkip: false, color: "#ef4444", stampTop: "28px", stampRight: "18px", stampRotate: "22deg" },
+  down: { label: "SKIP", emoji: "", isSkip: true, color: "#8e8e93", stampBottom: "90px", stampLeft: "50%", stampRotate: "8deg", stampTranslateX: "-50%" },
 } as const;
 
 type SwipeDir = keyof typeof SWIPE_CONFIGS;
@@ -834,7 +803,7 @@ function SwipeGlowOverlay({ dragX, dragY }: { dragX: MotionValue<number>; dragY:
     const ax = Math.abs(x), ay = Math.abs(y);
     if (ax < 16 && ay < 16) { setState(null); return; }
     const horizontal = ax >= ay;
-    const dir: SwipeDir = horizontal ? (x > 0 ? "right" : "left") : (y > 0 ? "down" : "up");
+    const dir: SwipeDir = horizontal ? (x > 0 ? "right" : "left") : (y < 0 ? "up" : "down");
     const raw = (horizontal ? ax : ay) - 16;
     setState({ dir, op: Math.min(1, raw / 80) });
   };
@@ -846,18 +815,16 @@ function SwipeGlowOverlay({ dragX, dragY }: { dragX: MotionValue<number>; dragY:
   const { dir, op } = state;
   const cfg = SWIPE_CONFIGS[dir];
   const hex = cfg.color;
-  const stOp = Math.min(1, op * 1.8); // stamp appears slightly faster
+  const stOp = Math.min(1, op * 1.8);
 
   return (
     <>
-      {/* Solid color tint — clean, confident, no gradient */}
       <div style={{
         position: "absolute", inset: 0, borderRadius: "var(--radius-poster)",
         background: hex, opacity: op * 0.22,
         pointerEvents: "none", zIndex: 10,
       }} />
 
-      {/* Stamp — corner-positioned, rotated, Tinder-style */}
       <div style={{
         position: "absolute",
         ...("stampTop" in cfg && { top: cfg.stampTop }),
@@ -875,56 +842,173 @@ function SwipeGlowOverlay({ dragX, dragY }: { dragX: MotionValue<number>; dragY:
           border: `4px solid ${hex}`,
           borderRadius: "6px",
           color: hex,
-          fontSize: "26px",
+          fontSize: "24px",
           fontWeight: 900,
-          letterSpacing: "0.16em",
+          letterSpacing: "0.14em",
           lineHeight: 1.15,
-          background: "rgba(0,0,0,0.35)",
+          background: "rgba(0,0,0,0.5)",
           backdropFilter: "blur(4px)",
           WebkitBackdropFilter: "blur(4px)",
           userSelect: "none",
           whiteSpace: "nowrap",
-          // subtle inner shadow for depth
           boxShadow: `inset 0 0 0 1px ${hex}44`,
+          display: "inline-flex",
+          alignItems: "center",
+          gap: "8px",
         }}>
-          {cfg.label}
+          {cfg.emoji ? <span>{cfg.emoji}</span> : null}
+          {cfg.isSkip ? (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="5 4 15 12 5 20 5 4" fill="currentColor" />
+              <line x1="19" y1="5" x2="19" y2="19" />
+            </svg>
+          ) : null}
+          <span>{cfg.label}</span>
         </div>
       </div>
     </>
   );
 }
 
-/* ─── Mobile Swipe Tutorial ─────────────────────────────────────────────────
- * Full-screen overlay shown ONCE on mobile. Walks through all 4 swipe
- * directions by animating a demo card off-screen in each direction, showing
- * the matching colour tint + stamp so users learn visually before they start.
+/* ─── Mobile Swipe Tutorial (Forced Interactive) ────────────────────────────
+ * Full-screen interactive overlay shown ONCE on mobile. Requires the user to
+ * physically perform all 4 swipe directions (Love, Like, Dislike, Skip)
+ * on interactive practice cards before entering the main rating onboarding.
  * ──────────────────────────────────────────────────────────────────────────*/
 const SWIPE_STEPS = [
-  // Colors mirror the global rating palette (--color-like / --color-dislike /
-  // --color-okay / --color-skip) as literals so framer-motion can interpolate
-  // them in the tint/dot animations.
-  { dir: "right", label: "LIKE", sub: "You loved it or would watch it", color: "#ff2d55", exitX: 320, exitY: 0, rot: 15, hand: "❤️", gesture: "Swipe right" },
-  { dir: "left", label: "NOPE", sub: "Not your thing at all", color: "#ff453a", exitX: -320, exitY: 0, rot: -15, hand: "👈", gesture: "Swipe left" },
-  { dir: "down", label: "OKAY", sub: "Seen it — it was fine", color: "#0a84ff", exitX: 0, exitY: 320, rot: -4, hand: "👇", gesture: "Swipe down" },
-  { dir: "up", label: "SKIP", sub: "Haven't seen it yet", color: "#8e8e93", exitX: 0, exitY: -320, rot: 4, hand: "👆", gesture: "Swipe up" },
+  {
+    dir: "up",
+    action: "love",
+    label: "LOVE",
+    emoji: "😍",
+    isSkip: false,
+    color: "#30d158",
+    gesture: "Swipe Up",
+    prompt: "Swipe card UP to Love",
+    sub: "Loved it — super strong recommendation signal",
+    exitX: 0,
+    exitY: -350,
+    rot: -4,
+    startX: 0,
+    startY: 78,
+    endX: 0,
+    endY: -78,
+    isValid: (x: number, y: number) => y < -45 && Math.abs(y) > Math.abs(x),
+  },
+  {
+    dir: "right",
+    action: "like",
+    label: "LIKE",
+    emoji: "😀",
+    isSkip: false,
+    color: "#facc15",
+    gesture: "Swipe Right",
+    prompt: "Swipe card RIGHT to Like",
+    sub: "Liked it — finds movies in this style",
+    exitX: 350,
+    exitY: 0,
+    rot: 14,
+    startX: -65,
+    startY: 0,
+    endX: 65,
+    endY: 0,
+    isValid: (x: number, y: number) => x > 45 && Math.abs(x) > Math.abs(y),
+  },
+  {
+    dir: "left",
+    action: "dislike",
+    label: "DISLIKE",
+    emoji: "🙁",
+    isSkip: false,
+    color: "#ef4444",
+    gesture: "Swipe Left",
+    prompt: "Swipe card LEFT to Dislike",
+    sub: "Not your taste — filters out similar tone",
+    exitX: -350,
+    exitY: 0,
+    rot: -14,
+    startX: 65,
+    startY: 0,
+    endX: -65,
+    endY: 0,
+    isValid: (x: number, y: number) => x < -45 && Math.abs(x) > Math.abs(y),
+  },
+  {
+    dir: "down",
+    action: "skip",
+    label: "SKIP",
+    emoji: "",
+    isSkip: true,
+    color: "#8e8e93",
+    gesture: "Swipe Down",
+    prompt: "Swipe card DOWN to Skip",
+    sub: "Haven't seen it yet — moves on neutral",
+    exitX: 0,
+    exitY: 350,
+    rot: 4,
+    startX: 0,
+    startY: -72,
+    endX: 0,
+    endY: 78,
+    isValid: (x: number, y: number) => y > 45 && Math.abs(y) > Math.abs(x),
+  },
 ] as const;
 
 function MobileSwipeTutorial({ onDismiss }: { onDismiss: () => void }) {
   const [step, setStep] = useState(0);
-  // each step: card shows 1.4s, then exits 0.5s, then next
-  const AUTO_MS = 1900;
+  const [isCompleted, setIsCompleted] = useState(false);
+  const [exitingStep, setExitingStep] = useState<number | null>(null);
+  const [showHint, setShowHint] = useState(false);
+  const [dragProgress, setDragProgress] = useState(0);
 
-  useEffect(() => {
-    if (step >= SWIPE_STEPS.length - 1) return;
-    const t = setTimeout(() => setStep((s) => s + 1), AUTO_MS);
-    return () => clearTimeout(t);
-  }, [step]);
+  const tDragX = useMotionValue(0);
+  const tDragY = useMotionValue(0);
 
-  const s = SWIPE_STEPS[step];
-  const isLast = step === SWIPE_STEPS.length - 1;
+  const s = SWIPE_STEPS[Math.min(step, SWIPE_STEPS.length - 1)];
+
+  const handleDrag = (_: unknown, info: { offset: { x: number; y: number } }) => {
+    if (isCompleted || exitingStep !== null) return;
+    const x = info.offset.x;
+    const y = info.offset.y;
+    tDragX.set(x);
+    tDragY.set(y);
+    const dist = Math.max(Math.abs(x), Math.abs(y));
+    setDragProgress(Math.min(1, dist / 80));
+  };
+
+  const handleDragEnd = (_: unknown, info: { offset: { x: number; y: number } }) => {
+    if (isCompleted || exitingStep !== null) return;
+    const x = info.offset.x;
+    const y = info.offset.y;
+
+    if (s.isValid(x, y)) {
+      triggerHaptic(s.action);
+      setExitingStep(step);
+      setTimeout(() => {
+        setExitingStep(null);
+        tDragX.set(0);
+        tDragY.set(0);
+        setDragProgress(0);
+        if (step >= SWIPE_STEPS.length - 1) {
+          setIsCompleted(true);
+          hapticSuccess();
+        } else {
+          setStep((prev) => prev + 1);
+        }
+      }, 340);
+    } else {
+      // Incorrect direction or insufficient distance -> bounce back
+      setShowHint(true);
+      tDragX.set(0);
+      tDragY.set(0);
+      setDragProgress(0);
+      setTimeout(() => setShowHint(false), 1600);
+    }
+  };
+
   const stampLeft = s.exitX > 0 ? "14px" : s.exitX < 0 ? undefined : "50%";
   const stampRight = s.exitX < 0 ? "14px" : undefined;
-  const stampTransform = s.exitX === 0 ? "translateX(-50%) rotate(-6deg)" : `rotate(${s.exitX > 0 ? "-20deg" : "20deg"})`;
+  const stampTransform = s.exitX === 0 ? "translateX(-50%) rotate(-6deg)" : `rotate(${s.exitX > 0 ? "-18deg" : "18deg"})`;
 
   return (
     <motion.div
@@ -934,163 +1018,470 @@ function MobileSwipeTutorial({ onDismiss }: { onDismiss: () => void }) {
       transition={{ duration: 0.3 }}
       style={{
         position: "fixed", inset: 0, zIndex: 300,
-        background: "rgba(0,0,0,0.94)",
-        backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)",
+        background: "rgba(0,0,0,0.95)",
+        backdropFilter: "blur(18px)", WebkitBackdropFilter: "blur(18px)",
         display: "flex", flexDirection: "column", alignItems: "center",
         justifyContent: "center", padding: "24px",
         fontFamily: "var(--font-sans)",
+        touchAction: "none",
       }}
     >
       {/* Title */}
       <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
-        style={{ textAlign: "center", marginBottom: "32px" }}>
-        <p style={{ fontSize: "11px", letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,255,255,0.35)", marginBottom: "6px" }}>
-          Quick tutorial
+        style={{ textAlign: "center", marginBottom: "20px" }}>
+        <p style={{ fontSize: "11px", letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)", marginBottom: "4px" }}>
+          Interactive Practice &nbsp;·&nbsp; Step {Math.min(step + 1, SWIPE_STEPS.length)} of {SWIPE_STEPS.length}
         </p>
-        <p style={{ fontSize: "22px", fontWeight: 700, color: "white", margin: 0 }}>
-          How to rate movies
-        </p>
-        <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.45)", marginTop: "6px" }}>
-          Swipe the card in any direction
+        <p style={{ fontSize: "20px", fontWeight: 800, color: "white", margin: 0, letterSpacing: "-0.01em" }}>
+          {isCompleted ? "You're All Set 🎬" : s.prompt}
         </p>
       </motion.div>
 
-      {/* Demo card */}
-      <div style={{ position: "relative", width: 170, height: 240, marginBottom: "16px" }}>
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={step}
-            initial={{ x: 0, y: 0, rotate: 0, opacity: 0, scale: 0.88 }}
-            animate={{ x: 0, y: 0, rotate: 0, opacity: 1, scale: 1, transition: { duration: 0.32 } }}
-            exit={{ x: s.exitX, y: s.exitY, rotate: s.rot, opacity: 0, transition: { duration: 0.46, ease: "easeIn" } }}
-            style={{
-              width: 170, height: 240,
-              borderRadius: "16px",
-              background: "linear-gradient(145deg, #1e1e2e 0%, #10101a 100%)",
-              border: "1px solid rgba(255,255,255,0.09)",
-              position: "relative", overflow: "hidden",
-              boxShadow: `0 24px 64px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04)`,
-            }}
-          >
-            {/* Fake poster art */}
-            <div style={{
-              position: "absolute", inset: 0, display: "flex",
-              flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "10px",
-            }}>
-              <div style={{ fontSize: "44px", filter: "grayscale(0.3)" }}>🎬</div>
-              <div style={{ width: "90px", height: "7px", background: "rgba(255,255,255,0.1)", borderRadius: "4px" }} />
-              <div style={{ width: "60px", height: "5px", background: "rgba(255,255,255,0.06)", borderRadius: "3px" }} />
-            </div>
-
-            {/* Animated colour tint */}
-            <motion.div
-              key={`tint-${step}`}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: [0, 0.18, 0.32] }}
-              transition={{ duration: 1.4, times: [0, 0.5, 1] }}
-              style={{ position: "absolute", inset: 0, background: s.color, borderRadius: "16px", pointerEvents: "none" }}
-            />
-
-            {/* Stamp badge */}
-            <motion.div
-              key={`stamp-${step}`}
-              initial={{ opacity: 0, scale: 0.7 }}
-              animate={{ opacity: [0, 0, 1], scale: [0.7, 0.7, 1] }}
-              transition={{ duration: 1.4, times: [0, 0.55, 1], ease: "backOut" }}
-              style={{
-                position: "absolute", top: "18px",
-                left: stampLeft, right: stampRight,
-                transform: stampTransform,
-                padding: "4px 12px 5px",
-                border: `3px solid ${s.color}`,
-                borderRadius: "6px",
-                color: s.color,
-                fontSize: "17px",
-                fontWeight: 900,
-                letterSpacing: "0.12em",
-                background: "rgba(0,0,0,0.4)",
-                backdropFilter: "blur(4px)",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {s.label}
-            </motion.div>
-          </motion.div>
-        </AnimatePresence>
-
-        {/* Animated hand emoji showing gesture direction */}
-        <motion.div
-          key={`hand-${step}`}
-          initial={{ opacity: 0 }}
-          animate={{
-            opacity: [0, 1, 1, 0],
-            x: [0, s.exitX > 0 ? 28 : s.exitX < 0 ? -28 : 0, 0],
-            y: [0, s.exitY > 0 ? 28 : s.exitY < 0 ? -28 : 0, 0],
-          }}
-          transition={{ duration: 1.6, times: [0, 0.4, 0.75, 1], repeat: Infinity, repeatDelay: 0.1 }}
+      {/* Demo Card Zone with Interactive Drag */}
+      <div style={{ position: "relative", width: 200, height: 285, marginBottom: "16px" }}>
+        {/* Shadow deck beneath */}
+        <div
           style={{
             position: "absolute",
-            bottom: s.exitY < 0 ? undefined : "-38px",
-            top: s.exitY < 0 ? "-44px" : undefined,
-            left: "50%", transform: "translateX(-50%)",
-            fontSize: "30px",
-            filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.6))",
-            pointerEvents: "none",
+            inset: "10px 12px -10px 12px",
+            borderRadius: "18px",
+            background: "rgba(255,255,255,0.03)",
+            border: "1px solid rgba(255,255,255,0.05)",
+            zIndex: 1,
           }}
-        >
-          {s.hand}
-        </motion.div>
+        />
+
+        <AnimatePresence mode="wait">
+          {exitingStep === null && !isCompleted && (
+            <motion.div
+              key={step}
+              drag
+              dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
+              dragElastic={0.7}
+              onDrag={handleDrag}
+              onDragEnd={handleDragEnd}
+              initial={{ y: -70, scale: 0.9, opacity: 0 }}
+              animate={{
+                y: 0,
+                scale: 1,
+                opacity: 1,
+                transition: { duration: 0.35, ease: "easeOut" },
+              }}
+              exit={{
+                x: s.exitX,
+                y: s.exitY,
+                rotate: s.rot,
+                opacity: 0,
+                scale: 0.95,
+                transition: { duration: 0.32, ease: "easeIn" },
+              }}
+              whileTap={{ cursor: "grabbing" }}
+              style={{
+                width: 200,
+                height: 285,
+                borderRadius: "18px",
+                background: "linear-gradient(145deg, #1e1e2e 0%, #10101a 100%)",
+                border: `1px solid ${dragProgress > 0.2 ? s.color : "rgba(255,255,255,0.16)"}`,
+                position: "relative",
+                overflow: "hidden",
+                boxShadow: `0 24px 64px rgba(0,0,0,0.75), 0 0 ${24 * dragProgress}px ${s.color}55`,
+                cursor: "grab",
+                zIndex: 2,
+                touchAction: "none",
+              }}
+            >
+              {/* Fake poster illustration background */}
+              <div style={{
+                position: "absolute", inset: 0, display: "flex",
+                flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "10px",
+                pointerEvents: "none",
+                opacity: 0.2,
+              }}>
+                <div style={{ fontSize: "42px", filter: "grayscale(0.4)" }}>🎬</div>
+                <div style={{ width: "90px", height: "6px", background: "rgba(255,255,255,0.12)", borderRadius: "4px" }} />
+                <div style={{ width: "60px", height: "4px", background: "rgba(255,255,255,0.08)", borderRadius: "3px" }} />
+              </div>
+
+              {/* Tint overlay based on target color */}
+              <div
+                style={{
+                  position: "absolute", inset: 0,
+                  background: s.color,
+                  opacity: Math.max(0.08, dragProgress * 0.4),
+                  borderRadius: "18px",
+                  pointerEvents: "none",
+                  transition: "opacity 0.1s ease",
+                }}
+              />
+
+              {/* Stamp badge at top */}
+              <div
+                style={{
+                  position: "absolute", top: "14px",
+                  left: stampLeft, right: stampRight,
+                  transform: stampTransform,
+                  padding: "4px 12px 5px",
+                  border: `2.5px solid ${s.color}`,
+                  borderRadius: "6px",
+                  color: s.color,
+                  fontSize: "15px",
+                  fontWeight: 900,
+                  letterSpacing: "0.12em",
+                  background: "rgba(0,0,0,0.75)",
+                  backdropFilter: "blur(6px)",
+                  WebkitBackdropFilter: "blur(6px)",
+                  whiteSpace: "nowrap",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  opacity: Math.max(0.8, dragProgress * 1.5),
+                  pointerEvents: "none",
+                  boxShadow: "0 4px 16px rgba(0,0,0,0.6)",
+                }}
+              >
+                {s.emoji ? <span>{s.emoji}</span> : null}
+                {s.isSkip ? (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                    <polygon points="5 4 15 12 5 20 5 4" fill="currentColor" />
+                    <line x1="19" y1="5" x2="19" y2="19" />
+                  </svg>
+                ) : null}
+                <span>{s.label}</span>
+              </div>
+
+              {/* ── NATURAL HAND-SWIPE GESTURE SWEEP DIRECTLY ON THE POSTER ── */}
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  pointerEvents: "none",
+                  zIndex: 8,
+                  overflow: "hidden",
+                }}
+              >
+                {/* 1. Origin Touch Circle at Starting Position */}
+                <div
+                  style={{
+                    position: "absolute",
+                    transform: `translate(${s.startX}px, ${s.startY}px)`,
+                    width: 52,
+                    height: 52,
+                    borderRadius: "50%",
+                    border: `2px dashed ${s.color}88`,
+                    background: `radial-gradient(circle, ${s.color}28 0%, rgba(10, 12, 20, 0.75) 75%)`,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    boxShadow: `0 0 16px ${s.color}33`,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 10,
+                      height: 10,
+                      borderRadius: "50%",
+                      background: s.color,
+                      boxShadow: `0 0 8px ${s.color}`,
+                    }}
+                  />
+                </div>
+
+                {/* 2. Touchdown Ripple expanding from start position */}
+                <motion.div
+                  key={`ripple-${step}`}
+                  animate={{
+                    scale: [0.6, 1.4, 1.7],
+                    opacity: [0.9, 0.4, 0],
+                  }}
+                  transition={{
+                    duration: 1.6,
+                    repeat: Infinity,
+                    repeatDelay: 0.2,
+                    ease: "easeOut",
+                    times: [0, 0.4, 0.8],
+                  }}
+                  style={{
+                    position: "absolute",
+                    transform: `translate(${s.startX}px, ${s.startY}px)`,
+                    width: 52,
+                    height: 52,
+                    borderRadius: "50%",
+                    border: `2px solid ${s.color}`,
+                    background: `radial-gradient(circle, ${s.color}66 0%, transparent 70%)`,
+                  }}
+                />
+
+                {/* 3. Motion Trail along swipe path */}
+                <motion.div
+                  key={`trail-${step}`}
+                  animate={{
+                    opacity: [0, 0.8, 0.85, 0],
+                    scaleY: s.dir === "up" || s.dir === "down" ? [0.1, 1, 1, 0.3] : 1,
+                    scaleX: s.dir === "left" || s.dir === "right" ? [0.1, 1, 1, 0.3] : 1,
+                  }}
+                  transition={{
+                    duration: 1.6,
+                    repeat: Infinity,
+                    repeatDelay: 0.2,
+                    ease: [0.25, 0.1, 0.25, 1],
+                    times: [0, 0.2, 0.75, 1],
+                  }}
+                  style={{
+                    position: "absolute",
+                    transform:
+                      s.dir === "up"
+                        ? "translate(0px, 0px)"
+                        : s.dir === "down"
+                          ? "translate(0px, 4px)"
+                          : "translate(0px, 0px)",
+                    pointerEvents: "none",
+                    borderRadius: "999px",
+                    background:
+                      s.dir === "up"
+                        ? `linear-gradient(to top, transparent 0%, ${s.color}66 50%, ${s.color} 100%)`
+                        : s.dir === "down"
+                          ? `linear-gradient(to bottom, transparent 0%, ${s.color}66 50%, ${s.color} 100%)`
+                          : s.dir === "right"
+                            ? `linear-gradient(to right, transparent 0%, ${s.color}66 50%, ${s.color} 100%)`
+                            : `linear-gradient(to left, transparent 0%, ${s.color}66 50%, ${s.color} 100%)`,
+                    width: s.dir === "up" || s.dir === "down" ? "6px" : "140px",
+                    height: s.dir === "up" || s.dir === "down" ? "140px" : "6px",
+                    boxShadow: `0 0 16px ${s.color}`,
+                  }}
+                />
+
+                {/* 4. Sweeping Handswipe Puck (Touch point + Prominent Arrow) */}
+                <motion.div
+                  key={`puck-${step}`}
+                  animate={{
+                    x: [s.startX, s.startX, s.endX, s.endX],
+                    y: [s.startY, s.startY, s.endY, s.endY],
+                    opacity: [0, 1, 1, 0],
+                    scale: [0.85, 1, 1.08, 0.85],
+                  }}
+                  transition={{
+                    duration: 1.6,
+                    repeat: Infinity,
+                    repeatDelay: 0.2,
+                    ease: [0.25, 0.1, 0.25, 1],
+                    times: [0, 0.15, 0.75, 1],
+                  }}
+                  style={{
+                    position: "absolute",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: 56,
+                    height: 56,
+                    borderRadius: "50%",
+                    background: "rgba(10, 10, 18, 0.94)",
+                    backdropFilter: "blur(14px)",
+                    WebkitBackdropFilter: "blur(14px)",
+                    border: `2.5px solid ${s.color}`,
+                    boxShadow: `0 0 28px ${s.color}88, 0 10px 24px rgba(0,0,0,0.9)`,
+                    zIndex: 2,
+                  }}
+                >
+                  <div
+                    style={{
+                      color: s.color,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      filter: `drop-shadow(0 0 8px ${s.color})`,
+                    }}
+                  >
+                    {s.dir === "up" && (
+                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 19V5" />
+                        <path d="m5 12 7-7 7 7" />
+                      </svg>
+                    )}
+                    {s.dir === "right" && (
+                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M5 12h14" />
+                        <path d="m12 5 7 7-7 7" />
+                      </svg>
+                    )}
+                    {s.dir === "left" && (
+                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M19 12H5" />
+                        <path d="m12 19-7-7 7-7" />
+                      </svg>
+                    )}
+                    {s.dir === "down" && (
+                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 5v14" />
+                        <path d="m19 12-7 7-7-7" />
+                      </svg>
+                    )}
+                  </div>
+                </motion.div>
+              </div>
+            </motion.div>
+          )}
+
+          {isCompleted && (
+            <motion.div
+              key="completed-card"
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 0.35, ease: "easeOut" }}
+              style={{
+                width: 200,
+                height: 285,
+                borderRadius: "18px",
+                background: "linear-gradient(155deg, #1c1d28 0%, #0f1017 100%)",
+                border: "1px solid rgba(245, 158, 11, 0.35)",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "14px",
+                padding: "24px 16px",
+                boxShadow: "0 24px 64px rgba(0,0,0,0.85), 0 0 30px rgba(245, 158, 11, 0.15)",
+                zIndex: 2,
+                textAlign: "center",
+              }}
+            >
+              {/* Cinematic Film Clapper Badge */}
+              <div
+                style={{
+                  width: 58,
+                  height: 58,
+                  borderRadius: "50%",
+                  background: "rgba(245, 158, 11, 0.14)",
+                  border: "1.5px solid rgba(245, 158, 11, 0.4)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  boxShadow: "0 0 20px rgba(245, 158, 11, 0.25)",
+                }}
+              >
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent, #f59e0b)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M19.82 2H4.18C2.97 2 2 2.97 2 4.18v15.64C2 21.03 2.97 22 4.18 22h15.64c1.21 0 2.18-.97 2.18-2.18V4.18C22 2.97 21.03 2 19.82 2z" />
+                  <path d="M7 2v20" />
+                  <path d="M17 2v20" />
+                  <path d="M2 12h20" />
+                  <path d="M2 7h5" />
+                  <path d="M2 17h5" />
+                  <path d="M17 17h5" />
+                  <path d="M17 7h5" />
+                </svg>
+              </div>
+
+              <div>
+                <p style={{ color: "#ffffff", fontWeight: 800, fontSize: "16px", margin: "0 0 4px", letterSpacing: "-0.01em" }}>
+                  Ready to Discover
+                </p>
+                <p style={{ color: "rgba(255,255,255,0.55)", fontSize: "11.5px", lineHeight: 1.45, margin: 0 }}>
+                  Swipe to rate movies and build your personalized slate
+                </p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
-      {/* Label + description */}
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={`label-${step}`}
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -10 }}
-          transition={{ duration: 0.22 }}
-          style={{ textAlign: "center", marginTop: "44px", marginBottom: "28px", minHeight: "52px" }}
-        >
-          <p style={{ fontSize: "20px", fontWeight: 800, color: s.color, margin: 0, letterSpacing: "-0.01em" }}>
-            {s.gesture}
-          </p>
-          <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.5)", marginTop: "5px", margin: "5px 0 0" }}>
-            {s.sub}
-          </p>
-        </motion.div>
-      </AnimatePresence>
+      {/* Dynamic feedback / Subtitle */}
+      <div style={{ textAlign: "center", minHeight: "48px", marginTop: "12px", marginBottom: "20px" }}>
+        <AnimatePresence mode="wait">
+          {showHint ? (
+            <motion.div
+              key="hint"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0 }}
+              style={{
+                color: "#ff453a",
+                fontSize: "13px",
+                fontWeight: 600,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "5px",
+                padding: "6px 14px",
+                borderRadius: "999px",
+                background: "rgba(255, 69, 58, 0.12)",
+                border: "1px solid rgba(255, 69, 58, 0.25)",
+              }}
+            >
+              <span>{s.gesture.toUpperCase()} to complete this step</span>
+            </motion.div>
+          ) : isCompleted ? (
+            <motion.div
+              key="completed-msg"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
+              <p style={{ fontSize: "14px", color: "var(--color-accent, #f59e0b)", margin: "0 0 4px", fontWeight: 700 }}>
+                Demo Complete
+              </p>
+              <p style={{ fontSize: "12.5px", color: "rgba(255,255,255,0.6)", margin: 0 }}>
+                Tap below to start rating your personal slate
+              </p>
+            </motion.div>
+          ) : (
+            <motion.div
+              key={`sub-${step}`}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+            >
+              <p style={{ fontSize: "14px", color: "rgba(255,255,255,0.7)", margin: "0 0 4px", fontWeight: 500 }}>
+                {s.sub}
+              </p>
+              <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.4)", margin: 0 }}>
+                Drag and release the card to practice
+              </p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
 
       {/* Step dots */}
-      <div style={{ display: "flex", gap: "7px", marginBottom: "28px" }}>
+      <div style={{ display: "flex", gap: "7px", marginBottom: isCompleted ? "20px" : "0px" }}>
         {SWIPE_STEPS.map((st, i) => (
           <motion.div
             key={i}
-            animate={{ width: i === step ? "22px" : "8px", background: i === step ? s.color : "rgba(255,255,255,0.18)" }}
-            transition={{ duration: 0.3 }}
+            animate={{
+              width: i === step ? "24px" : "8px",
+              background: i < step || isCompleted ? "var(--color-accent, #f59e0b)" : i === step ? s.color : "rgba(255,255,255,0.2)",
+            }}
+            transition={{ duration: 0.25 }}
             style={{ height: "8px", borderRadius: "4px" }}
           />
         ))}
       </div>
 
-      {/* CTA button */}
-      <motion.button
-        whileTap={{ scale: 0.96 }}
-        onClick={onDismiss}
-        style={{
-          padding: "14px 36px",
-          borderRadius: "100px",
-          background: isLast ? s.color : "rgba(255,255,255,0.1)",
-          border: isLast ? "none" : "1px solid rgba(255,255,255,0.15)",
-          color: isLast ? "#000" : "rgba(255,255,255,0.65)",
-          fontSize: "15px",
-          fontWeight: isLast ? 700 : 500,
-          cursor: "pointer",
-          transition: "all 0.3s ease",
-        }}
-      >
-        {isLast ? "Start rating 🍿" : "Skip tutorial"}
-      </motion.button>
+      {/* CTA button (Only active once completed) */}
+      {isCompleted && (
+        <motion.button
+          initial={{ opacity: 0, scale: 0.92, y: 6 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          whileTap={{ scale: 0.96 }}
+          onClick={() => {
+            hapticSuccess();
+            onDismiss();
+          }}
+          style={{
+            marginTop: "16px",
+            padding: "14px 38px",
+            borderRadius: "100px",
+            background: "linear-gradient(135deg, var(--color-accent-strong, #fbbf24), var(--color-accent, #f59e0b))",
+            border: "none",
+            color: "#0a0a12",
+            fontSize: "15px",
+            fontWeight: 700,
+            cursor: "pointer",
+            boxShadow: "0 4px 16px rgba(59, 130, 246, 0.4)",
+          }}
+        >
+          Start rating 🍿
+        </motion.button>
+      )}
     </motion.div>
   );
 }
@@ -1128,6 +1519,7 @@ function PreferencesWizard({
   const isLast = step === WIZARD_STEPS.length - 1;
 
   const go = (delta: number) => {
+    hapticTap();
     setDir(delta);
     setStep((s) => Math.min(WIZARD_STEPS.length - 1, Math.max(0, s + delta)));
   };
@@ -1165,7 +1557,7 @@ function PreferencesWizard({
               }}
               transition={{ duration: 0.3, ease }}
               style={{ height: 8, borderRadius: 4, cursor: "pointer" }}
-              onClick={() => { setDir(i > step ? 1 : -1); setStep(i); }}
+              onClick={() => { hapticTap(); setDir(i > step ? 1 : -1); setStep(i); }}
             />
           ))}
         </div>
@@ -1204,7 +1596,7 @@ function PreferencesWizard({
                         key={region}
                         label={region}
                         active={preferences.region === region}
-                        onClick={() => setPreferences((p) => ({ ...p, region }))}
+                        onClick={() => { hapticSelection(); setPreferences((p) => ({ ...p, region })); }}
                       />
                     ))}
                   </div>
@@ -1215,7 +1607,7 @@ function PreferencesWizard({
                         key={age}
                         label={age}
                         active={preferences.age_group === age}
-                        onClick={() => setPreferences((p) => ({ ...p, age_group: age }))}
+                        onClick={() => { hapticSelection(); setPreferences((p) => ({ ...p, age_group: age })); }}
                       />
                     ))}
                   </div>
@@ -1230,12 +1622,13 @@ function PreferencesWizard({
                       <motion.button
                         key={code}
                         whileTap={{ scale: 0.96 }}
-                        onClick={() =>
+                        onClick={() => {
+                          hapticSelection();
                           setPreferences((p) => ({
                             ...p,
                             languages: active ? p.languages.filter((l) => l !== code) : [...p.languages, code],
-                          }))
-                        }
+                          }));
+                        }}
                         style={{
                           position: "relative",
                           padding: "14px 12px",
@@ -1276,19 +1669,23 @@ function PreferencesWizard({
                           key={genre}
                           label={genre}
                           active={active}
-                          onClick={() =>
+                          onClick={() => {
+                            hapticSelection();
                             setPreferences((p) => ({
                               ...p,
                               genres: active ? p.genres.filter((g) => g !== genre) : [...p.genres, genre],
-                            }))
-                          }
+                            }));
+                          }}
                         />
                       );
                     })}
                   </div>
                   {/* Classics toggle */}
                   <button
-                    onClick={() => setPreferences((p) => ({ ...p, include_classics: !p.include_classics }))}
+                    onClick={() => {
+                      hapticSelection();
+                      setPreferences((p) => ({ ...p, include_classics: !p.include_classics }));
+                    }}
                     style={{
                       marginTop: 22, display: "flex", alignItems: "center", gap: 12, width: "100%",
                       padding: "13px 14px", borderRadius: "var(--radius-md)",
@@ -1336,7 +1733,14 @@ function PreferencesWizard({
         )}
         <motion.button
           whileTap={{ scale: 0.98 }}
-          onClick={() => (isLast ? onStart() : go(1))}
+          onClick={() => {
+            if (isLast) {
+              hapticSuccess();
+              onStart();
+            } else {
+              go(1);
+            }
+          }}
           disabled={loading}
           style={{
             flex: 1, padding: "14px 0", borderRadius: "var(--radius-pill)",

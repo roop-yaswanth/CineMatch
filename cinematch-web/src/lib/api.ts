@@ -471,6 +471,15 @@ export async function apiUndoOnboarding(
   });
 }
 
+export async function apiResetSession(
+  sessionId: string
+): Promise<{ status: string; session_id: string }> {
+  return request<{ status: string; session_id: string }>("/api/onboarding/reset", {
+    method: "POST",
+    body: JSON.stringify({ session_id: sessionId }),
+  });
+}
+
 export async function apiEscapeObscure(
   sessionId: string
 ): Promise<OnboardingState> {

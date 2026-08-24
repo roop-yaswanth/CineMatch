@@ -21,7 +21,7 @@ interface Props {
   collection: Collection;
   onBack: () => void;
   onMovieClick: (movie: Recommendation) => void;
-  onQuickAction?: (movie: Recommendation, action: "dislike" | "okay" | "like" | "watchlist") => void;
+  onQuickAction?: (movie: Recommendation, action: "dislike" | "like" | "love" | "watchlist") => void;
 }
 
 export default function CollectionOverlay({ collection, onBack, onMovieClick, onQuickAction }: Props) {

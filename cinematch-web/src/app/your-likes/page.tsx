@@ -9,7 +9,7 @@ function YourLikesContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const rawFilter = searchParams.get("filter");
-  const filter = (rawFilter ?? "all") as "watchlist" | "like" | "okay" | "dislike" | "not_watched" | "all";
+  const filter = (rawFilter ?? "all") as "watchlist" | "love" | "like" | "dislike" | "not_watched" | "all";
   const { session, isLoading } = useSession();
 
   // Route protection

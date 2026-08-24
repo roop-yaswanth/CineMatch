@@ -6,6 +6,8 @@ import RecommendationsView from "@/components/RecommendationsView";
 import { useSession } from "@/context/SessionContext";
 import { useMounted } from "@/lib/useMounted";
 
+import { apiResetSession } from "@/lib/api";
+
 export default function DashboardPage() {
   const router = useRouter();
   const { session, isLoading, logout, updateSession } = useSession();
@@ -41,11 +43,7 @@ export default function DashboardPage() {
     } catch { /* non-critical */ }
     updateSession({ ...session, onboarding_complete: false });
     try {
-      await fetch("/api/reset", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session_id: session.session_id }),
-      });
+      await apiResetSession(session.session_id);
     } catch {
     }
     router.push("/onboarding");

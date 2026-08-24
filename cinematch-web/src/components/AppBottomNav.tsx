@@ -6,6 +6,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 
 import { useMounted } from "@/lib/useMounted";
+import { hapticTap, hapticSelection } from "@/lib/haptics";
 
 interface NavItem {
   href: string;
@@ -141,9 +142,7 @@ export default function AppBottomNav() {
     rawPos.set(fractional);
     if (targetIndex !== scrubIndex) {
       setScrubIndex(targetIndex);
-      if (typeof navigator !== "undefined" && navigator.vibrate) {
-        try { navigator.vibrate(5); } catch { }
-      }
+      hapticSelection();
     }
   };
 
@@ -252,6 +251,7 @@ export default function AppBottomNav() {
                   return;
                 }
                 if (displayedActiveId !== item.id) {
+                  hapticTap();
                   setOptimisticId(item.id);
                   rawPos.set(idx);
                   setScrubIndex(idx);

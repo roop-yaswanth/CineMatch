@@ -215,7 +215,7 @@ function ExplorePageInner() {
   }, [tab, gridPage, gridTotalPages, gridLoading, region, selectedLanguage, selectedGenre, sortByFilter]);
 
   const handleQuickAction = useCallback(
-    async (m: MovieLike, action: "like" | "okay" | "dislike" | "watchlist") => {
+    async (m: MovieLike, action: "love" | "like" | "dislike" | "watchlist") => {
       if (!session) return;
       const targetId = ("tmdb_id" in m && m.tmdb_id) ? m.tmdb_id : m.id;
       try {
@@ -229,7 +229,7 @@ function ExplorePageInner() {
   );
 
   const handleAction = useCallback(
-    async (action: "like" | "okay" | "dislike" | "watchlist" | "skip") => {
+    async (action: "love" | "like" | "dislike" | "watchlist" | "skip") => {
       if (!session || !active) return;
       const targetId = active.tmdb_id ?? active.id;
       try {
@@ -431,7 +431,7 @@ function Grid({
   canLoadMore: boolean;
   onLoadMore: () => void;
   onSelect: (m: ExploreMovie) => void;
-  onQuickAction?: (movie: MovieLike, action: "like" | "okay" | "dislike" | "watchlist") => void;
+  onQuickAction?: (movie: MovieLike, action: "love" | "like" | "dislike" | "watchlist") => void;
   categoryId: ExploreCategory;
 }) {
   const cat = CATEGORIES.find((c) => c.id === categoryId);
@@ -493,7 +493,7 @@ function Discover({
 }: {
   region?: string;
   onSelect: (m: ExploreMovie) => void;
-  onQuickAction?: (movie: MovieLike, action: "like" | "okay" | "dislike" | "watchlist") => void;
+  onQuickAction?: (movie: MovieLike, action: "love" | "like" | "dislike" | "watchlist") => void;
 }) {
   const [genres, setGenres] = useState<TmdbGenre[]>([]);
   const [filters, setFilters] = useState<DiscoverFilters>({

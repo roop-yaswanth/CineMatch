@@ -22,7 +22,7 @@ interface Props {
   overlay?: boolean;
   noLayout?: boolean;
   showFullDate?: boolean;
-  onQuickAction?: (movie: MovieLike, action: "like" | "okay" | "dislike" | "watchlist") => void;
+  onQuickAction?: (movie: MovieLike, action: "love" | "like" | "dislike" | "watchlist") => void;
 }
 
 const NOW_MS = new Date().getTime();
@@ -292,7 +292,7 @@ export default function MovieCard({
                   aria-label={`Like ${movie.title}`}
                   onClick={(e) => {
                     e.stopPropagation();
-                    onQuickAction(movie, "okay");
+                    onQuickAction(movie, "like");
                   }}
                 >
                   <span aria-hidden>😀</span>
@@ -304,7 +304,7 @@ export default function MovieCard({
                   aria-label={`Love ${movie.title}`}
                   onClick={(e) => {
                     e.stopPropagation();
-                    onQuickAction(movie, "like");
+                    onQuickAction(movie, "love");
                   }}
                 >
                   <span aria-hidden>😍</span>
@@ -318,7 +318,7 @@ export default function MovieCard({
                 aria-label={`Rate ${movie.title}`}
                 onClick={(e) => {
                   e.stopPropagation();
-                  onQuickAction(movie, "okay");
+                  onQuickAction(movie, "like");
                 }}
               >
                 <span aria-hidden style={{ fontSize: 16 }}>😀</span>

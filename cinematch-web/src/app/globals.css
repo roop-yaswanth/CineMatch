@@ -66,8 +66,8 @@
   /* ─── Semantic Rating Colors ─────────────────── */
   --color-success: #30d158;
   --color-danger: #ff453a;
-  --color-like: #ff2d55;
-  --color-okay: #0a84ff;
+  --color-love: #30d158;
+  --color-like: #facc15;
   --color-dislike: #ff453a;
   --color-skip: #8e8e93;
 
@@ -77,8 +77,8 @@
   --rgb-rating: 232, 200, 74;
 
   /* Color tints for rating glow/fill (rgba-ready) */
-  --rgb-like: 255, 45, 85;
-  --rgb-okay: 10, 132, 255;
+  --rgb-love: 48, 209, 88;
+  --rgb-like: 250, 204, 21;
   --rgb-dislike: 255, 69, 58;
   --rgb-skip: 142, 142, 147;
 
@@ -950,17 +950,17 @@ textarea,
   transition-duration: 80ms;
 }
 
+.rating-btn--love {
+  --rating-tint: rgba(var(--rgb-love), 0.28);
+  --rating-border: rgba(var(--rgb-love), 0.5);
+  --rating-shadow: rgba(var(--rgb-love), 0.45);
+  color: #fff;
+}
+
 .rating-btn--like {
   --rating-tint: rgba(var(--rgb-like), 0.28);
   --rating-border: rgba(var(--rgb-like), 0.5);
   --rating-shadow: rgba(var(--rgb-like), 0.45);
-  color: #fff;
-}
-
-.rating-btn--okay {
-  --rating-tint: rgba(var(--rgb-okay), 0.28);
-  --rating-border: rgba(var(--rgb-okay), 0.5);
-  --rating-shadow: rgba(var(--rgb-okay), 0.45);
   color: #fff;
 }
 

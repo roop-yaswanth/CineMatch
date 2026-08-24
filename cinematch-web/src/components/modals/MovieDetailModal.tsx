@@ -6,6 +6,7 @@ import { posterUrl, languageLabel, apiSimilarMovies, apiCredits, apiImdbTitle, t
 import { PersonDetailOverlay } from "./PersonDetailOverlay";
 import WatchProvidersPanel, { REGION_TO_COUNTRY, fetchWatchProviders } from "@/components/WatchProvidersPanel";
 import { pushBackHandler } from "@/lib/backStack";
+import { triggerHaptic, hapticTap, hapticSelection } from "@/lib/haptics";
 
 const NOW_MS = new Date().getTime();
 
@@ -38,7 +39,7 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   movie: DetailMovie | null;
-  onAction?: (action: "like" | "okay" | "dislike" | "watchlist" | "skip") => void;
+  onAction?: (action: "love" | "like" | "dislike" | "watchlist" | "skip") => void;
   onMovieSelect?: (movie: DetailMovie) => void;
   sessionId?: string | null;
   userRegion?: string | null;
@@ -217,14 +218,16 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
     fetchWatchProviders(id).catch(() => {});
   }, [movie?.id, movie?.tmdb_id, isOpen]);
 
-  const handleActionClick = (action: "like" | "okay" | "dislike" | "watchlist" | "skip") => {
+  const handleActionClick = (action: "love" | "like" | "dislike" | "watchlist" | "skip") => {
     if (!onAction) return;
+    triggerHaptic(action);
     onAction(action);
     setSuccessAction(action);
     setTimeout(() => setSuccessAction(null), 2500);
   };
 
   const handleWatchTrailer = (langKey?: string) => {
+    hapticTap();
     if (langKey) { setShowTrailerPlayer(true); setSelectedTrailerLang(langKey); return; }
     if (trailerFetched && !trailerLoading) {
       if (trailerKey) { setShowTrailerPlayer(true); }
@@ -530,7 +533,10 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
             {directors.map((d, i) => (
               <span key={`${d.id}-${i}`}>
                 <button
-                  onClick={() => setActivePersonId(d.id)}
+                  onClick={() => {
+                    hapticSelection();
+                    setActivePersonId(d.id);
+                  }}
                   style={{ padding: 0, background: "none", border: "none", cursor: "pointer", color: "inherit", textDecoration: "none", fontSize: "inherit", fontFamily: "inherit", fontWeight: "inherit" }}
                 >
                   {d.name}
@@ -574,7 +580,7 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
 
   /* ── Rate this movie buttons ── */
   const rateCardButton = (
-    action: "like" | "okay" | "dislike",
+    action: "love" | "like" | "dislike",
     label: string,
     color: string,
     icon: React.ReactNode,
@@ -663,12 +669,12 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
         RATE THIS MOVIE
       </h4>
       <div style={{ display: "flex", gap: "8px" }}>
-        {rateCardButton("dislike", "Not for me", "#ef4444",
-          <span style={{ fontSize: "20px" }}>🙁</span>)}
-        {rateCardButton("okay", "Like", "#3b82f6",
-          <span style={{ fontSize: "20px" }}>😀</span>)}
-        {rateCardButton("like", "Love", "#f59e0b",
+        {rateCardButton("love", "Love", "#30d158",
           <span style={{ fontSize: "20px" }}>😍</span>)}
+        {rateCardButton("like", "Like", "#facc15",
+          <span style={{ fontSize: "20px" }}>😀</span>)}
+        {rateCardButton("dislike", "Dislike", "#ef4444",
+          <span style={{ fontSize: "20px" }}>🙁</span>)}
       </div>
       <div style={{ display: "flex", gap: "8px" }}>
         {pillAction("watchlist", "Add to Watchlist", "Added",

@@ -6,6 +6,7 @@ import {
   REGION_OPTIONS,
   AGE_GROUP_OPTIONS,
 } from "@/lib/api";
+import { hapticSelection, hapticSuccess } from "@/lib/haptics";
 
 interface Preferences {
   languages: string[];
@@ -60,6 +61,7 @@ export default function PreferencesModal({ preferences, onUpdate, onClose, mode 
   const [localPrefs, setLocalPrefs] = useState<Preferences>(preferences);
 
   const toggle = (field: "languages" | "genres", value: string) => {
+    hapticSelection();
     const arr = localPrefs[field];
     setLocalPrefs({
       ...localPrefs,
@@ -70,9 +72,7 @@ export default function PreferencesModal({ preferences, onUpdate, onClose, mode 
   };
 
   const handleApply = () => {
-    // onUpdate applies the change optimistically and persists in the background
-    // (it must NOT block) — so we navigate immediately via onClose. Awaiting a
-    // network call here previously caused an indefinite "Applying…" hang.
+    hapticSuccess();
     onUpdate(localPrefs);
     onClose();
   };

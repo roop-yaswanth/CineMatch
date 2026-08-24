@@ -46,7 +46,7 @@ interface Props {
   onLogout: () => void;
 }
 
-type RecommendationAction = "like" | "okay" | "dislike" | "remove" | "watchlist" | "skip";
+type RecommendationAction = "love" | "like" | "dislike" | "remove" | "watchlist" | "skip";
 type StackId = "hollywood" | "matched" | "other";
 
 interface Stack {
@@ -587,7 +587,7 @@ export default function RecommendationsView({
       if (isFirstForMovie) {
         counted.add(tmdbId);
         actionCountRef.current.total++;
-        if (action === "like" || action === "okay") actionCountRef.current.positive++;
+        if (action === "love" || action === "like") actionCountRef.current.positive++;
         if (action === "dislike") actionCountRef.current.negative++;
         if (action === "remove" || action === "skip") actionCountRef.current.negative += 0.5;
       }
@@ -789,7 +789,7 @@ export default function RecommendationsView({
               movies={heroMovies}
               onOpenDetail={openMovieDetail}
               onWatchlist={(m) => handleAction(m, "watchlist")}
-              onLike={(m) => handleAction(m, "okay")}
+              onLike={(m) => handleAction(m, "like")}
               onAction={(m, action) => handleAction(m, action)}
             />
           )}

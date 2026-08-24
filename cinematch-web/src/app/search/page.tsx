@@ -155,7 +155,7 @@ function SearchPage() {
   }, []);
 
   const handleAction = useCallback(
-    async (action: "like" | "okay" | "dislike" | "watchlist" | "skip") => {
+    async (action: "love" | "like" | "dislike" | "watchlist" | "skip") => {
       if (!session || !active) return;
       try {
         await apiRecommendationAction(session.session_id, active.id, action);
