@@ -85,20 +85,10 @@ export function DesktopNavTabs({
   const router = useRouter();
   const { openPreferences, isPreferencesOpen } = useSession();
   const pathname = usePathname() ?? "/";
-  const [filterParam, setFilterParam] = useState<string | null>(null);
-
-  /* eslint-disable react-hooks/set-state-in-effect */
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      setFilterParam(params.get("filter"));
-    }
-  }, [pathname]);
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   const isDashboardActive = pathname.startsWith("/dashboard");
   const isExploreActive = pathname.startsWith("/explore");
-  const isWatchlistActive = pathname.startsWith("/your-likes") && filterParam === "watchlist";
+  const isWatchlistActive = pathname.startsWith("/your-likes");
   const isPreferencesActive = isPreferencesOpen;
 
   return (

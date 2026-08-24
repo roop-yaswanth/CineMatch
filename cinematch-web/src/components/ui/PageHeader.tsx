@@ -25,8 +25,10 @@ interface Props {
   sticky?: boolean;
   /** Stable accessibility label for the back button. */
   backAriaLabel?: string;
-  /** Show the global search button on desktop. Default true. */
+  /** Show the global search button on desktop. Default false. */
   showSearchButton?: boolean;
+  /** Show desktop navigation tabs instead of title on desktop (>=900px). Default false. */
+  showNavTabs?: boolean;
 }
 
 export default function PageHeader({
@@ -38,7 +40,8 @@ export default function PageHeader({
   children,
   sticky = true,
   backAriaLabel = "Back",
-  showSearchButton = true,
+  showSearchButton = false,
+  showNavTabs = false,
 }: Props) {
   const router = useRouter();
   return (
@@ -67,34 +70,29 @@ export default function PageHeader({
       >
         <div style={{ display: "flex", alignItems: "center", minWidth: "44px", zIndex: 10 }}>
           {!hideBackButton ? (
-            <BackButton href={backHref} onClick={onBack} ariaLabel={backAriaLabel} />
+            <div className={showNavTabs ? "mobile-only" : undefined}>
+              <BackButton href={backHref} onClick={onBack} ariaLabel={backAriaLabel} />
+            </div>
           ) : (
             <div style={{ width: "44px" }} />
           )}
         </div>
 
         <div className="page-header-center">
-          <div className="desktop-header-tabs">
-            <DesktopNavTabs />
-          </div>
-          <h1
-            className="mobile-header-title"
-            style={{
-              margin: 0,
-              fontSize: "22px",
-              fontWeight: 800,
-              letterSpacing: "-0.035em",
-              color: "#ffffff",
-              textAlign: "center",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "6px",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {title}
-          </h1>
+          {showNavTabs ? (
+            <>
+              <div className="desktop-header-tabs">
+                <DesktopNavTabs />
+              </div>
+              <h1 className="page-header-title mobile-header-title">
+                {title}
+              </h1>
+            </>
+          ) : (
+            <h1 className="page-header-title">
+              {title}
+            </h1>
+          )}
         </div>
 
         {/* Right Column: search button on desktop + rightSlot */}
@@ -130,34 +128,6 @@ export default function PageHeader({
           {children}
         </div>
       )}
-
-      <style>{`
-        .page-header-center {
-          position: absolute;
-          left: 50%;
-          transform: translateX(-50%);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          pointer-events: auto;
-          max-width: calc(100% - 100px);
-        }
-
-        @media (min-width: 900px) {
-          .desktop-header-tabs { display: flex !important; }
-          .mobile-header-title { display: none !important; }
-          .page-header-children-wrapper {
-            max-height: none !important;
-            opacity: 1 !important;
-            pointer-events: auto !important;
-          }
-        }
-
-        @media (max-width: 899px) {
-          .desktop-header-tabs { display: none !important; }
-          .mobile-header-title { display: flex !important; }
-        }
-      `}</style>
     </header>
   );
 }

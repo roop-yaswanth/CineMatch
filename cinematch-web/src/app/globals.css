@@ -2030,6 +2030,220 @@ a[role="button"]:active,
   cursor: pointer;
 }
 
+/* ── Desktop Center Navigation Tabs ───────────────────────── */
+.desktop-center-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  background: rgba(22, 24, 32, 0.65);
+  backdrop-filter: blur(24px) saturate(1.8);
+  -webkit-backdrop-filter: blur(24px) saturate(1.8);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+}
+
+.desktop-center-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  height: 32px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.desktop-center-tab:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+.desktop-center-tab.active {
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+  font-weight: 600;
+  border-color: rgba(255, 255, 255, 0.16);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+}
+
+.desktop-tab-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.85;
+}
+
+.desktop-account-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  height: 38px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.desktop-account-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+
+.desktop-account-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.desktop-account-chevron {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.5);
+  transition: transform 0.2s ease;
+}
+
+.desktop-account-chevron.open {
+  transform: rotate(180deg);
+}
+
+/* ── Page Header Styles ───────────────────────────────────── */
+.page-header-center {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  max-width: calc(100% - 100px);
+  text-align: center;
+}
+
+.page-header-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: #ffffff;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+@media (min-width: 900px) {
+  .page-header-title {
+    font-size: 19px;
+  }
+  .desktop-header-tabs {
+    display: flex !important;
+  }
+  .mobile-header-title {
+    display: none !important;
+  }
+  .page-header-children-wrapper {
+    max-height: none !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
+}
+
+@media (max-width: 899px) {
+  .desktop-header-tabs {
+    display: none !important;
+  }
+  .mobile-header-title {
+    display: flex !important;
+  }
+}
+
+/* ── Filter Select Dropdowns ──────────────────────────────── */
+/* All styling here in CSS — no inline styles in React — eliminates the
+   background shorthand vs background-image longhand React DOM conflict. */
+.filter-select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 6px 28px 6px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background-color: rgba(28, 30, 36, 0.58);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.5)' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 10px;
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  outline: none;
+  flex-shrink: 0;
+  transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease, font-weight 0.18s ease;
+}
+
+.filter-select:hover {
+  background-color: rgba(255, 255, 255, 0.10);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.filter-select[data-active="true"] {
+  background-color: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.35);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.filter-select option {
+  background-color: #161820;
+  color: #ffffff;
+}
+
+@media (max-width: 640px) {
+  .filter-select {
+    padding: 6px 28px 6px 12px;
+    font-size: 16px;
+  }
+}
+
+/* ── Explore Grid (Responsive 2-column on mobile, auto-fill on desktop) ── */
+.explore-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 24px 18px;
+}
+
+@media (max-width: 640px) {
+  .explore-content-container {
+    padding: 16px 12px var(--s-bottom-clearance) !important;
+  }
+  .explore-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 14px 10px !important;
+  }
+}
+
 /* ── Hero accents ─────────────────────────────────────────── */
 .hero-kicker {
   font-size: 11px;

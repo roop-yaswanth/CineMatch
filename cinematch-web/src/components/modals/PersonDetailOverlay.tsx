@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
 import { apiPerson, type PersonDetail, type PersonCredit } from "@/lib/api";
 import { PersonContent } from "@/components/PersonProfileContent";
+import BackButton from "@/components/ui/BackButton";
 import type { DetailMovie } from "@/components/modals/MovieDetailModal";
 
 interface PersonDetailOverlayProps {
@@ -71,8 +72,7 @@ export function PersonDetailOverlay({ personId, onClose, onSelectMovie }: Person
   // Render via portal so the overlay is a sibling of the modal panel rather
   // than a child of the modal's scroll container. This guarantees the overlay
   // covers the *viewport* (position: fixed) instead of being trapped at the
-  // top of the parent's scrolled content — that mismatch was the cause of the
-  // half-modal/half-person split-screen glitch.
+  // top of the parent's scrolled content.
   return createPortal(
     <motion.div
       ref={scrollRef}
@@ -90,26 +90,52 @@ export function PersonDetailOverlay({ personId, onClose, onSelectMovie }: Person
         flexDirection: "column",
       }}
     >
-      <div style={{
-        position: "sticky", top: 0, zIndex: 10, padding: "12px 16px",
-        background: "rgba(8,8,12,0.8)", backdropFilter: "blur(12px)",
-        borderBottom: "1px solid rgba(255,255,255,0.06)",
-        display: "flex", alignItems: "center"
-      }}>
-        <button
-          onClick={onClose}
+      {/* Sticky Header with iOS Safe Area Inset Support */}
+      <header
+        style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 40,
+          paddingTop: "env(safe-area-inset-top, 0px)",
+          background: "rgba(14, 16, 22, 0.75)",
+          backdropFilter: "blur(24px) saturate(1.8)",
+          WebkitBackdropFilter: "blur(24px) saturate(1.8)",
+          borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
+        }}
+      >
+        <div
           style={{
-            background: "transparent", border: "none", color: "var(--color-text-primary)",
-            display: "flex", alignItems: "center", gap: "6px", cursor: "pointer",
-            fontWeight: 600, fontSize: "14px", padding: "4px 8px 4px 0"
+            height: "48px",
+            padding: "0 16px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            position: "relative",
           }}
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="15 18 9 12 15 6" />
-          </svg>
-          Back
-        </button>
-      </div>
+          <div style={{ display: "flex", alignItems: "center", minWidth: "44px", zIndex: 10 }}>
+            <BackButton onClick={onClose} ariaLabel="Back" />
+          </div>
+
+          <h2
+            style={{
+              margin: 0,
+              fontSize: "18px",
+              fontWeight: 700,
+              color: "#ffffff",
+              textAlign: "center",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              maxWidth: "calc(100% - 100px)",
+            }}
+          >
+            {data?.name || "Person"}
+          </h2>
+
+          <div style={{ width: "44px", minWidth: "44px" }} />
+        </div>
+      </header>
 
       <div style={{ flex: 1, padding: "16px 20px 40px" }}>
         {loading ? (

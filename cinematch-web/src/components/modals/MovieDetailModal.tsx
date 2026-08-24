@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { useSession } from "@/context/SessionContext";
 import { posterUrl, languageLabel, apiSimilarMovies, apiCredits, apiImdbTitle, type Recommendation, type CastMember, type CrewMember, type ImdbTitle } from "@/lib/api";
 import { PersonDetailOverlay } from "./PersonDetailOverlay";
-import WatchProvidersPanel, { REGION_TO_COUNTRY } from "@/components/WatchProvidersPanel";
+import WatchProvidersPanel, { REGION_TO_COUNTRY, fetchWatchProviders } from "@/components/WatchProvidersPanel";
 import { pushBackHandler } from "@/lib/backStack";
 
 const NOW_MS = new Date().getTime();
@@ -214,6 +214,13 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
       .catch(() => { });
     return () => { cancelled = true; };
   }, [movie?.id, movie?.tmdb_id, movie?.imdb_id, isOpen]);
+
+  // Eagerly prefetch watch providers on modal open
+  useEffect(() => {
+    const id = movie?.tmdb_id ?? movie?.id;
+    if (!isOpen || !id) return;
+    fetchWatchProviders(id).catch(() => {});
+  }, [movie?.id, movie?.tmdb_id, isOpen]);
 
   const handleActionClick = (action: "like" | "okay" | "dislike" | "watchlist" | "skip") => {
     if (!onAction) return;
@@ -434,14 +441,14 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
       No trailer available
     </div>
   ) : isMultiLang ? (
-    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
       <button
         type="button"
         onClick={() => handleWatchTrailer()}
         style={{
-          width: "100%", height: "44px", borderRadius: "999px",
+          width: "100%", height: "46px", borderRadius: "999px",
           background: "#ffffff", border: "none",
-          color: "#000000", fontSize: "14px", fontWeight: 700,
+          color: "#000000", fontSize: "14.5px", fontWeight: 700,
           display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
           cursor: "pointer", boxShadow: "0 4px 14px rgba(0,0,0,0.3)",
           transition: "transform 0.12s ease, filter 0.12s ease",
@@ -449,29 +456,36 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
         onPointerDown={(e) => { (e.currentTarget as HTMLElement).style.transform = "scale(0.98)"; }}
         onPointerUp={(e) => { (e.currentTarget as HTMLElement).style.transform = ""; }}
       >
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
           <polygon points="5 3 19 12 5 21 5 3" />
         </svg>
         <span>Watch Trailer</span>
       </button>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-        {trailerLanguages.map((tl) => {
-          const isActive = tl.key === selectedTrailerLang;
-          return (
-            <button
-              key={tl.lang}
-              onClick={() => handleWatchTrailer(tl.key)}
-              style={{
-                padding: "4px 10px", borderRadius: "12px",
-                background: isActive ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.06)",
-                border: isActive ? "1px solid rgba(255,255,255,0.35)" : "1px solid rgba(255,255,255,0.1)",
-                color: "#fff", fontSize: "11px", fontWeight: isActive ? 600 : 500, cursor: "pointer",
-              }}
-            >
-              {tl.label}
-            </button>
-          );
-        })}
+      <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+        <span style={{ fontSize: "12px", color: "rgba(255, 255, 255, 0.6)", fontWeight: 600, letterSpacing: "0.02em" }}>
+          Trailer Languages / Dubs:
+        </span>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+          {trailerLanguages.map((tl) => {
+            const isActive = tl.key === selectedTrailerLang;
+            return (
+              <button
+                key={tl.lang}
+                onClick={() => handleWatchTrailer(tl.key)}
+                style={{
+                  padding: "7px 16px", borderRadius: "999px",
+                  background: isActive ? "rgba(255, 255, 255, 0.26)" : "rgba(255, 255, 255, 0.08)",
+                  border: isActive ? "1px solid rgba(255, 255, 255, 0.45)" : "1px solid rgba(255, 255, 255, 0.14)",
+                  color: "#ffffff", fontSize: "13.5px", fontWeight: isActive ? 700 : 500,
+                  cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "6px",
+                  transition: "all 0.15s ease",
+                }}
+              >
+                {tl.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
   ) : (
@@ -881,6 +895,9 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
               <TrailerOverlay
                 videoKey={selectedTrailerLang}
                 title={movie.title}
+                languages={trailerLanguages}
+                selectedLanguage={selectedTrailerLang}
+                onSelectLanguage={(k) => setSelectedTrailerLang(k)}
                 onClose={() => setShowTrailerPlayer(false)}
               />
             )}
@@ -1107,22 +1124,17 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: "auto" }}
                         exit={{ opacity: 0, height: 0 }}
-                        transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-                        style={{ overflow: "hidden" }}
+                        transition={{
+                          height: { duration: 0.28, ease: [0.16, 1, 0.3, 1] },
+                          opacity: { duration: 0.22, ease: "easeOut" },
+                        }}
+                        style={{ overflow: "hidden", willChange: "height, opacity" }}
                       >
-                        <div style={{
-                          padding: "14px",
-                          borderRadius: "16px",
-                          background: "rgba(0, 0, 0, 0.65)",
-                          border: "1px solid rgba(255, 255, 255, 0.14)",
-                          minHeight: "110px",
-                        }}>
-                          <WatchProvidersPanel
-                            tmdbId={(movie.tmdb_id ?? movie.id) as number}
-                            defaultCountry={guessedCountry}
-                            movieTitle={movie.title}
-                          />
-                        </div>
+                        <WatchProvidersPanel
+                          tmdbId={(movie.tmdb_id ?? movie.id) as number}
+                          defaultCountry={guessedCountry}
+                          movieTitle={movie.title}
+                        />
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -1355,10 +1367,16 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
 export function TrailerOverlay({
   videoKey,
   title,
+  languages,
+  selectedLanguage,
+  onSelectLanguage,
   onClose,
 }: {
   videoKey: string;
   title: string;
+  languages?: Array<{ lang: string; label: string; key: string }>;
+  selectedLanguage?: string | null;
+  onSelectLanguage?: (key: string) => void;
   onClose: () => void;
 }) {
   // ESC key closes
@@ -1409,9 +1427,9 @@ export function TrailerOverlay({
         <p
           style={{
             margin: 0,
-            fontSize: "14px",
+            fontSize: "15px",
             fontWeight: 600,
-            color: "rgba(255,255,255,0.8)",
+            color: "rgba(255,255,255,0.9)",
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
@@ -1449,7 +1467,7 @@ export function TrailerOverlay({
           width: "100%",
           maxWidth: "900px",
           aspectRatio: "16 / 9",
-          borderRadius: "12px",
+          borderRadius: "14px",
           overflow: "hidden",
           background: "#000",
           boxShadow: "0 32px 80px rgba(0,0,0,0.8)",
@@ -1457,6 +1475,7 @@ export function TrailerOverlay({
       >
         {/^[A-Za-z0-9_-]{11}$/.test(videoKey) && (
           <iframe
+            key={videoKey}
             width="100%"
             height="100%"
             src={`https://www.youtube-nocookie.com/embed/${videoKey}?autoplay=1&playsinline=1&rel=0&modestbranding=1&enablejsapi=1`}
@@ -1469,6 +1488,48 @@ export function TrailerOverlay({
           />
         )}
       </div>
+
+      {/* Language Switcher under player if multiple languages exist */}
+      {languages && languages.length > 1 && (
+        <div
+          style={{
+            width: "100%",
+            maxWidth: "900px",
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "8px",
+            alignItems: "center",
+            marginTop: "14px",
+            justifyContent: "center",
+          }}
+        >
+          <span style={{ fontSize: "13px", color: "rgba(255, 255, 255, 0.6)", fontWeight: 500 }}>
+            Trailer Language:
+          </span>
+          {languages.map((tl) => {
+            const isActive = tl.key === (selectedLanguage ?? videoKey);
+            return (
+              <button
+                key={tl.lang}
+                onClick={() => onSelectLanguage?.(tl.key)}
+                style={{
+                  padding: "7px 16px",
+                  borderRadius: "999px",
+                  background: isActive ? "rgba(255, 255, 255, 0.28)" : "rgba(255, 255, 255, 0.08)",
+                  border: isActive ? "1px solid rgba(255, 255, 255, 0.45)" : "1px solid rgba(255, 255, 255, 0.14)",
+                  color: "#ffffff",
+                  fontSize: "13.5px",
+                  fontWeight: isActive ? 700 : 500,
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
+                }}
+              >
+                {tl.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Tap-backdrop-to-close on mobile */}
       <div

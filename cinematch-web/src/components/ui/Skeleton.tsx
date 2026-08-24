@@ -81,13 +81,7 @@ export function SkeletonRail({ count = 6 }: { count?: number }) {
 /** A grid of poster skeletons. */
 export function SkeletonGrid({ count = 12 }: { count?: number }) {
   return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
-        gap: "20px 14px",
-      }}
-    >
+    <div className="explore-grid">
       {Array.from({ length: count }).map((_, i) => (
         <SkeletonCard key={i} compact />
       ))}

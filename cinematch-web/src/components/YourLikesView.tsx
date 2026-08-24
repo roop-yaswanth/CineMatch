@@ -70,7 +70,7 @@ const RATING_CONFIG: Record<string, { label: string; color: string; icon: React.
 };
 
 const INTERACTION_FILTERS: Array<{ value: InteractionFilter; label: string }> = [
-  { value: "all", label: "All" },
+  { value: "all", label: "All Reactions" },
   { value: "like", label: "Loved" },
   { value: "okay", label: "Liked" },
   { value: "dislike", label: "Disliked" },
@@ -94,9 +94,8 @@ function toDetailMovie(item: HistoryListItem): DetailMovie {
 export default function YourLikesView({ sessionId, onClose, initialFilter = "all" }: Props) {
   const { logout } = useSession();
   const router = useRouter();
-  const [cachedItems] = useState<HistoryListItem[]>(() => readHistoryCache<HistoryListItem>(sessionId) ?? []);
-  const [items, setItems] = useState<HistoryListItem[]>(cachedItems);
-  const [loading, setLoading] = useState(cachedItems.length === 0);
+  const [items, setItems] = useState<HistoryListItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [activeMovie, setActiveMovie] = useState<DetailMovie | null>(null);
 
   // Filters
@@ -112,6 +111,14 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
   // We don't watch searchParams here since it's passed from parent as initialFilter
 
   useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect */
+    const cached = readHistoryCache<HistoryListItem>(sessionId);
+    if (cached && cached.length > 0) {
+      setItems(cached);
+      setLoading(false);
+    }
+    /* eslint-enable react-hooks/set-state-in-effect */
+
     let cancelled = false;
     apiGetHistory(sessionId)
       .then((data) => {
@@ -219,6 +226,7 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
           hideBackButton={!onClose}
           backAriaLabel="Go back"
           showSearchButton={false}
+          showNavTabs
           title={
             <span style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}>
               {interactionFilter === "watchlist" ? "Watchlist" : "Your Collection"}
@@ -293,7 +301,7 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
           }
         />
 
-        {/* Mobile Search Input — Square shape, placed at the top */}
+        {/* Mobile Search Input — Standardized to match main search (no iOS auto-zoom) */}
         <div
           className="mobile-only"
           style={{
@@ -303,15 +311,15 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
         >
           <div style={{ position: "relative", width: "100%" }}>
             <svg
-              width="14"
-              height="14"
+              width="15"
+              height="15"
               viewBox="0 0 24 24"
               fill="none"
               stroke="rgba(255, 255, 255, 0.45)"
-              strokeWidth="2"
+              strokeWidth="2.2"
               strokeLinecap="round"
               strokeLinejoin="round"
-              style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}
+              style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}
               aria-hidden
             >
               <circle cx="11" cy="11" r="8" />
@@ -322,16 +330,16 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={interactionFilter === "watchlist" ? "Search watchlist…" : "Search collection…"}
+              className="app-search-input"
               style={{
                 width: "100%",
-                padding: "8px 28px 8px 34px",
-                borderRadius: "10px",
-                border: searchQuery.trim() ? "1px solid rgba(255, 255, 255, 0.32)" : "1px solid rgba(255, 255, 255, 0.12)",
-                background: searchQuery.trim() ? "rgba(255, 255, 255, 0.10)" : "rgba(255, 255, 255, 0.06)",
+                padding: "9px 36px 9px 38px",
+                borderRadius: "12px",
+                fontSize: "16px",
                 color: "#ffffff",
-                fontSize: "13px",
-                outline: "none",
                 boxSizing: "border-box",
+                background: searchQuery.trim() ? "rgba(255, 255, 255, 0.10)" : "rgba(28, 30, 36, 0.82)",
+                border: searchQuery.trim() ? "1px solid rgba(255, 255, 255, 0.32)" : "1px solid rgba(255, 255, 255, 0.14)",
               }}
             />
             {searchQuery && (
@@ -341,15 +349,21 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
                 aria-label="Clear search"
                 style={{
                   position: "absolute",
-                  right: "8px",
+                  right: "10px",
                   top: "50%",
                   transform: "translateY(-50%)",
-                  background: "transparent",
+                  background: "rgba(255, 255, 255, 0.12)",
                   border: "none",
-                  color: "rgba(255, 255, 255, 0.6)",
+                  borderRadius: "50%",
+                  color: "rgba(255, 255, 255, 0.7)",
                   cursor: "pointer",
-                  fontSize: "12px",
-                  padding: "4px",
+                  width: "22px",
+                  height: "22px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "11px",
+                  padding: 0,
                 }}
               >
                 ✕
@@ -373,75 +387,31 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
           }}
         >
 
-          {/* Interaction filter pills */}
-          <div
-            className="interaction-pills"
-            role="tablist"
-            aria-label="Filter by interaction"
-            style={{
-              display: "flex",
-              gap: "8px",
-              alignItems: "center",
-              flexShrink: 0,
-            }}
+          {/* Reaction / Interaction Filter Dropdown */}
+          <select
+            value={interactionFilter}
+            onChange={(e) => setInteractionFilter(e.target.value as InteractionFilter)}
+            className="filter-select"
+            data-active={interactionFilter !== "all" ? "true" : undefined}
           >
-            {INTERACTION_FILTERS.map((filter) => {
-              const active = interactionFilter === filter.value;
-              return (
-                <button
-                  key={filter.value}
-                  role="tab"
-                  aria-selected={active}
-                  onClick={() => setInteractionFilter(filter.value)}
-                  style={{
-                    padding: "6px 14px",
-                    borderRadius: "999px",
-                    border: active ? "1px solid rgba(255,255,255,0.28)" : "1px solid rgba(255,255,255,0.10)",
-                    background: active ? "rgba(255,255,255,0.14)" : "rgba(28,30,36,0.58)",
-                    color: active ? "#ffffff" : "rgba(255,255,255,0.65)",
-                    fontSize: "12.5px",
-                    fontWeight: active ? 600 : 500,
-                    whiteSpace: "nowrap",
-                    cursor: "pointer",
-                    flexShrink: 0,
-                    transition: "all 160ms ease",
-                  }}
-                >
-                  {filter.label}
-                </button>
-              );
-            })}
-          </div>
+            {INTERACTION_FILTERS.map((filter) => (
+              <option key={filter.value} value={filter.value}>
+                {filter.label}
+              </option>
+            ))}
+          </select>
 
           {/* Genre Filter */}
           {genres.length > 0 && (
             <select
               value={genreFilter}
               onChange={(e) => setGenreFilter(e.target.value)}
-              style={{
-                appearance: "none",
-                WebkitAppearance: "none",
-                background: genreFilter !== "all" ? "rgba(255, 255, 255, 0.16)" : "rgba(28, 30, 36, 0.58)",
-                border: genreFilter !== "all" ? "1px solid rgba(255, 255, 255, 0.35)" : "1px solid rgba(255, 255, 255, 0.10)",
-                borderRadius: "999px",
-                color: genreFilter !== "all" ? "#ffffff" : "rgba(255, 255, 255, 0.65)",
-                padding: "6px 28px 6px 14px",
-                fontSize: "12.5px",
-                fontWeight: genreFilter !== "all" ? 600 : 500,
-                cursor: "pointer",
-                outline: "none",
-                flexShrink: 0,
-                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.5)' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`,
-                backgroundRepeat: "no-repeat",
-                backgroundPosition: "right 10px center",
-                backgroundSize: "10px",
-              }}
+              className="filter-select"
+              data-active={genreFilter !== "all" ? "true" : undefined}
             >
-              <option value="all" style={{ background: "#161820", color: "#fff" }}>All Genres</option>
+              <option value="all">All Genres</option>
               {genres.map((genre) => (
-                <option key={genre} value={genre} style={{ background: "#161820", color: "#fff" }}>
-                  {genre}
-                </option>
+                <option key={genre} value={genre}>{genre}</option>
               ))}
             </select>
           )}
@@ -451,30 +421,12 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
             <select
               value={languageFilter}
               onChange={(e) => setLanguageFilter(e.target.value)}
-              style={{
-                appearance: "none",
-                WebkitAppearance: "none",
-                background: languageFilter !== "all" ? "rgba(255, 255, 255, 0.16)" : "rgba(28, 30, 36, 0.58)",
-                border: languageFilter !== "all" ? "1px solid rgba(255, 255, 255, 0.35)" : "1px solid rgba(255, 255, 255, 0.10)",
-                borderRadius: "999px",
-                color: languageFilter !== "all" ? "#ffffff" : "rgba(255, 255, 255, 0.65)",
-                padding: "6px 28px 6px 14px",
-                fontSize: "12.5px",
-                fontWeight: languageFilter !== "all" ? 600 : 500,
-                cursor: "pointer",
-                outline: "none",
-                flexShrink: 0,
-                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.5)' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`,
-                backgroundRepeat: "no-repeat",
-                backgroundPosition: "right 10px center",
-                backgroundSize: "10px",
-              }}
+              className="filter-select"
+              data-active={languageFilter !== "all" ? "true" : undefined}
             >
-              <option value="all" style={{ background: "#161820", color: "#fff" }}>All Languages</option>
+              <option value="all">All Languages</option>
               {languages.map((lang) => (
-                <option key={lang} value={lang} style={{ background: "#161820", color: "#fff" }}>
-                  {languageLabel(lang)}
-                </option>
+                <option key={lang} value={lang}>{languageLabel(lang)}</option>
               ))}
             </select>
           )}
@@ -633,26 +585,6 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
       )}
 
       <style>{`
-        .filter-select {
-          padding: 7px 14px;
-          border-radius: 12px;
-          border: 1px solid var(--color-border-subtle);
-          background: rgba(255, 255, 255, 0.03);
-          color: var(--color-text-primary);
-          font-size: 13px;
-          font-weight: 500;
-          cursor: pointer;
-          transition: all 0.2s;
-        }
-        .filter-select:hover {
-          background: rgba(255, 255, 255, 0.06);
-          border-color: var(--color-border);
-        }
-        .filter-select option {
-          background: var(--color-surface);
-          color: var(--color-text-primary);
-        }
-
         @media (max-width: 640px) {
           .likes-modal-container {
             margin: 0 !important;
@@ -663,7 +595,7 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
             border-radius: 0 !important;
           }
           .likes-filters {
-            padding: 10px 16px !important;
+            padding: 8px 16px 12px !important;
             gap: 8px !important;
             flex-wrap: nowrap !important;
             overflow-x: auto !important;
@@ -682,16 +614,6 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
           .likes-grid {
             grid-template-columns: repeat(2, 1fr) !important;
             gap: 10px !important;
-          }
-          .filter-select {
-            padding: 6px 10px;
-            font-size: 12px;
-          }
-          .interaction-pills {
-            display: none !important;
-          }
-          .interaction-select-mobile {
-            display: block !important;
           }
         }
       `}</style>

@@ -17,7 +17,6 @@ import { ShelfRow, type QuickAction } from "@/components/dashboard/ShelfRow";
 import CollectionOverlay, { type Collection } from "@/components/dashboard/CollectionOverlay";
 import { buildShelves, type Shelf } from "@/components/dashboard/shelves";
 import EmptyState from "@/components/ui/EmptyState";
-import { toast } from "@/components/ui/Toast";
 import { useSession } from "@/context/SessionContext";
 import type { DetailMovie } from "@/components/modals/MovieDetailModal";
 import { prefetchBackdrops } from "@/lib/usePoster";
@@ -560,43 +559,9 @@ export default function RecommendationsView({
   }, [stacks, movies, session.user_id]);
 
 
-  const undoWatchlistAdd = useCallback(
-    (tmdbId: number, opts?: { movie?: Recommendation | null; stackId?: StackId | null }) => {
-      apiRecommendationAction(session.session_id, tmdbId, "clear")
-        .then((result) => {
-          onSessionUpdate(result.session);
-          invalidateHistoryCache(session.session_id);
-          const { movie, stackId } = opts ?? {};
-          if (movie && stackId) {
-            // Un-mark as seen so it flows through dedup/rerun logic normally.
-            seenIdsRef.current.delete(tmdbId);
-            setStacks((prev) =>
-              prev.map((s) => {
-                if (s.id !== stackId) return s;
-                if (s.movies.some((m) => recommendationId(m) === tmdbId)) return s;
-                return { ...s, movies: [movie, ...s.movies] };
-              })
-            );
-          }
-        })
-        .catch((err) => {
-          if (isSessionExpiredError(err)) { onLogout(); return; }
-          console.error("Undo watchlist failed:", err);
-        });
-    },
-    [onLogout, onSessionUpdate, session.session_id]
-  );
-
   const handleAction = useCallback(
     async (movie: Recommendation | DetailMovie, action: RecommendationAction) => {
       const tmdbId = "tmdb_id" in movie && movie.tmdb_id ? movie.tmdb_id : movie.id;
-      // Capture the full Recommendation object (refs still hold the
-      // pre-removal state at this synchronous moment) so a watchlist Undo can
-      // put the exact card back on its rail.
-      const originalMovie: Recommendation | null =
-        moviesRef.current.find((m) => recommendationId(m) === tmdbId) ??
-        stacksRef.current.flatMap((s) => s.movies).find((m) => recommendationId(m) === tmdbId) ??
-        null;
 
       seenIdsRef.current.add(tmdbId);
 
@@ -672,7 +637,7 @@ export default function RecommendationsView({
           console.error("Recommendation action failed:", err);
         });
     },
-    [generate, onLogout, onSessionUpdate, preferences, session.session_id, silentRefresh, undoWatchlistAdd]
+    [generate, onLogout, onSessionUpdate, preferences, session.session_id, silentRefresh]
   );
 
   const appliedPrefsKeyRef = useRef<string>(JSON.stringify(preferences));

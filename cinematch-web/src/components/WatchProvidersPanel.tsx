@@ -246,11 +246,61 @@ function ProviderRow({ title, providers, link }: { title: string; providers?: Wa
   );
 }
 
+const watchProvidersCache = new Map<number, WatchProvidersResponse>();
+const watchProvidersInFlight = new Map<number, Promise<WatchProvidersResponse>>();
+
+export async function fetchWatchProviders(tmdbId: number): Promise<WatchProvidersResponse> {
+  if (watchProvidersCache.has(tmdbId)) {
+    return watchProvidersCache.get(tmdbId)!;
+  }
+  if (watchProvidersInFlight.has(tmdbId)) {
+    return watchProvidersInFlight.get(tmdbId)!;
+  }
+  const promise = fetch(`/api/tmdb-watch-providers?id=${tmdbId}`)
+    .then((r) => {
+      if (!r.ok) throw new Error("Failed to fetch watch providers");
+      return r.json();
+    })
+    .then((d: WatchProvidersResponse) => {
+      watchProvidersCache.set(tmdbId, d);
+      watchProvidersInFlight.delete(tmdbId);
+      return d;
+    })
+    .catch((err) => {
+      watchProvidersInFlight.delete(tmdbId);
+      throw err;
+    });
+  watchProvidersInFlight.set(tmdbId, promise);
+  return promise;
+}
+
+const panelCardStyle: React.CSSProperties = {
+  position: "relative",
+  padding: "14px",
+  background: "linear-gradient(150deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.03) 60%, rgba(255,255,255,0.05) 100%)",
+  border: "1px solid rgba(255,255,255,0.10)",
+  borderRadius: "14px",
+  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.10), 0 4px 16px rgba(0,0,0,0.18)",
+  backdropFilter: "blur(18px) saturate(1.4)",
+  WebkitBackdropFilter: "blur(18px) saturate(1.4)",
+};
+
 export default function WatchProvidersPanel({ tmdbId, defaultCountry, movieTitle }: Props) {
-  const [data, setData] = useState<WatchProvidersResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const cached = watchProvidersCache.get(tmdbId);
+  const [data, setData] = useState<WatchProvidersResponse | null>(cached ?? null);
+  const [loading, setLoading] = useState(!cached);
   const [error, setError] = useState<string | null>(null);
-  const [country, setCountry] = useState<string>(defaultCountry || "US");
+  const [country, setCountry] = useState<string>(() => {
+    if (cached) {
+      const available = Object.keys(cached.results || {});
+      if (available.length > 0) {
+        if (defaultCountry && available.includes(defaultCountry)) return defaultCountry;
+        if (available.includes("US")) return "US";
+        return available[0];
+      }
+    }
+    return defaultCountry || "US";
+  });
   const [pickerOpen, setPickerOpen] = useState(false);
   const [countryQuery, setCountryQuery] = useState("");
   const popoverRef = useRef<HTMLDivElement | null>(null);
@@ -284,25 +334,42 @@ export default function WatchProvidersPanel({ tmdbId, defaultCountry, movieTitle
 
   useEffect(() => {
     if (!tmdbId) return;
-    /* eslint-disable react-hooks/set-state-in-effect */
+    const cachedData = watchProvidersCache.get(tmdbId);
+    if (cachedData) {
+      /* eslint-disable react-hooks/set-state-in-effect */
+      setData(cachedData);
+      setLoading(false);
+      /* eslint-enable react-hooks/set-state-in-effect */
+      const available = Object.keys(cachedData.results || {});
+      if (available.length > 0 && !cachedData.results[country]) {
+        setCountry(available.includes(defaultCountry || "") ? (defaultCountry as string) : available[0]);
+      }
+      return;
+    }
+
+    let cancelled = false;
     setLoading(true);
     setError(null);
-    /* eslint-enable react-hooks/set-state-in-effect */
-    fetch(`/api/tmdb-watch-providers?id=${tmdbId}`)
-      .then((r) => r.json())
+    fetchWatchProviders(tmdbId)
       .then((d: WatchProvidersResponse) => {
+        if (cancelled) return;
         setData(d);
-        // If our chosen default country has no data, pick the first available.
         const available = Object.keys(d.results || {});
         if (available.length > 0 && !d.results[country]) {
           setCountry(available.includes(defaultCountry || "") ? (defaultCountry as string) : available[0]);
         }
       })
-      .catch(() => setError("Couldn't load streaming info."))
-      .finally(() => setLoading(false));
-    // We intentionally only run when tmdbId changes; country state is internal.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tmdbId]);
+      .catch(() => {
+        if (!cancelled) setError("Couldn't load streaming info.");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [tmdbId, defaultCountry, country]);
 
   const availableCountries = useMemo(() => {
     if (!data) return [] as string[];
@@ -335,7 +402,7 @@ export default function WatchProvidersPanel({ tmdbId, defaultCountry, movieTitle
 
   if (loading) {
     return (
-      <div style={{ display: "flex", flexDirection: "column", gap: "12px", minHeight: "110px" }}>
+      <div style={{ ...panelCardStyle, display: "flex", flexDirection: "column", gap: "12px", minHeight: "110px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div className="skeleton-shimmer" style={{ width: "90px", height: "14px", borderRadius: "4px" }} />
           <div className="skeleton-shimmer" style={{ width: "100px", height: "26px", borderRadius: "999px" }} />
@@ -354,12 +421,7 @@ export default function WatchProvidersPanel({ tmdbId, defaultCountry, movieTitle
     // Still show a JustWatch link — JustWatch often has theatre/upcoming info.
     const fallbackJwLink = movieTitle ? justWatchUrl(country, movieTitle) : null;
     return (
-      <div style={{
-        padding: "12px",
-        background: "rgba(255,255,255,0.03)",
-        border: "1px solid rgba(255,255,255,0.08)",
-        borderRadius: "10px",
-      }}>
+      <div style={panelCardStyle}>
         <p style={{ margin: "0 0 10px", fontSize: "12px", color: "rgba(255,255,255,0.45)", lineHeight: 1.5 }}>
           {error
             ? "Couldn't load streaming info."
@@ -397,16 +459,7 @@ export default function WatchProvidersPanel({ tmdbId, defaultCountry, movieTitle
   }
 
   return (
-    <div style={{
-      position: "relative",
-      padding: "14px",
-      background: "linear-gradient(150deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.03) 60%, rgba(255,255,255,0.05) 100%)",
-      border: "1px solid rgba(255,255,255,0.10)",
-      borderRadius: "14px",
-      boxShadow: "inset 0 1px 0 rgba(255,255,255,0.10), 0 4px 16px rgba(0,0,0,0.18)",
-      backdropFilter: "blur(18px) saturate(1.4)",
-      WebkitBackdropFilter: "blur(18px) saturate(1.4)",
-    }}>
+    <div style={panelCardStyle}>
       {/* Country selector row — compact: no verbose label, just flag+name+chevron */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px" }}>
         <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", letterSpacing: "0.02em" }}>Available in</span>

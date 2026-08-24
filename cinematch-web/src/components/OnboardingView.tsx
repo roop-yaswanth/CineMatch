@@ -353,7 +353,8 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
 
       <div className="onboarding-rating-layout" style={{
         display: "flex", flexDirection: "column", alignItems: "center",
-        position: "fixed", inset: 0, padding: "clamp(8px, 1.8vh, 18px) clamp(10px, 2vw, 20px)",
+        position: "fixed", inset: 0,
+        padding: "calc(env(safe-area-inset-top, 0px) + clamp(12px, 2vh, 20px)) clamp(12px, 2vw, 20px) calc(env(safe-area-inset-bottom, 0px) + clamp(12px, 2vh, 20px))",
         fontFamily: "var(--font-sans)", width: "100%", overflowY: "auto", overflowX: "hidden",
       }}>
         {/* Header */}
@@ -1139,7 +1140,7 @@ function PreferencesWizard({
       style={{
         position: "fixed", inset: 0, display: "flex", flexDirection: "column",
         alignItems: "center", fontFamily: "var(--font-sans)",
-        padding: "calc(env(safe-area-inset-top) + 18px) 20px calc(env(safe-area-inset-bottom) + 18px)",
+        padding: "calc(env(safe-area-inset-top, 0px) + 18px) 20px calc(env(safe-area-inset-bottom, 0px) + 18px)",
         overflow: "hidden",
       }}
     >

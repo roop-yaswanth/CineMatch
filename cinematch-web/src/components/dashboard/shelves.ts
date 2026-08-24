@@ -134,7 +134,7 @@ export function buildShelves(
 
   const shelves: Shelf[] = [];
   const narrativePool = pool.filter(isNarrative);
-  let curatedSource = narrativePool.length >= MIN_SHELF ? narrativePool : pool;
+  const curatedSource = narrativePool.length >= MIN_SHELF ? narrativePool : pool;
 
 
 

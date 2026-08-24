@@ -100,33 +100,11 @@ function PillSelect({
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      style={{
-        appearance: "none",
-        WebkitAppearance: "none",
-        background: isActive
-          ? "rgba(var(--rgb-accent), 0.14)"
-          : "var(--glass-chrome)",
-        border: isActive
-          ? "1px solid rgba(var(--rgb-accent), 0.45)"
-          : "1px solid var(--hairline)",
-        borderRadius: "var(--radius-pill)",
-        color: isActive ? "var(--color-accent)" : "var(--color-text-secondary)",
-        padding: "7px 28px 7px 14px",
-        fontSize: "12.5px",
-        fontWeight: isActive ? 600 : 500,
-        cursor: "pointer",
-        outline: "none",
-        transition: "all var(--dur-base) var(--ease-out)",
-        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.5)' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`,
-        backgroundRepeat: "no-repeat",
-        backgroundPosition: "right 10px center",
-        backgroundSize: "10px",
-        minWidth: 0,
-        whiteSpace: "nowrap" as const,
-      }}
+      className="filter-select"
+      data-active={isActive ? "true" : undefined}
     >
       {options.map((o) => (
-        <option key={o.value} value={o.value} style={{ background: "#161820", color: "#fff" }}>
+        <option key={o.value} value={o.value}>
           {o.label}
         </option>
       ))}
@@ -276,6 +254,8 @@ function ExplorePageInner() {
       <PageHeader
         title="Explore"
         hideBackButton
+        showNavTabs
+        showSearchButton
         rightSlot={
           session ? (
             <MobileMenu onLogout={() => { logout(); router.replace("/login"); }} />
@@ -403,7 +383,7 @@ function ExplorePageInner() {
       </div>
 
       {/* Content */}
-      <div className="app-container" style={{ flex: 1, width: "100%", padding: "32px 24px var(--s-bottom-clearance)" }}>
+      <div className="app-container explore-content-container" style={{ flex: 1, width: "100%", padding: "32px 24px var(--s-bottom-clearance)" }}>
         {isDiscover ? (
           <Discover
             region={region}
@@ -473,13 +453,7 @@ function Grid({
         <EmptyState title="No movies found" description="Try clearing some filters or changing your selection." />
       ) : (
         <>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(165px, 1fr))",
-              gap: "24px 18px",
-            }}
-          >
+          <div className="explore-grid">
             {movies.map((m) => (
               <div key={m.tmdb_id} style={{ cursor: "pointer" }} onClick={() => onSelect(m)}>
                 <MovieCard movie={m} onQuickAction={onQuickAction} />
@@ -739,13 +713,7 @@ function Discover({
         <EmptyState title="No matching movies" description="Try broadening your Discover filters." />
       ) : (
         <>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(165px, 1fr))",
-              gap: "24px 18px",
-            }}
-          >
+          <div className="explore-grid">
             {results.map((m) => (
               <div key={m.tmdb_id} style={{ cursor: "pointer" }} onClick={() => onSelect(m)}>
                 <MovieCard movie={m} onQuickAction={onQuickAction} />
@@ -820,7 +788,7 @@ function NumberInput({
         borderRadius: "var(--radius-pill)",
         color: "var(--color-text-secondary)",
         padding: "7px 14px",
-        fontSize: "12.5px",
+        fontSize: "16px",
         fontWeight: 500,
         outline: "none",
         width: "100%",

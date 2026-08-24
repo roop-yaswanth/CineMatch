@@ -196,6 +196,7 @@ function SearchPage() {
       <PageHeader
         title="Search"
         hideBackButton
+        showNavTabs
         rightSlot={
           session ? <MobileMenu onLogout={() => { logout(); router.replace("/login"); }} /> : null
         }

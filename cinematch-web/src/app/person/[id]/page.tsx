@@ -74,6 +74,20 @@ export default function PersonPage() {
     });
   }, [data]);
 
+  const handleAction = useCallback(
+    async (action: "like" | "okay" | "dislike" | "watchlist" | "skip") => {
+      if (!session || !active) return;
+      const targetId = active.tmdb_id ?? active.id;
+      try {
+        await apiRecommendationAction(session.session_id, targetId, action);
+        invalidateHistoryCache(session.session_id);
+      } catch {
+        /* ignore */
+      }
+    },
+    [session, active]
+  );
+
   if (isLoading || !session) {
     return <div style={{ minHeight: "100dvh", background: "var(--color-bg)" }} />;
   }
@@ -93,20 +107,6 @@ export default function PersonPage() {
       window.open(`https://www.themoviedb.org/tv/${c.tmdb_id}`, "_blank", "noopener,noreferrer");
     }
   };
-
-  const handleAction = useCallback(
-    async (action: "like" | "okay" | "dislike" | "watchlist" | "skip") => {
-      if (!session || !active) return;
-      const targetId = active.tmdb_id ?? active.id;
-      try {
-        await apiRecommendationAction(session.session_id, targetId, action);
-        invalidateHistoryCache(session.session_id);
-      } catch {
-        /* ignore */
-      }
-    },
-    [session, active]
-  );
 
   return (
     <div style={{ minHeight: "100dvh", background: "var(--color-bg)", display: "flex", flexDirection: "column" }}>
