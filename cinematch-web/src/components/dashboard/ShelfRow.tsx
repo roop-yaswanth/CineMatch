@@ -150,7 +150,7 @@ function PosterCard({
           setCoords({ top: computedTop, left: computedLeft, width: targetW });
           setIsHovered(true);
         }
-      }, 480);
+      }, 700);
     }
   };
 
@@ -186,6 +186,15 @@ function PosterCard({
   const handleOpen = () => {
     hapticTap();
     onOpen();
+  };
+
+  const handleQuick = (action: QuickAction) => {
+    onQuickAction?.(movie, action);
+  };
+
+  const handlePortalQuick = (action: QuickAction) => {
+    handleMouseLeave();
+    onQuickAction?.(movie, action);
   };
 
   const onKeyDown = (e: React.KeyboardEvent) => {
@@ -240,7 +249,7 @@ function PosterCard({
                     type="button"
                     className="shelf-reaction-item"
                     aria-label={`Dislike ${movie.title}`}
-                    onClick={(e) => { e.stopPropagation(); e.currentTarget.blur(); triggerHaptic("dislike"); onQuickAction(movie, "dislike"); }}
+                    onClick={(e) => { e.stopPropagation(); e.currentTarget.blur(); triggerHaptic("dislike"); handleQuick("dislike"); }}
                   >
                     <span aria-hidden>🙁</span>
                     <span className="shelf-tooltip">Not for me</span>
@@ -249,7 +258,7 @@ function PosterCard({
                     type="button"
                     className="shelf-reaction-item"
                     aria-label={`Like ${movie.title}`}
-                    onClick={(e) => { e.stopPropagation(); e.currentTarget.blur(); triggerHaptic("like"); onQuickAction(movie, "like"); }}
+                    onClick={(e) => { e.stopPropagation(); e.currentTarget.blur(); triggerHaptic("like"); handleQuick("like"); }}
                   >
                     <span aria-hidden>😀</span>
                     <span className="shelf-tooltip">I like this</span>
@@ -258,7 +267,7 @@ function PosterCard({
                     type="button"
                     className="shelf-reaction-item"
                     aria-label={`Love ${movie.title}`}
-                    onClick={(e) => { e.stopPropagation(); e.currentTarget.blur(); triggerHaptic("love"); onQuickAction(movie, "love"); }}
+                    onClick={(e) => { e.stopPropagation(); e.currentTarget.blur(); triggerHaptic("love"); handleQuick("love"); }}
                   >
                     <span aria-hidden>😍</span>
                     <span className="shelf-tooltip">Love this!</span>
@@ -269,7 +278,7 @@ function PosterCard({
                   type="button"
                   className="shelf-action-btn shelf-action-btn--reaction"
                   aria-label={`Rate ${movie.title}`}
-                  onClick={(e) => { e.stopPropagation(); e.currentTarget.blur(); onQuickAction(movie, "like"); }}
+                  onClick={(e) => { e.stopPropagation(); e.currentTarget.blur(); handleQuick("like"); }}
                 >
                   <span aria-hidden style={{ fontSize: 16 }}>😀</span>
                   <span className="shelf-tooltip">Rate</span>
@@ -280,7 +289,7 @@ function PosterCard({
                 type="button"
                 className="shelf-action-btn shelf-action-btn--watchlist"
                 aria-label={`Add ${movie.title} to watchlist`}
-                onClick={(e) => { e.stopPropagation(); e.currentTarget.blur(); triggerHaptic("watchlist"); onQuickAction(movie, "watchlist"); }}
+                onClick={(e) => { e.stopPropagation(); e.currentTarget.blur(); triggerHaptic("watchlist"); handleQuick("watchlist"); }}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                   <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
@@ -305,10 +314,10 @@ function PosterCard({
       {mounted && isHovered && coords && createPortal(
         <AnimatePresence>
           <motion.div
-            initial={{ opacity: 0, scale: 0.93, y: 6 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.93, y: 6 }}
-            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            initial={{ opacity: 0, scale: 0.9, y: 14, filter: "blur(6px)" }}
+            animate={{ opacity: 1, scale: 1, y: 0, filter: "blur(0px)" }}
+            exit={{ opacity: 0, scale: 0.94, y: 8, transition: { duration: 0.16 } }}
+            transition={{ duration: 0.34, ease: [0.22, 1, 0.36, 1] }}
             onMouseEnter={() => {
               if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
               setIsHovered(true);
@@ -596,7 +605,7 @@ function PosterCard({
                           type="button"
                           className="shelf-reaction-item"
                           aria-label={`Dislike ${movie.title}`}
-                          onClick={() => onQuickAction(movie, "dislike")}
+                          onClick={() => handlePortalQuick("dislike")}
                         >
                           <span aria-hidden>🙁</span>
                           <span className="shelf-tooltip">Not for me</span>
@@ -605,7 +614,7 @@ function PosterCard({
                           type="button"
                           className="shelf-reaction-item"
                           aria-label={`Like ${movie.title}`}
-                          onClick={() => onQuickAction(movie, "like")}
+                          onClick={() => handlePortalQuick("like")}
                         >
                           <span aria-hidden>😀</span>
                           <span className="shelf-tooltip">I like this</span>
@@ -614,7 +623,7 @@ function PosterCard({
                           type="button"
                           className="shelf-reaction-item"
                           aria-label={`Love ${movie.title}`}
-                          onClick={() => onQuickAction(movie, "love")}
+                          onClick={() => handlePortalQuick("love")}
                         >
                           <span aria-hidden>😍</span>
                           <span className="shelf-tooltip">Love this!</span>
@@ -638,7 +647,7 @@ function PosterCard({
                         onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255, 255, 255, 0.20)"; e.currentTarget.style.transform = "scale(1.05)"; }}
                         onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255, 255, 255, 0.10)"; e.currentTarget.style.transform = "none"; }}
                         aria-label={`Rate ${movie.title}`}
-                        onClick={() => onQuickAction(movie, "like")}
+                        onClick={() => handlePortalQuick("like")}
                       >
                         <span aria-hidden style={{ fontSize: 16 }}>😀</span>
                       </button>
@@ -662,7 +671,7 @@ function PosterCard({
                       onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255, 255, 255, 0.20)"; e.currentTarget.style.transform = "scale(1.05)"; }}
                       onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255, 255, 255, 0.10)"; e.currentTarget.style.transform = "none"; }}
                       aria-label={`Add ${movie.title} to watchlist`}
-                      onClick={() => onQuickAction(movie, "watchlist")}
+                      onClick={() => handlePortalQuick("watchlist")}
                     >
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                         <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />

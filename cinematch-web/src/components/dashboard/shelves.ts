@@ -193,9 +193,13 @@ export function buildShelves(
     // uncertain reception the scorer can't rank confidently. Deterministic
     // pick seeded by shelf id + ids (no per-render shuffle).
     if (opts.seed && movies.length >= MIN_SHELF && deep.length > 0) {
+      // High-variance but NOT junk: real TMDB audience footprint required —
+      // zero-footprint micro-releases are the "nobody knows this" class.
       const explorables = deep.filter(
         (m) =>
-          (votesOf(m) >= 50 && votesOf(m) <= 5000) && ratingOf(m) >= 6.5
+          (votesOf(m) >= 2000 && votesOf(m) <= 25_000) &&
+          ratingOf(m) >= 7.0 &&
+          (m.popularity ?? 0) >= 1.0
       );
       if (explorables.length > 0) {
         const seedStr =

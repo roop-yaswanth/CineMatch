@@ -235,7 +235,7 @@ export default function RecommendationsView({
   // Track the OPEN shelf by id, not by snapshot: the collection is derived
   // from live shelves below, so a skip/like inside the detail modal (which
   // removes the movie from stacks) updates the overlay grid in real time
-  const [activeCollectionId, setActiveCollectionId] = useState<string | null>(null);
+
 
   const [preferences, setPreferences] = useState<RecommendationPreferences>(
     () => preferencesFromProfile(session.profile)
@@ -243,6 +243,7 @@ export default function RecommendationsView({
 
   // Detail Modal state
   const [activeMovie, setActiveMovie] = useState<DetailMovie | null>(null);
+  const [activeCollection, setActiveCollection] = useState<Collection | null>(null);
 
   // Route-based navigation for sub-pages
   const openYourLikes = () => router.push("/your-likes");
@@ -461,7 +462,7 @@ export default function RecommendationsView({
         setIsUpdating(true);
       } else {
         setLoading(true);
-        setActiveCollectionId(null);
+        setActiveCollection(null);
         setStacks([]);
         setMovies([]);
         bucketCacheRef.current = EMPTY_CACHE();
@@ -711,21 +712,80 @@ export default function RecommendationsView({
     []
   );
 
-  const activeCollection = useMemo<Collection | null>(() => {
-    if (!activeCollectionId) return null;
-    const shelf = shelves.find((s) => s.id === activeCollectionId);
-    if (!shelf || shelf.movies.length === 0) return null;
-    return {
+  // ── Infinite collection loader ────────────────────────────────────────────
+  // Feeds the open overlay indefinitely: bucket-cache reserves first (instant),
+  // then a fresh multi request excluding everything ever displayed. Returns
+  // null when no new items exist — the overlay then shows its end-marker.
+  const loadMoreForCollection = useCallback(
+    async (col: Collection): Promise<Recommendation[] | null> => {
+      if (!session?.session_id) return null;
+      const existing = new Set(col.movies.map(recommendationId));
+      const take = (pool: Recommendation[], n: number) => {
+        const out: Recommendation[] = [];
+        while (pool.length && out.length < n) {
+          const m = pool.shift()!;
+          if (!existing.has(recommendationId(m)) &&
+              !seenIdsRef.current.has(recommendationId(m))) out.push(m);
+        }
+        return out;
+      };
+      const preferred = (preferences.languages ?? []).length === 0 ||
+        (preferences.languages ?? []).some((l) => l.toLowerCase() === "en");
+      const keys: StackId[] =
+        col.id === "hollywood" ? ["hollywood"]
+        : col.id === "world" ? ["other"]
+        : col.id === "matched" || col.id.startsWith("matched-") ? ["matched"]
+        : preferred ? ["matched", "hollywood"] : ["matched"];
+
+      // 1) instant: cache reserves
+      const batch: Recommendation[] = [];
+      for (const k of keys) {
+        const cache = bucketCacheRef.current[k];
+        if (cache?.length) batch.push(...take(cache, 40 - batch.length));
+        if (batch.length >= 30) break;
+      }
+      if (batch.length >= 10) return batch;
+
+      // 2) network: fresh batch excluding everything shown
+      const exclude = new Set<number>([
+        ...col.movies.map(recommendationId),
+        ...displayedIdsRef.current,
+      ]);
+      try {
+        const resp = await apiMultiRecommendations(session.session_id, {
+          languages: preferences.languages,
+          genres: preferences.genres,
+          age_group: preferences.age_group,
+          region: preferences.region,
+          include_classics: preferences.include_classics,
+          semantic_index: preferences.semantic_index,
+          per_bucket_k: bucketFetchK(preferences),
+          exclude_ids: Array.from(exclude),
+        });
+        const pools: Recommendation[][] = [];
+        if (keys.includes("matched"))
+          pools.push(Object.entries(resp.buckets.regional)
+            .filter(([k]) => k !== "_merged").flatMap(([, v]) => v));
+        if (keys.includes("hollywood")) pools.push(resp.buckets.english || []);
+        if (keys.includes("other")) pools.push(resp.buckets.global || []);
+        for (const pool of pools) batch.push(...take([...pool], 40 - batch.length));
+        for (const m of batch) displayedIdsRef.current.add(recommendationId(m));
+        return batch.length ? batch : null;
+      } catch {
+        return null;
+      }
+    },
+    [session.session_id, preferences]
+  );
+
+  const openShelfCollection = useCallback((shelf: Shelf) => {
+    setActiveCollection({
       id: shelf.id,
       title: shelf.title,
       subtitle: shelf.subtitle,
       movies: shelf.fullMovies ?? shelf.movies,
-    };
-  }, [activeCollectionId, shelves]);
-
-  const openShelfCollection = useCallback((shelf: Shelf) => {
-    setActiveCollectionId(shelf.id);
-  }, []);
+    });
+  }, [setActiveCollection]);
 
   // Shelf cards expose only like/watchlist; the wider RecommendationAction
   // union on handleAction makes it directly assignable here.
@@ -936,9 +996,10 @@ export default function RecommendationsView({
           <CollectionOverlay
             key={"collection-" + activeCollection.id}
             collection={activeCollection}
-            onBack={() => setActiveCollectionId(null)}
+            onBack={() => setActiveCollection(null)}
             onMovieClick={openMovieDetail}
             onQuickAction={handleAction}
+            onLoadMore={() => loadMoreForCollection(activeCollection)}
           />
         )}
       </AnimatePresence>

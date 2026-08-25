@@ -208,6 +208,8 @@ export interface Recommendation {
   year?: number;
   /** Interaction-acceleration score (7d vs 30d velocity), normalised 0–1. */
   trend_score?: number;
+  /** TMDB popularity — audience-footprint signal for quality heuristics. */
+  popularity?: number;
   poster_path?: string;
   backdrop_path?: string;
   overview?: string;
