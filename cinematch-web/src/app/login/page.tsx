@@ -13,19 +13,28 @@ export default function LoginPage() {
   // If already logged in, push them away from the login screen
   useEffect(() => {
     if (!isLoading && session) {
-      router.replace(session.onboarding_complete ? "/dashboard" : "/onboarding");
+      const target = session.onboarding_complete ? "/dashboard" : "/onboarding";
+      if (typeof window !== "undefined") {
+        window.location.replace(target);
+      } else {
+        router.replace(target);
+      }
     }
   }, [session, isLoading, router]);
 
   const handleLogin = (newSession: UserSession) => {
-    updateSession(newSession); // Sync with your global SessionContext
+    updateSession(newSession); // Sync with global SessionContext
     
-    if (newSession.is_returning && newSession.onboarding_complete) {
-      router.replace("/dashboard");
+    const target = newSession.onboarding_complete ? "/dashboard" : "/onboarding";
+    if (typeof window !== "undefined") {
+      window.location.replace(target);
     } else {
-      router.replace("/onboarding");
+      router.replace(target);
     }
   };
+
+  // Avoid flashing login screen if session is already active
+  if (!isLoading && session) return null;
 
   return <LoginScreen onLogin={handleLogin} />;
 }

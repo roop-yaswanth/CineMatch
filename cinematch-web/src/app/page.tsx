@@ -41,12 +41,22 @@ export default function HomePage() {
   // Send already-logged-in users into the app; logged-out visitors stay here.
   useEffect(() => {
     if (!mounted || isLoading || !session) return;
-    router.replace(session.is_returning && session.onboarding_complete ? "/dashboard" : "/onboarding");
+    const target = session.onboarding_complete ? "/dashboard" : "/onboarding";
+    if (typeof window !== "undefined") {
+      window.location.replace(target);
+    } else {
+      router.replace(target);
+    }
   }, [mounted, session, isLoading, router]);
 
   const handleLogin = (newSession: UserSession) => {
     updateSession(newSession);
-    router.replace(newSession.is_returning && newSession.onboarding_complete ? "/dashboard" : "/onboarding");
+    const target = newSession.onboarding_complete ? "/dashboard" : "/onboarding";
+    if (typeof window !== "undefined") {
+      window.location.replace(target);
+    } else {
+      router.replace(target);
+    }
   };
 
   // About to redirect — render nothing to avoid a flash of the landing page.
