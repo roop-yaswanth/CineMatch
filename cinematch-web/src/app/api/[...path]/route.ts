@@ -71,11 +71,14 @@ async function proxy(
   }
 
   let upstream: Response;
-  // 6s timeout — HuggingFace free-tier Spaces hibernate when inactive.
-  // When cold-starting, response time exceeds 5-7s. We abort at 6s and return a 500
-  // status with SERVER_SLEEPING to trigger the HTTP Cat 500 page advising a 3-minute retry.
+  // 12s timeout — HuggingFace free-tier Spaces hibernate when inactive; a truly
+  // sleeping Space needs minutes, so it still trips this and returns
+  // SERVER_SLEEPING for the retry page. The longer ceiling exists because the
+  // deep multi-bucket request (up to ~6 language buckets × 90-150 movies)
+  // legitimately takes 5-6s warm on CPU; aborting at 6s turned slow-but-alive
+  // responses into spurious error pages.
   const controller = new AbortController();
-  const upstreamTimeout = setTimeout(() => controller.abort(), 6_000);
+  const upstreamTimeout = setTimeout(() => controller.abort(), 12_000);
   try {
     upstream = await fetch(url, { method: req.method, headers, body, signal: controller.signal });
   } catch {

@@ -206,6 +206,8 @@ export interface Recommendation {
   tmdb_id?: number;
   title: string;
   year?: number;
+  /** Interaction-acceleration score (7d vs 30d velocity), normalised 0–1. */
+  trend_score?: number;
   poster_path?: string;
   backdrop_path?: string;
   overview?: string;

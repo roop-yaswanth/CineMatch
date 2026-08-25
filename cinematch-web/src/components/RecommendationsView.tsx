@@ -54,9 +54,8 @@ interface Stack {
   label: string;
   subtitle: string;
   movies: Recommendation[];
+  byLanguage?: Record<string, Recommendation[]>;
 }
-
-
 
 function toDetailMovie(movie: Recommendation): DetailMovie {
   return { ...movie };
@@ -74,6 +73,7 @@ function partitionFromBuckets(
   const hasRegional = regionalEntries.some(([, arr]) => arr.length > 0);
 
   const regionalMerged: Recommendation[] = [];
+  const seenRegional = new Set<number>();
   if (hasRegional) {
     const buckets = regionalEntries.map(([, arr]) => [...arr]);
     const cursors = buckets.map(() => 0);
@@ -82,9 +82,13 @@ function partitionFromBuckets(
       added = false;
       for (let i = 0; i < buckets.length; i++) {
         if (cursors[i] < buckets[i].length) {
-          regionalMerged.push(buckets[i][cursors[i]]);
+          const m = buckets[i][cursors[i]];
           cursors[i]++;
           added = true;
+          if (!seenRegional.has(recommendationId(m))) {
+            seenRegional.add(recommendationId(m));
+            regionalMerged.push(m);
+          }
         }
       }
     }
@@ -101,11 +105,18 @@ function partitionFromBuckets(
 
   if (hasRegional || (regional._merged && regional._merged.length > 0)) {
     const movies = hasRegional ? regionalMerged : (regional._merged || []);
+    const byLanguage: Record<string, Recommendation[]> = {};
+    for (const [lang, arr] of regionalEntries) {
+      if (arr && arr.length > 0) {
+        byLanguage[lang] = arr;
+      }
+    }
     result.push({
       id: "matched",
       label: matchedLabel ? `${matchedLabel} Cinema` : "Regional Favorites",
       subtitle: "",
       movies,
+      byLanguage,
     });
   }
 
@@ -127,17 +138,41 @@ function partitionFromBuckets(
     });
   }
 
-  const allMovies = [
+  const allSeen = new Set<number>();
+  const allMovies: Recommendation[] = [];
+  for (const m of [
     ...(hasRegional ? regionalMerged : (regional._merged || [])),
     ...(english || []),
     ...(globalMovies || []),
-  ];
+  ]) {
+    if (!allSeen.has(recommendationId(m))) {
+      allSeen.add(recommendationId(m));
+      allMovies.push(m);
+    }
+  }
 
   return { stacks: result, allMovies };
 }
 
-const BUCKET_DISPLAY = 50;
-const BUCKET_FETCH = 100;
+// Deep buckets: the dashboard cuts 8–14 shelves from these pools, and every
+// shelf must draw DISJOINT items (no movie on two rails). ~150/bucket gives
+// the preferred-language pool enough unique depth to fill all of its shelves
+// (backend caps per_bucket_k at 200).
+const BUCKET_DISPLAY = 150;
+const BUCKET_FETCH = 150;
+
+// Latency scales ~0.7s per bucket server-side and the proxy aborts slow
+// upstreams, so depth is scaled down when many language buckets are requested:
+// identity rails only need ~36 cards per language — only the MERGED pool that
+// feeds the theme rails needs ~150 unique items in total.
+function bucketFetchK(preferences: RecommendationPreferences): number {
+  const langs = preferences.languages ?? [];
+  const regionalCount = langs.filter((l) => l && l.toLowerCase() !== "en").length;
+  const includesEn = regionalCount === 0 || langs.some((l) => l.toLowerCase() === "en");
+  const buckets = regionalCount + (includesEn ? 1 : 0);
+  if (buckets <= 3) return BUCKET_FETCH;
+  return Math.max(60, Math.min(BUCKET_FETCH, Math.ceil(450 / buckets)));
+}
 const CACHE_REFETCH_THRESHOLD = 20;
 
 type StackCache = Record<StackId, Recommendation[]>;
@@ -298,33 +333,44 @@ export default function RecommendationsView({
       const fEn = filterBucket(resp.buckets.english || []);
       const fGlob = filterBucket(resp.buckets.global || []);
 
-      // Interleave regional languages, then filter
-      const regionalEntries = Object.entries(resp.buckets.regional || {});
+      // Filter each regional language bucket individually so per-language lists are preserved
+      const regionalEntries = Object.entries(resp.buckets.regional || {}).filter(([k]) => k !== "_merged");
+      const regionalByLangDisplay: Record<string, Recommendation[]> = {};
       const regionalMergedRaw: Recommendation[] = [];
+      const seenRegRaw = new Set<number>();
+
       if (regionalEntries.length > 0) {
-        const buckets = regionalEntries.map(([, arr]) => [...(arr || [])]);
+        for (const [lang, arr] of regionalEntries) {
+          const filtered = filterBucket(arr || []);
+          regionalByLangDisplay[lang] = filtered.slice(0, BUCKET_DISPLAY);
+        }
+        // Interleave regional languages for the merged rail
+        const buckets = Object.values(regionalByLangDisplay).map((arr) => [...arr]);
         const cursors = buckets.map(() => 0);
         let added = true;
         while (added) {
           added = false;
           for (let i = 0; i < buckets.length; i++) {
             if (cursors[i] < buckets[i].length) {
-              regionalMergedRaw.push(buckets[i][cursors[i]++]);
+              const m = buckets[i][cursors[i]++];
               added = true;
+              if (!seenRegRaw.has(recommendationId(m))) {
+                seenRegRaw.add(recommendationId(m));
+                regionalMergedRaw.push(m);
+              }
             }
           }
         }
       }
-      const fReg = filterBucket(regionalMergedRaw);
+      const displayReg = regionalMergedRaw;
 
       // Split each into display slice and cache reserve
       const displayEn = fEn.slice(0, BUCKET_DISPLAY);
-      const displayReg = fReg.slice(0, BUCKET_DISPLAY);
       const displayGlob = fGlob.slice(0, BUCKET_DISPLAY);
 
       bucketCacheRef.current = {
         hollywood: fEn.slice(BUCKET_DISPLAY),
-        matched: fReg.slice(BUCKET_DISPLAY),
+        matched: displayReg.slice(BUCKET_DISPLAY),
         other: fGlob.slice(BUCKET_DISPLAY),
       };
 
@@ -332,7 +378,7 @@ export default function RecommendationsView({
         ...resp,
         buckets: {
           english: displayEn,
-          regional: regionalEntries.length > 0 ? { _merged: displayReg } : {},
+          regional: regionalEntries.length > 0 ? { ...regionalByLangDisplay, _merged: displayReg } : {},
           global: displayGlob,
         },
       };
@@ -362,7 +408,7 @@ export default function RecommendationsView({
         region: prefs.region,
         include_classics: prefs.include_classics,
         semantic_index: prefs.semantic_index,
-        per_bucket_k: BUCKET_FETCH,
+        per_bucket_k: bucketFetchK(prefs),
       });
 
       // Drop the response if a newer silentRefresh has been kicked off
@@ -435,7 +481,7 @@ export default function RecommendationsView({
           region: nextPreferences.region,
           include_classics: nextPreferences.include_classics,
           semantic_index: nextPreferences.semantic_index,
-          per_bucket_k: BUCKET_FETCH,
+          per_bucket_k: bucketFetchK(nextPreferences),
           exclude_ids: excludeIds,
         });
 
@@ -691,6 +737,47 @@ export default function RecommendationsView({
   );
 
 
+  // ── Rail analytics (#10): buffered exposure/action telemetry per shelf.
+  // Batched flush every 10 events or on tab-hide; fire-and-forget — analytics
+  // must never block or break the recommendation path.
+  const railEventsRef = useRef<
+    { shelf_id: string; tmdb_id: number; action: string; position: number; ts: number }[]
+  >([]);
+  const sessionSid = session?.session_id ?? "";
+  const flushRailEvents = useCallback(() => {
+    if (!railEventsRef.current.length || !sessionSid) return;
+    const events = railEventsRef.current.splice(0);
+    try {
+      // keepalive lets the batch survive tab close; same-origin → Next proxy.
+      void fetch("/api/analytics/rail", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: sessionSid, events }),
+        keepalive: true,
+      }).catch(() => {});
+    } catch { /* analytics is best-effort */ }
+  }, [sessionSid]);
+  useEffect(() => {
+    const onVis = () => {
+      if (document.visibilityState === "hidden") flushRailEvents();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [flushRailEvents]);
+  const trackRailEvent = useCallback(
+    (shelf: Shelf, movie: Recommendation, action: string) => {
+      railEventsRef.current.push({
+        shelf_id: shelf.id,
+        tmdb_id: recommendationId(movie),
+        action,
+        position: shelf.movies.findIndex((m) => recommendationId(m) === recommendationId(movie)),
+        ts: Date.now() / 1000,
+      });
+      if (railEventsRef.current.length >= 10) flushRailEvents();
+    },
+    [flushRailEvents]
+  );
+
   const showSkeleton = loading && movies.length === 0;
   const showEmpty = !loading && movies.length === 0;
   const scrolled = scrollProgress > 0.002;
@@ -809,9 +896,15 @@ export default function RecommendationsView({
                 shelf={shelf}
                 index={i}
                 priority={i === 0}
-                onOpenMovie={openMovieDetail}
+                onOpenMovie={(m) => {
+                  trackRailEvent(shelf, m, "open");
+                  openMovieDetail(m);
+                }}
                 onOpenShelf={openShelfCollection}
-                onQuickAction={handleQuickAction}
+                onQuickAction={(m, a) => {
+                  trackRailEvent(shelf, m, a);
+                  handleQuickAction(m, a);
+                }}
               />
             ))}
 
