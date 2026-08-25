@@ -16,20 +16,45 @@ import {
   apiDiscover,
   apiExplore,
   apiGenres,
+  apiGetHistory,
   apiRecommendationAction,
   invalidateHistoryCache,
+  readHistoryCache,
+  writeHistoryCache,
   LANGUAGE_LABELS,
   languageLabel,
   type DiscoverFilters,
   type DiscoverSort,
   type ExploreCategory,
   type ExploreMovie,
+  type HistoryItem,
   type Movie,
   type Recommendation,
   type TmdbGenre,
 } from "@/lib/api";
 
 type MovieLike = Movie | Recommendation | ExploreMovie;
+
+interface UserReactionEntry {
+  rating?: "love" | "like" | "dislike" | null;
+  watchlist?: boolean;
+}
+
+function buildReactionsMap(items: HistoryItem[]): Record<number, UserReactionEntry> {
+  const map: Record<number, UserReactionEntry> = {};
+  for (const item of items) {
+    if (!map[item.tmdb_id]) {
+      map[item.tmdb_id] = {};
+    }
+    const r = (item.rating || "").toLowerCase();
+    if (r === "love" || r === "like" || r === "dislike") {
+      map[item.tmdb_id].rating = r as "love" | "like" | "dislike";
+    } else if (r === "watchlist") {
+      map[item.tmdb_id].watchlist = true;
+    }
+  }
+  return map;
+}
 
 interface CategoryDef {
   id: ExploreCategory;
@@ -214,13 +239,39 @@ function ExplorePageInner() {
     finally { setGridLoading(false); }
   }, [tab, gridPage, gridTotalPages, gridLoading, region, selectedLanguage, selectedGenre, sortByFilter]);
 
-  const [userReactions, setUserReactions] = useState<Record<number, "love" | "like" | "dislike" | "watchlist">>({});
+  const [userReactions, setUserReactions] = useState<Record<number, UserReactionEntry>>(() => {
+    if (!session?.session_id) return {};
+    const cached = readHistoryCache<HistoryItem>(session.session_id);
+    return cached ? buildReactionsMap(cached) : {};
+  });
+
+  useEffect(() => {
+    if (!session?.session_id) return;
+    let cancelled = false;
+    apiGetHistory(session.session_id)
+      .then((history) => {
+        if (cancelled || !Array.isArray(history)) return;
+        writeHistoryCache(session.session_id, history);
+        setUserReactions((prev) => ({ ...buildReactionsMap(history), ...prev }));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.session_id]);
 
   const handleQuickAction = useCallback(
     async (m: MovieLike, action: "love" | "like" | "dislike" | "watchlist") => {
       if (!session) return;
       const targetId = ("tmdb_id" in m && m.tmdb_id) ? m.tmdb_id : m.id;
-      setUserReactions((prev) => ({ ...prev, [targetId]: action }));
+      setUserReactions((prev) => {
+        const cur = prev[targetId] || {};
+        if (action === "watchlist") {
+          return { ...prev, [targetId]: { ...cur, watchlist: !cur.watchlist } };
+        } else {
+          return { ...prev, [targetId]: { ...cur, rating: action } };
+        }
+      });
       try {
         await apiRecommendationAction(session.session_id, targetId, action);
         invalidateHistoryCache(session.session_id);
@@ -236,7 +287,14 @@ function ExplorePageInner() {
       if (!session || !active) return;
       const targetId = active.tmdb_id ?? active.id;
       if (action !== "skip") {
-        setUserReactions((prev) => ({ ...prev, [targetId]: action }));
+        setUserReactions((prev) => {
+          const cur = prev[targetId] || {};
+          if (action === "watchlist") {
+            return { ...prev, [targetId]: { ...cur, watchlist: !cur.watchlist } };
+          } else {
+            return { ...prev, [targetId]: { ...cur, rating: action } };
+          }
+        });
       }
       try {
         await apiRecommendationAction(session.session_id, targetId, action);
@@ -437,7 +495,7 @@ function Grid({
 }: {
   movies: ExploreMovie[];
   loading: boolean;
-  userReactions?: Record<number, "love" | "like" | "dislike" | "watchlist">;
+  userReactions?: Record<number, UserReactionEntry>;
   canLoadMore: boolean;
   onLoadMore: () => void;
   onSelect: (m: ExploreMovie) => void;
@@ -468,7 +526,8 @@ function Grid({
               <div key={m.tmdb_id} style={{ cursor: "pointer" }} onClick={() => onSelect(m)}>
                 <MovieCard
                   movie={m}
-                  userAction={userReactions[m.tmdb_id]}
+                  userRating={userReactions[m.tmdb_id]?.rating}
+                  isWatchlist={userReactions[m.tmdb_id]?.watchlist}
                   onQuickAction={onQuickAction}
                 />
               </div>
@@ -507,7 +566,7 @@ function Discover({
   onQuickAction,
 }: {
   region?: string;
-  userReactions?: Record<number, "love" | "like" | "dislike" | "watchlist">;
+  userReactions?: Record<number, UserReactionEntry>;
   onSelect: (m: ExploreMovie) => void;
   onQuickAction?: (movie: MovieLike, action: "love" | "like" | "dislike" | "watchlist") => void;
 }) {
@@ -734,7 +793,8 @@ function Discover({
               <div key={m.tmdb_id} style={{ cursor: "pointer" }} onClick={() => onSelect(m)}>
                 <MovieCard
                   movie={m}
-                  userAction={userReactions[m.tmdb_id]}
+                  userRating={userReactions[m.tmdb_id]?.rating}
+                  isWatchlist={userReactions[m.tmdb_id]?.watchlist}
                   onQuickAction={onQuickAction}
                 />
               </div>

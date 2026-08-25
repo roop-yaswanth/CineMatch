@@ -25,6 +25,8 @@ interface Props {
   noLayout?: boolean;
   showFullDate?: boolean;
   userAction?: "love" | "like" | "dislike" | "watchlist" | null;
+  userRating?: "love" | "like" | "dislike" | null;
+  isWatchlist?: boolean;
   onQuickAction?: (movie: MovieLike, action: "love" | "like" | "dislike" | "watchlist") => void;
 }
 
@@ -170,6 +172,8 @@ export default function MovieCard({
   noLayout = false,
   showFullDate = false,
   userAction,
+  userRating,
+  isWatchlist,
   onQuickAction,
 }: Props) {
   // Pick the smallest TMDB size that still looks crisp on the rendered card.
@@ -193,11 +197,11 @@ export default function MovieCard({
   const [feedbackSplash, setFeedbackSplash] = useState<"love" | "like" | "dislike" | "watchlist" | null>(null);
   const splashTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const propRating = userAction === "love" || userAction === "like" || userAction === "dislike" ? userAction : null;
-  const ratingAction = localRating ?? propRating;
+  const propRating = userRating !== undefined ? userRating : (userAction === "love" || userAction === "like" || userAction === "dislike" ? userAction : null);
+  const ratingAction = localRating !== null ? localRating : propRating;
 
-  const propWatchlist = userAction === "watchlist";
-  const isWatchlisted = localWatchlist !== null ? localWatchlist : propWatchlist;
+  const propWatchlist = isWatchlist !== undefined ? isWatchlist : (userAction === "watchlist");
+  const isWatchlisted = localWatchlist !== null ? localWatchlist : Boolean(propWatchlist);
 
   useEffect(() => {
     return () => {
@@ -464,6 +468,28 @@ export default function MovieCard({
                 </span>
               </button>
             </div>
+
+            <button
+              type="button"
+              className={`shelf-action-btn shelf-action-btn--watchlist ${isWatchlisted ? "shelf-action-btn--watchlisted" : ""}`}
+              aria-label={isWatchlisted ? `Remove ${movie.title} from watchlist` : `Add ${movie.title} to watchlist`}
+              onClick={(e) => handleActionClick(e, "watchlist")}
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill={isWatchlisted ? "currentColor" : "none"}
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden
+              >
+                <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+              </svg>
+              <span className="shelf-tooltip">{isWatchlisted ? "In Watchlist" : "Add to Watchlist"}</span>
+            </button>
           </div>
         )}
       </div>

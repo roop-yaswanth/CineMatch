@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -25,17 +25,41 @@ interface Props {
   /** Fetch the next batch when the user reaches the end. Return new items,
    *  or null when exhausted — the overlay then shows "You've seen it all". */
   onLoadMore?: () => Promise<Recommendation[] | null>;
+  /** Set of acted-upon / seen movie IDs to keep the overlay in sync */
+  seenIds?: Set<number>;
 }
 
-export default function CollectionOverlay({ collection, onBack, onMovieClick, onQuickAction, onLoadMore }: Props) {
+export default function CollectionOverlay({ collection, onBack, onMovieClick, onQuickAction, onLoadMore, seenIds }: Props) {
   const mounted = useMounted();
 
-  // Snapshot the collection: live shelf updates (refills, actions elsewhere)
-  // must never shrink or close an open overlay while the user is browsing.
-  const [items, setItems] = useState<Recommendation[]>(() => [...collection.movies]);
+  const [extraItems, setExtraItems] = useState<Recommendation[]>([]);
+  const [dismissedIds, setDismissedIds] = useState<Set<number>>(() => new Set());
   const [loadingMore, setLoadingMore] = useState(false);
   const [exhausted, setExhausted] = useState(!onLoadMore);
   const sentinelRef = useRef<HTMLDivElement>(null);
+
+  const items = useMemo(() => {
+    const all = [...collection.movies, ...extraItems];
+    const seen = new Set<number>();
+    const out: Recommendation[] = [];
+    for (const m of all) {
+      const id = recommendationId(m);
+      if (!seen.has(id) && (!seenIds || !seenIds.has(id)) && !dismissedIds.has(id)) {
+        seen.add(id);
+        out.push(m);
+      }
+    }
+    return out;
+  }, [collection.movies, extraItems, seenIds, dismissedIds]);
+
+  const handleCardQuickAction = useCallback((movie: Recommendation, action: "dislike" | "like" | "love" | "watchlist") => {
+    setDismissedIds((prev) => {
+      const next = new Set(prev);
+      next.add(recommendationId(movie));
+      return next;
+    });
+    onQuickAction?.(movie, action);
+  }, [onQuickAction]);
 
   const loadMore = useCallback(async () => {
     if (!onLoadMore || loadingMore || exhausted) return;
@@ -43,9 +67,15 @@ export default function CollectionOverlay({ collection, onBack, onMovieClick, on
     try {
       const more = await onLoadMore();
       if (more && more.length > 0) {
-        setItems((prev) => {
-          const seen = new Set(prev.map(recommendationId));
-          const fresh = more.filter((m) => !seen.has(recommendationId(m)));
+        setExtraItems((prev) => {
+          const currentSeen = new Set([
+            ...collection.movies.map(recommendationId),
+            ...prev.map(recommendationId),
+          ]);
+          const fresh = more.filter((m) => {
+            const id = recommendationId(m);
+            return !currentSeen.has(id) && (!seenIds || !seenIds.has(id)) && !dismissedIds.has(id);
+          });
           return fresh.length ? [...prev, ...fresh] : prev;
         });
         if (more.length < 10) setExhausted(true);
@@ -57,7 +87,7 @@ export default function CollectionOverlay({ collection, onBack, onMovieClick, on
     } finally {
       setLoadingMore(false);
     }
-  }, [onLoadMore, loadingMore, exhausted]);
+  }, [onLoadMore, loadingMore, exhausted, collection.movies, seenIds, dismissedIds]);
 
   // Infinite scroll sentinel
   useEffect(() => {
@@ -134,7 +164,7 @@ export default function CollectionOverlay({ collection, onBack, onMovieClick, on
               key={recommendationId(movie)}
               movie={movie}
               onClick={() => onMovieClick(movie)}
-              onQuickAction={onQuickAction}
+              onQuickAction={handleCardQuickAction}
             />
           ))}
         </AnimatePresence>

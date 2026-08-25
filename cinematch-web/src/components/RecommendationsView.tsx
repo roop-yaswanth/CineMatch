@@ -291,6 +291,9 @@ export default function RecommendationsView({
   const seenIdsRef = useRef<Set<number>>(
     new Set(initialCache?.seenIds ?? [])
   );
+  const [seenMovieIds, setSeenMovieIds] = useState<Set<number>>(
+    () => new Set(initialCache?.seenIds ?? [])
+  );
 
   // All movie IDs ever displayed — sent to backend on auto-rerun so it generates truly new movies
   const displayedIdsRef = useRef<Set<number>>(
@@ -427,6 +430,7 @@ export default function RecommendationsView({
       );
       if (!hasUnseen && totalMovies.length > 0) {
         seenIdsRef.current = new Set();
+        setSeenMovieIds(new Set());
         actionCountRef.current = { positive: 0, negative: 0, total: 0 }; countedActionsRef.current = new Set();
       }
 
@@ -467,6 +471,7 @@ export default function RecommendationsView({
         setMovies([]);
         bucketCacheRef.current = EMPTY_CACHE();
         seenIdsRef.current = new Set();
+        setSeenMovieIds(new Set());
         displayedIdsRef.current = new Set();
         actionCountRef.current = { positive: 0, negative: 0, total: 0 }; countedActionsRef.current = new Set();
       }
@@ -611,6 +616,11 @@ export default function RecommendationsView({
       const tmdbId = "tmdb_id" in movie && movie.tmdb_id ? movie.tmdb_id : movie.id;
 
       seenIdsRef.current.add(tmdbId);
+      setSeenMovieIds((prev) => {
+        const next = new Set(prev);
+        next.add(tmdbId);
+        return next;
+      });
 
       setMovies((prev) => prev.filter((m) => recommendationId(m) !== tmdbId));
       let targetStackId: StackId | null = null;
@@ -1000,6 +1010,7 @@ export default function RecommendationsView({
             onMovieClick={openMovieDetail}
             onQuickAction={handleAction}
             onLoadMore={() => loadMoreForCollection(activeCollection)}
+            seenIds={seenMovieIds}
           />
         )}
       </AnimatePresence>

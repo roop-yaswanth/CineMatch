@@ -2,8 +2,6 @@
 
 CineMatch is a semantic movie recommendation system designed to bridge the gap between regional and global cinema. By combining **LLM-augmented vector embeddings** with **graph-based collaborative filtering**, CineMatch delivers personalized, cross-cultural, and multilingual recommendations that go beyond simple metadata matching.
 
-Developed as part of EGN 6933, Spring 2026, University of Florida.
-
 ---
 
 ## Architecture

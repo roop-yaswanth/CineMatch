@@ -179,8 +179,8 @@ function PosterCard({
     const handleScroll = () => {
       handleMouseLeave();
     };
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
+    window.addEventListener("scroll", handleScroll, { passive: true, capture: true });
+    return () => window.removeEventListener("scroll", handleScroll, { capture: true });
   }, [isHovered]);
 
   const handleOpen = () => {
@@ -189,6 +189,7 @@ function PosterCard({
   };
 
   const handleQuick = (action: QuickAction) => {
+    handleMouseLeave();
     onQuickAction?.(movie, action);
   };
 
