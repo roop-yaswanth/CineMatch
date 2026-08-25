@@ -2453,9 +2453,7 @@ a[role="button"]:active,
 }
 
 .shelf-card:hover .shelf-card-actions,
-.shelf-card:focus-within .shelf-card-actions,
-.card-hover:hover .shelf-card-actions,
-.card-hover:focus-within .shelf-card-actions {
+.card-hover:hover .shelf-card-actions {
   opacity: 1;
   transform: translateY(0);
   pointer-events: auto;
@@ -2513,6 +2511,81 @@ a[role="button"]:active,
   border-color: var(--color-accent-strong);
 }
 
+/* Active / Reacted State on Buttons */
+.shelf-action-btn--loved {
+  background: rgba(236, 72, 153, 0.35) !important;
+  border-color: rgba(244, 114, 182, 0.8) !important;
+  box-shadow: 0 0 14px rgba(236, 72, 153, 0.5);
+}
+
+.shelf-action-btn--liked {
+  background: rgba(16, 185, 129, 0.35) !important;
+  border-color: rgba(52, 211, 153, 0.8) !important;
+  box-shadow: 0 0 14px rgba(16, 185, 129, 0.5);
+}
+
+.shelf-action-btn--disliked {
+  background: rgba(239, 68, 68, 0.35) !important;
+  border-color: rgba(248, 113, 113, 0.8) !important;
+  box-shadow: 0 0 14px rgba(239, 68, 68, 0.5);
+}
+
+.shelf-action-btn--watchlisted {
+  background: linear-gradient(135deg, #6366f1, #4f46e5) !important;
+  border-color: rgba(199, 210, 254, 0.75) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.35) !important;
+}
+
+/* Persistent Action Badges on Posters */
+.poster-action-badge {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #ffffff;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  pointer-events: none;
+  animation: badge-pop 250ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes badge-pop {
+  0% { transform: scale(0.6); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.poster-action-badge--love {
+  background: linear-gradient(135deg, rgba(236, 72, 153, 0.95), rgba(219, 39, 119, 0.95));
+  border-color: rgba(244, 114, 182, 0.7);
+}
+
+.poster-action-badge--like {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.95), rgba(5, 150, 105, 0.95));
+  border-color: rgba(52, 211, 153, 0.7);
+}
+
+.poster-action-badge--dislike {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.95), rgba(220, 38, 38, 0.95));
+  border-color: rgba(248, 113, 113, 0.7);
+}
+
+.poster-action-badge--watchlist {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.95), rgba(79, 70, 229, 0.95));
+  border-color: rgba(199, 210, 254, 0.7);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+}
+
 /* Reaction group containing trigger + floating reaction tray */
 .shelf-reaction-group {
   position: relative;
@@ -2557,8 +2630,7 @@ a[role="button"]:active,
   pointer-events: auto;
 }
 
-.shelf-reaction-group:hover .shelf-reaction-tray,
-.shelf-reaction-group:focus-within .shelf-reaction-tray {
+.shelf-reaction-group:hover .shelf-reaction-tray {
   opacity: 1;
   pointer-events: auto;
   transform: translateX(-50%) translateY(0) scale(1);
@@ -2629,6 +2701,33 @@ a[role="button"]:active,
 .shelf-reaction-item:hover .shelf-tooltip {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
+}
+
+/* Safe edge alignment for tray tooltips to prevent clipping on poster boundaries */
+.shelf-reaction-item:first-child .shelf-tooltip {
+  left: -4px;
+  transform: translateY(4px);
+}
+.shelf-reaction-item:first-child .shelf-tooltip::after {
+  left: 18px;
+  transform: none;
+}
+.shelf-reaction-item:first-child:hover .shelf-tooltip {
+  transform: translateY(0);
+}
+
+.shelf-reaction-item:last-child .shelf-tooltip {
+  left: auto;
+  right: -4px;
+  transform: translateY(4px);
+}
+.shelf-reaction-item:last-child .shelf-tooltip::after {
+  left: auto;
+  right: 18px;
+  transform: none;
+}
+.shelf-reaction-item:last-child:hover .shelf-tooltip {
+  transform: translateY(0);
 }
 
 .shelf-rank-num {

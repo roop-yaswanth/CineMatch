@@ -240,7 +240,7 @@ function PosterCard({
                     type="button"
                     className="shelf-reaction-item"
                     aria-label={`Dislike ${movie.title}`}
-                    onClick={(e) => { e.stopPropagation(); triggerHaptic("dislike"); onQuickAction(movie, "dislike"); }}
+                    onClick={(e) => { e.stopPropagation(); e.currentTarget.blur(); triggerHaptic("dislike"); onQuickAction(movie, "dislike"); }}
                   >
                     <span aria-hidden>🙁</span>
                     <span className="shelf-tooltip">Not for me</span>
@@ -249,7 +249,7 @@ function PosterCard({
                     type="button"
                     className="shelf-reaction-item"
                     aria-label={`Like ${movie.title}`}
-                    onClick={(e) => { e.stopPropagation(); triggerHaptic("like"); onQuickAction(movie, "like"); }}
+                    onClick={(e) => { e.stopPropagation(); e.currentTarget.blur(); triggerHaptic("like"); onQuickAction(movie, "like"); }}
                   >
                     <span aria-hidden>😀</span>
                     <span className="shelf-tooltip">I like this</span>
@@ -258,7 +258,7 @@ function PosterCard({
                     type="button"
                     className="shelf-reaction-item"
                     aria-label={`Love ${movie.title}`}
-                    onClick={(e) => { e.stopPropagation(); triggerHaptic("love"); onQuickAction(movie, "love"); }}
+                    onClick={(e) => { e.stopPropagation(); e.currentTarget.blur(); triggerHaptic("love"); onQuickAction(movie, "love"); }}
                   >
                     <span aria-hidden>😍</span>
                     <span className="shelf-tooltip">Love this!</span>
@@ -269,7 +269,7 @@ function PosterCard({
                   type="button"
                   className="shelf-action-btn shelf-action-btn--reaction"
                   aria-label={`Rate ${movie.title}`}
-                  onClick={(e) => { e.stopPropagation(); onQuickAction(movie, "like"); }}
+                  onClick={(e) => { e.stopPropagation(); e.currentTarget.blur(); onQuickAction(movie, "like"); }}
                 >
                   <span aria-hidden style={{ fontSize: 16 }}>😀</span>
                   <span className="shelf-tooltip">Rate</span>
@@ -280,9 +280,9 @@ function PosterCard({
                 type="button"
                 className="shelf-action-btn shelf-action-btn--watchlist"
                 aria-label={`Add ${movie.title} to watchlist`}
-                onClick={(e) => { e.stopPropagation(); triggerHaptic("watchlist"); onQuickAction(movie, "watchlist"); }}
+                onClick={(e) => { e.stopPropagation(); e.currentTarget.blur(); triggerHaptic("watchlist"); onQuickAction(movie, "watchlist"); }}
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                   <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
                 </svg>
                 <span className="shelf-tooltip">Add to Watchlist</span>

@@ -1,7 +1,9 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 
+import { triggerHaptic } from "@/lib/haptics";
 import {
   languageLabel,
   prefetchMovieDetails,
@@ -22,6 +24,7 @@ interface Props {
   overlay?: boolean;
   noLayout?: boolean;
   showFullDate?: boolean;
+  userAction?: "love" | "like" | "dislike" | "watchlist" | null;
   onQuickAction?: (movie: MovieLike, action: "love" | "like" | "dislike" | "watchlist") => void;
 }
 
@@ -166,6 +169,7 @@ export default function MovieCard({
   overlay = false,
   noLayout = false,
   showFullDate = false,
+  userAction,
   onQuickAction,
 }: Props) {
   // Pick the smallest TMDB size that still looks crisp on the rendered card.
@@ -182,6 +186,44 @@ export default function MovieCard({
     : null;
   const tmdbRating = movie.vote_average ? movie.vote_average.toFixed(1) : null;
   const runtimeFormatted = "runtime" in movie && movie.runtime ? formatRuntime(movie.runtime) : "";
+
+  // ── Action State & Visual Feedback ──────────────────────────────────────────
+  const [localRating, setLocalRating] = useState<"love" | "like" | "dislike" | null>(null);
+  const [localWatchlist, setLocalWatchlist] = useState<boolean | null>(null);
+  const [feedbackSplash, setFeedbackSplash] = useState<"love" | "like" | "dislike" | "watchlist" | null>(null);
+  const splashTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const propRating = userAction === "love" || userAction === "like" || userAction === "dislike" ? userAction : null;
+  const ratingAction = localRating ?? propRating;
+
+  const propWatchlist = userAction === "watchlist";
+  const isWatchlisted = localWatchlist !== null ? localWatchlist : propWatchlist;
+
+  useEffect(() => {
+    return () => {
+      if (splashTimerRef.current) clearTimeout(splashTimerRef.current);
+    };
+  }, []);
+
+  const handleActionClick = (e: React.MouseEvent, action: "love" | "like" | "dislike" | "watchlist") => {
+    e.stopPropagation();
+    (document.activeElement as HTMLElement)?.blur();
+    triggerHaptic(action);
+
+    if (action === "watchlist") {
+      setLocalWatchlist((prev) => (prev !== null ? !prev : !propWatchlist));
+    } else {
+      setLocalRating(action);
+    }
+
+    setFeedbackSplash(action);
+    if (splashTimerRef.current) clearTimeout(splashTimerRef.current);
+    splashTimerRef.current = setTimeout(() => {
+      setFeedbackSplash(null);
+    }, 1700);
+
+    onQuickAction?.(movie, action);
+  };
 
   // Overlay mode: info displayed on poster
   if (overlay) {
@@ -206,11 +248,28 @@ export default function MovieCard({
 
           <PosterStatusBadge movie={movie} />
 
+          {/* Persistent Action Badges */}
+          {ratingAction && (
+            <span className={`poster-action-badge poster-action-badge--${ratingAction}`}>
+              {ratingAction === "love" ? "😍 Loved" : ratingAction === "like" ? "😀 Liked" : "🙁 Not for me"}
+            </span>
+          )}
+          {isWatchlisted && (
+            <span
+              className="poster-action-badge poster-action-badge--watchlist"
+              style={{ bottom: ratingAction ? "34px" : "8px" }}
+            >
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 2 }}>
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              Watchlist
+            </span>
+          )}
+
           {/* Gradient overlay at bottom */}
           <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/95 via-black/65 to-transparent pointer-events-none" />
 
-          {/* Info overlay at bottom — same vocabulary as PosterInfo:
-              title + one "year · lang" line + gold rating. */}
+          {/* Info overlay at bottom */}
           <div
             className="absolute inset-x-0 bottom-0 text-white"
             style={{ padding: "14px 18px 16px 18px" }}
@@ -237,7 +296,7 @@ export default function MovieCard({
     );
   }
 
-  // Default mode: info below poster (the global PosterInfo treatment)
+  // Default mode: info below poster
   return (
     <motion.div
       layout={!noLayout}
@@ -258,7 +317,11 @@ export default function MovieCard({
       {/* Poster */}
       <div
         className="card-poster-frame relative w-full aspect-[2/3] overflow-hidden bg-[var(--color-surface)]"
-        style={{ borderRadius: compact ? "14px" : "var(--radius-poster)" }}
+        style={{
+          borderRadius: compact ? "14px" : "var(--radius-poster)",
+          opacity: ratingAction === "dislike" ? 0.72 : 1,
+          transition: "opacity 200ms ease",
+        }}
       >
         <img
           src={poster}
@@ -269,6 +332,82 @@ export default function MovieCard({
         <PosterStatusBadge movie={movie} />
         <PosterRatingBadge movie={movie} />
 
+        {/* Persistent Action Badges on Poster */}
+        {ratingAction && (
+          <span className={`poster-action-badge poster-action-badge--${ratingAction}`}>
+            {ratingAction === "love" ? "😍 Loved" : ratingAction === "like" ? "😀 Liked" : "🙁 Not for me"}
+          </span>
+        )}
+        {isWatchlisted && (
+          <span
+            className="poster-action-badge poster-action-badge--watchlist"
+            style={{ bottom: ratingAction ? "34px" : "8px" }}
+          >
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 2 }}>
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+            Watchlist
+          </span>
+        )}
+
+        {/* Interactive Splash Confirmation on Click */}
+        <AnimatePresence>
+          {feedbackSplash && (
+            <motion.div
+              key="feedback-splash"
+              initial={{ opacity: 0, scale: 0.55 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ type: "spring", stiffness: 450, damping: 22 }}
+              style={{
+                position: "absolute",
+                inset: 0,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "8px",
+                background: "rgba(8, 9, 14, 0.78)",
+                backdropFilter: "blur(6px)",
+                WebkitBackdropFilter: "blur(6px)",
+                zIndex: 25,
+                pointerEvents: "none",
+                borderRadius: compact ? "14px" : "var(--radius-poster)",
+              }}
+            >
+              <motion.span
+                initial={{ scale: 0.5, rotate: -15 }}
+                animate={{ scale: [0.5, 1.28, 1], rotate: [0, 8, 0] }}
+                transition={{ duration: 0.35 }}
+                style={{ fontSize: "38px", filter: "drop-shadow(0 6px 16px rgba(0,0,0,0.7))" }}
+              >
+                {feedbackSplash === "love" ? "😍" : feedbackSplash === "like" ? "😀" : feedbackSplash === "dislike" ? "🙁" : "🔖"}
+              </motion.span>
+              <span
+                style={{
+                  fontSize: "12px",
+                  fontWeight: 700,
+                  color: "#ffffff",
+                  background: feedbackSplash === "love"
+                    ? "rgba(236, 72, 153, 0.5)"
+                    : feedbackSplash === "like"
+                    ? "rgba(16, 185, 129, 0.5)"
+                    : feedbackSplash === "dislike"
+                    ? "rgba(239, 68, 68, 0.5)"
+                    : "rgba(99, 102, 241, 0.5)",
+                  padding: "4px 12px",
+                  borderRadius: "999px",
+                  border: "1px solid rgba(255, 255, 255, 0.35)",
+                  boxShadow: "0 4px 14px rgba(0,0,0,0.5)",
+                  letterSpacing: "-0.01em",
+                }}
+              >
+                {feedbackSplash === "love" ? "Loved this!" : feedbackSplash === "like" ? "Liked!" : feedbackSplash === "dislike" ? "Not for me" : "Added to Watchlist"}
+              </span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Quick Actions on Poster on Hover */}
         {onQuickAction && (
           <div className="shelf-card-actions" style={{ zIndex: 12 }}>
@@ -278,10 +417,7 @@ export default function MovieCard({
                   type="button"
                   className="shelf-reaction-item"
                   aria-label={`Dislike ${movie.title}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onQuickAction(movie, "dislike");
-                  }}
+                  onClick={(e) => handleActionClick(e, "dislike")}
                 >
                   <span aria-hidden>🙁</span>
                   <span className="shelf-tooltip">Not for me</span>
@@ -290,10 +426,7 @@ export default function MovieCard({
                   type="button"
                   className="shelf-reaction-item"
                   aria-label={`Like ${movie.title}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onQuickAction(movie, "like");
-                  }}
+                  onClick={(e) => handleActionClick(e, "like")}
                 >
                   <span aria-hidden>😀</span>
                   <span className="shelf-tooltip">I like this</span>
@@ -302,10 +435,7 @@ export default function MovieCard({
                   type="button"
                   className="shelf-reaction-item"
                   aria-label={`Love ${movie.title}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onQuickAction(movie, "love");
-                  }}
+                  onClick={(e) => handleActionClick(e, "love")}
                 >
                   <span aria-hidden>😍</span>
                   <span className="shelf-tooltip">Love this!</span>
@@ -314,32 +444,26 @@ export default function MovieCard({
 
               <button
                 type="button"
-                className="shelf-action-btn shelf-action-btn--reaction"
+                className={`shelf-action-btn ${
+                  ratingAction === "love"
+                    ? "shelf-action-btn--loved"
+                    : ratingAction === "like"
+                    ? "shelf-action-btn--liked"
+                    : ratingAction === "dislike"
+                    ? "shelf-action-btn--disliked"
+                    : "shelf-action-btn--reaction"
+                }`}
                 aria-label={`Rate ${movie.title}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onQuickAction(movie, "like");
-                }}
+                onClick={(e) => handleActionClick(e, "like")}
               >
-                <span aria-hidden style={{ fontSize: 16 }}>😀</span>
-                <span className="shelf-tooltip">Rate</span>
+                <span aria-hidden style={{ fontSize: 16 }}>
+                  {ratingAction === "love" ? "😍" : ratingAction === "like" ? "😀" : ratingAction === "dislike" ? "🙁" : "😀"}
+                </span>
+                <span className="shelf-tooltip">
+                  {ratingAction === "love" ? "Loved!" : ratingAction === "like" ? "Liked" : ratingAction === "dislike" ? "Not for me" : "Rate"}
+                </span>
               </button>
             </div>
-
-            <button
-              type="button"
-              className="shelf-action-btn shelf-action-btn--watchlist"
-              aria-label={`Add ${movie.title} to watchlist`}
-              onClick={(e) => {
-                e.stopPropagation();
-                onQuickAction(movie, "watchlist");
-              }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
-              </svg>
-              <span className="shelf-tooltip">Add to Watchlist</span>
-            </button>
           </div>
         )}
       </div>

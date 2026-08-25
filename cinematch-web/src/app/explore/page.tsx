@@ -214,10 +214,13 @@ function ExplorePageInner() {
     finally { setGridLoading(false); }
   }, [tab, gridPage, gridTotalPages, gridLoading, region, selectedLanguage, selectedGenre, sortByFilter]);
 
+  const [userReactions, setUserReactions] = useState<Record<number, "love" | "like" | "dislike" | "watchlist">>({});
+
   const handleQuickAction = useCallback(
     async (m: MovieLike, action: "love" | "like" | "dislike" | "watchlist") => {
       if (!session) return;
       const targetId = ("tmdb_id" in m && m.tmdb_id) ? m.tmdb_id : m.id;
+      setUserReactions((prev) => ({ ...prev, [targetId]: action }));
       try {
         await apiRecommendationAction(session.session_id, targetId, action);
         invalidateHistoryCache(session.session_id);
@@ -232,6 +235,9 @@ function ExplorePageInner() {
     async (action: "love" | "like" | "dislike" | "watchlist" | "skip") => {
       if (!session || !active) return;
       const targetId = active.tmdb_id ?? active.id;
+      if (action !== "skip") {
+        setUserReactions((prev) => ({ ...prev, [targetId]: action }));
+      }
       try {
         await apiRecommendationAction(session.session_id, targetId, action);
         invalidateHistoryCache(session.session_id);
@@ -387,6 +393,7 @@ function ExplorePageInner() {
         {isDiscover ? (
           <Discover
             region={region}
+            userReactions={userReactions}
             onSelect={(m) => setActive(toDetailMovie(m))}
             onQuickAction={handleQuickAction}
           />
@@ -394,6 +401,7 @@ function ExplorePageInner() {
           <Grid
             movies={grid}
             loading={gridLoading}
+            userReactions={userReactions}
             canLoadMore={gridPage < gridTotalPages}
             onLoadMore={loadMore}
             onSelect={(m) => setActive(toDetailMovie(m))}
@@ -420,6 +428,7 @@ function ExplorePageInner() {
 function Grid({
   movies,
   loading,
+  userReactions = {},
   canLoadMore,
   onLoadMore,
   onSelect,
@@ -428,6 +437,7 @@ function Grid({
 }: {
   movies: ExploreMovie[];
   loading: boolean;
+  userReactions?: Record<number, "love" | "like" | "dislike" | "watchlist">;
   canLoadMore: boolean;
   onLoadMore: () => void;
   onSelect: (m: ExploreMovie) => void;
@@ -456,7 +466,11 @@ function Grid({
           <div className="explore-grid">
             {movies.map((m) => (
               <div key={m.tmdb_id} style={{ cursor: "pointer" }} onClick={() => onSelect(m)}>
-                <MovieCard movie={m} onQuickAction={onQuickAction} />
+                <MovieCard
+                  movie={m}
+                  userAction={userReactions[m.tmdb_id]}
+                  onQuickAction={onQuickAction}
+                />
               </div>
             ))}
           </div>
@@ -488,10 +502,12 @@ const CURRENT_YEAR = new Date().getFullYear();
 
 function Discover({
   region,
+  userReactions = {},
   onSelect,
   onQuickAction,
 }: {
   region?: string;
+  userReactions?: Record<number, "love" | "like" | "dislike" | "watchlist">;
   onSelect: (m: ExploreMovie) => void;
   onQuickAction?: (movie: MovieLike, action: "love" | "like" | "dislike" | "watchlist") => void;
 }) {
@@ -716,7 +732,11 @@ function Discover({
           <div className="explore-grid">
             {results.map((m) => (
               <div key={m.tmdb_id} style={{ cursor: "pointer" }} onClick={() => onSelect(m)}>
-                <MovieCard movie={m} onQuickAction={onQuickAction} />
+                <MovieCard
+                  movie={m}
+                  userAction={userReactions[m.tmdb_id]}
+                  onQuickAction={onQuickAction}
+                />
               </div>
             ))}
           </div>
