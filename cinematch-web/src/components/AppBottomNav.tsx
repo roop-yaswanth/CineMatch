@@ -243,6 +243,7 @@ export default function AppBottomNav() {
           return (
             <Link
               key={item.id}
+              data-tour={`bottom-${item.id}`}
               href={item.href}
               prefetch
               onClick={(e) => {

@@ -38,6 +38,7 @@ import {
 } from "@/lib/api";
 import { useMounted } from "@/lib/useMounted";
 import MovieDetailModal from "@/components/modals/MovieDetailModal";
+import { hasSeenTutorial } from "@/components/TutorialOverlay";
 
 interface Props {
   session: UserSession;
@@ -248,7 +249,7 @@ export default function RecommendationsView({
   // Route-based navigation for sub-pages
   const openYourLikes = () => router.push("/your-likes");
   const openWatchlist = () => router.push("/your-likes?filter=watchlist");
-  const { openPreferences } = useSession();
+  const { openPreferences, openTutorial } = useSession();
   const openPrefs = () => openPreferences();
 
 
@@ -598,6 +599,28 @@ export default function RecommendationsView({
     return () => clearTimeout(t);
   }, [generate, initialLoad, preferences]);
 
+  useEffect(() => {
+    if (!mounted || loading || initialLoad) return;
+    if (!session?.onboarding_complete) return;
+    if (!session?.user_id) return;
+
+    // Check if user just completed onboarding in this session
+    const justOnboarded =
+      typeof window !== "undefined" &&
+      sessionStorage.getItem("cinematch_just_onboarded") === "1";
+    if (!justOnboarded) return;
+
+    // Clear flag immediately so it never auto-triggers again in this session
+    try {
+      sessionStorage.removeItem("cinematch_just_onboarded");
+    } catch { }
+
+    if (hasSeenTutorial(session.user_id)) return;
+
+    const t = setTimeout(() => openTutorial(), 600);
+    return () => clearTimeout(t);
+  }, [mounted, loading, initialLoad, session?.onboarding_complete, session?.user_id, openTutorial]);
+
   // Keep navigation cache in sync with optimistic stack updates (actions, etc.)
   useEffect(() => {
     if (stacks.length === 0) return; // Don't cache empty state
@@ -735,7 +758,7 @@ export default function RecommendationsView({
         while (pool.length && out.length < n) {
           const m = pool.shift()!;
           if (!existing.has(recommendationId(m)) &&
-              !seenIdsRef.current.has(recommendationId(m))) out.push(m);
+            !seenIdsRef.current.has(recommendationId(m))) out.push(m);
         }
         return out;
       };
@@ -743,9 +766,9 @@ export default function RecommendationsView({
         (preferences.languages ?? []).some((l) => l.toLowerCase() === "en");
       const keys: StackId[] =
         col.id === "hollywood" ? ["hollywood"]
-        : col.id === "world" ? ["other"]
-        : col.id === "matched" || col.id.startsWith("matched-") ? ["matched"]
-        : preferred ? ["matched", "hollywood"] : ["matched"];
+          : col.id === "world" ? ["other"]
+            : col.id === "matched" || col.id.startsWith("matched-") ? ["matched"]
+              : preferred ? ["matched", "hollywood"] : ["matched"];
 
       // 1) instant: cache reserves
       const batch: Recommendation[] = [];
@@ -824,7 +847,7 @@ export default function RecommendationsView({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ session_id: sessionSid, events }),
         keepalive: true,
-      }).catch(() => {});
+      }).catch(() => { });
     } catch { /* analytics is best-effort */ }
   }, [sessionSid]);
   useEffect(() => {
@@ -898,6 +921,7 @@ export default function RecommendationsView({
           <div className="dash-topbar-right">
             <button
               type="button"
+              data-tour="nav-search"
               className="dash-search desktop-only"
               onClick={() => router.push("/search")}
             >

@@ -11,6 +11,7 @@ interface MobileMenuProps {
   onPreferences?: () => void;
   onYourLikes?: () => void;
   onWatchlist?: () => void;
+  onTutorial?: () => void;
 }
 
 const IconCompass = () => (
@@ -69,6 +70,14 @@ const IconUser = () => (
   </svg>
 );
 
+const IconHelp = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" />
+    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+    <line x1="12" y1="17" x2="12.01" y2="17" />
+  </svg>
+);
+
 const IconChevronDown = () => (
   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
     <polyline points="6 9 12 15 18 9" />
@@ -94,6 +103,7 @@ export function DesktopNavTabs({
   return (
     <nav className="desktop-center-nav" aria-label="Primary Navigation">
       <button
+        data-tour="nav-dashboard"
         className={`desktop-center-tab ${isDashboardActive ? "active" : ""}`}
         onClick={() => router.push("/dashboard")}
       >
@@ -102,6 +112,7 @@ export function DesktopNavTabs({
       </button>
 
       <button
+        data-tour="nav-explore"
         className={`desktop-center-tab ${isExploreActive ? "active" : ""}`}
         onClick={() => router.push("/explore")}
       >
@@ -110,6 +121,7 @@ export function DesktopNavTabs({
       </button>
 
       <button
+        data-tour="nav-watchlist"
         className={`desktop-center-tab ${isWatchlistActive ? "active" : ""}`}
         onClick={() => {
           if (onWatchlist) onWatchlist();
@@ -121,6 +133,7 @@ export function DesktopNavTabs({
       </button>
 
       <button
+        data-tour="nav-preferences"
         className={`desktop-center-tab ${isPreferencesActive ? "active" : ""}`}
         onClick={() => {
           if (onPreferences) onPreferences();
@@ -151,8 +164,10 @@ export default function MobileMenu({
         setShowResetConfirm(false);
       }
     };
-    document.addEventListener("mousedown", handleOutsideClick);
-    document.addEventListener("touchstart", handleOutsideClick, { passive: true });
+    if (isOpen) {
+      document.addEventListener("mousedown", handleOutsideClick);
+      document.addEventListener("touchstart", handleOutsideClick, { passive: true });
+    }
     return () => {
       document.removeEventListener("mousedown", handleOutsideClick);
       document.removeEventListener("touchstart", handleOutsideClick);
@@ -165,7 +180,7 @@ export default function MobileMenu({
     if (action) action();
   };
 
-  const { openPreferences, session } = useSession();
+  const { openPreferences, openTutorial, session } = useSession();
   const storedName = typeof window !== "undefined" ? localStorage.getItem("cinematch_user_name") : null;
   const displayName =
     session?.name ||
@@ -180,10 +195,21 @@ export default function MobileMenu({
     else openPreferences();
   };
 
+  const handleTutorial = () => {
+    setIsOpen(false);
+    setShowResetConfirm(false);
+    // Prefer explicit prop if provided (Dashboard wiring), otherwise fall back to context
+    const ctxOpen = (openTutorial as unknown as (() => void) | undefined);
+    if (ctxOpen) ctxOpen();
+    // Dispatch global event as last resort so any listener can open the guide
+    try { window.dispatchEvent(new CustomEvent("cinematch:open_tutorial")); } catch { }
+  };
+
   return (
     <div style={{ position: "relative" }} ref={containerRef}>
       {/* DESKTOP ACCOUNT BUTTON (Visible >= 900px) */}
       <button
+        data-tour="nav-account"
         className="desktop-account-btn"
         onClick={(e) => {
           e.stopPropagation();
@@ -202,6 +228,7 @@ export default function MobileMenu({
 
       {/* MOBILE TRIGGER BUTTON */}
       <button
+        data-tour="mobile-menu-trigger"
         className="mobile-menu-trigger"
         onClick={(e) => {
           e.stopPropagation();
@@ -296,6 +323,12 @@ export default function MobileMenu({
                 </p>
               )}
             </div>
+
+            {/* How it works — always visible (both mobile and desktop) so the auto-only tutorial stays discoverable */}
+            <button className="menu-btn" onClick={handleTutorial}>
+              <span className="menu-btn-icon"><IconHelp /></span>
+              <span>How It Works</span>
+            </button>
 
             {/* Preferences (Mobile only: on desktop it is already in center nav tabs) */}
             <button className="menu-btn mobile-only-menu-item" onClick={handlePreferences}>

@@ -12,6 +12,7 @@ import {
   type RecommendationPreferences,
 } from "@/lib/api";
 import PreferencesModal from "@/components/PreferencesModal";
+import TutorialOverlay from "@/components/TutorialOverlay";
 
 interface SessionContextType {
   session: UserSession | null;
@@ -21,6 +22,9 @@ interface SessionContextType {
   openPreferences: () => void;
   closePreferences: () => void;
   isPreferencesOpen: boolean;
+  isTutorialOpen: boolean;
+  openTutorial: () => void;
+  closeTutorial: () => void;
 }
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
@@ -132,6 +136,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<UserSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isPreferencesOpen, setIsPreferencesOpen] = useState(false);
+  const [isTutorialOpen, setIsTutorialOpen] = useState(false);
 
   const openPreferences = useCallback(() => {
     setIsPreferencesOpen(true);
@@ -140,6 +145,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const closePreferences = useCallback(() => {
     setIsPreferencesOpen(false);
   }, []);
+
+  const openTutorial = useCallback(() => setIsTutorialOpen(true), []);
+  const closeTutorial = useCallback(() => setIsTutorialOpen(false), []);
 
   const clearSession = useCallback(() => {
     clearStoredSession();
@@ -154,6 +162,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       window.location.replace("/login");
     }
   }, [clearSession, session]);
+
+  // Global tutorial opener — lets the hamburger menu (or any page) trigger the guide
+  useEffect(() => {
+    const handleOpenTutorial = () => setIsTutorialOpen(true);
+    window.addEventListener("cinematch:open_tutorial", handleOpenTutorial);
+    return () => window.removeEventListener("cinematch:open_tutorial", handleOpenTutorial);
+  }, []);
 
   // Listen for global session expiration dispatched by API client (e.g. 404 Session not found)
   useEffect(() => {
@@ -353,6 +368,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         openPreferences,
         closePreferences,
         isPreferencesOpen,
+        isTutorialOpen,
+        openTutorial,
+        closeTutorial,
       }}
     >
       {children}
@@ -365,6 +383,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             onUpdate={handlePreferencesUpdate}
             onClose={closePreferences}
             mode="recommendations"
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isTutorialOpen && (
+          <TutorialOverlay
+            key="tutorial-overlay"
+            isOpen={isTutorialOpen}
+            onClose={closeTutorial}
+            userId={session?.user_id ?? null}
           />
         )}
       </AnimatePresence>

@@ -24,6 +24,9 @@ export default function OnboardingPage() {
 
   const handleComplete = (updatedSession: UserSession) => {
     updateSession(updatedSession);
+    try {
+      sessionStorage.setItem("cinematch_just_onboarded", "1");
+    } catch {}
     router.replace("/dashboard");
   };
 
