@@ -215,7 +215,7 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
   useEffect(() => {
     const id = movie?.tmdb_id ?? movie?.id;
     if (!isOpen || !id) return;
-    fetchWatchProviders(id).catch(() => {});
+    fetchWatchProviders(id).catch(() => { });
   }, [movie?.id, movie?.tmdb_id, isOpen]);
 
   const handleActionClick = (action: "love" | "like" | "dislike" | "watchlist" | "skip") => {
@@ -259,7 +259,7 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
   let curatedSimilar = similar;
   const currentRating = movie.imdb_rating || movie.vote_average || 0;
   const isFamily = movie.genres?.some(g => g.toLowerCase() === 'family') || movie.primary_genre?.toLowerCase() === 'family';
-  const MIN_SIMILAR = 4;
+  const MIN_SIMILAR = 10;
 
   if (currentRating >= 6.0) {
     const minR = 6.0;
@@ -294,7 +294,7 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
     : movie.imdb_rating ? movie.imdb_rating.toFixed(1)
       : movie.vote_average ? movie.vote_average.toFixed(1) : null;
   const overview = movie.overview || "No overview available.";
-  
+
   const effectiveMins =
     movie.runtime ?? runtimeLive ?? (imdbLive?.runtime ? parseInt(imdbLive.runtime, 10) : null);
   const runtime = effectiveMins && effectiveMins > 0 ? `${Math.floor(effectiveMins / 60)}h ${effectiveMins % 60}m` : null;

@@ -315,10 +315,10 @@ function PosterCard({
       {mounted && isHovered && coords && createPortal(
         <AnimatePresence>
           <motion.div
-            initial={{ opacity: 0, scale: 0.9, y: 14, filter: "blur(6px)" }}
+            initial={{ opacity: 0, scale: 0.92, y: 16, filter: "blur(8px)" }}
             animate={{ opacity: 1, scale: 1, y: 0, filter: "blur(0px)" }}
-            exit={{ opacity: 0, scale: 0.94, y: 8, transition: { duration: 0.16 } }}
-            transition={{ duration: 0.34, ease: [0.22, 1, 0.36, 1] }}
+            exit={{ opacity: 0, scale: 0.94, y: 8, transition: { duration: 0.22 } }}
+            transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
             onMouseEnter={() => {
               if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
               setIsHovered(true);
