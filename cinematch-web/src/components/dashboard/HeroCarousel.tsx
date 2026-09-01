@@ -324,13 +324,6 @@ function HeroSlide({
           exit={{ opacity: 0, y: -6 }}
           transition={{ duration: 0.35, ease: "easeOut" }}
         >
-          <div className="hero-kicker">
-            {movie.reason === "trending" ? (
-              <><span aria-hidden></span> Trending Now</>
-            ) : (
-              <>Picked for You</>
-            )}
-          </div>
 
           <div
             style={{

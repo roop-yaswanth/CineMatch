@@ -335,8 +335,12 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
     }
   };
 
-  const likeCount = state?.feedback_counts?.like || 0;
-  const minLikes = state?.session?.min_likes_needed || 10;
+  const likes = state?.feedback_counts?.like || 0;
+  const loves = state?.feedback_counts?.love || 0;
+  
+  const pathA = Math.min(loves / 10, 1);
+  const pathB = (Math.min(likes / 20, 1) + Math.min(loves / 5, 1)) / 2;
+  const progressPercent = Math.min(Math.max(pathA, pathB) * 100, 100);
   const ratedCount = Object.values(state?.feedback_counts ?? {}).reduce(
     (sum, value) => sum + (typeof value === "number" ? value : 0),
     0
@@ -417,16 +421,16 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginTop: "8px", marginBottom: "6px" }}>
               <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--color-text-primary)", letterSpacing: "0.02em", textTransform: "uppercase" }}>
-                Likes Needed
+                Profile Build Progress
               </span>
               <span style={{ fontSize: "11px", color: "var(--color-text-muted)" }}>
-                {likeCount} / {minLikes}
+                {Math.floor(progressPercent)}%
               </span>
             </div>
             <div style={{ height: "6px", width: "100%", background: "var(--color-border)", borderRadius: "3px", overflow: "hidden" }}>
               <motion.div
                 initial={{ width: 0 }}
-                animate={{ width: `${Math.min((likeCount / Math.max(minLikes, 1)) * 100, 100)}%` }}
+                animate={{ width: `${progressPercent}%` }}
                 transition={{ duration: 1, ease: "easeOut" }}
                 style={{ height: "100%", background: "var(--color-like)", borderRadius: "3px" }}
               />
