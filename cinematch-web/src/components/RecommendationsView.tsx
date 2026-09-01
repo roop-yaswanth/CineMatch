@@ -25,6 +25,7 @@ import MobileMenu, { DesktopNavTabs } from "@/components/MobileMenu";
 import {
   apiMultiRecommendations,
   apiRecommendationAction,
+  apiTrendingHero,
   invalidateHistoryCache,
   isSessionExpiredError,
   languageLabel,
@@ -34,6 +35,7 @@ import {
   type MultiBucketResponse,
   type Recommendation,
   type RecommendationPreferences,
+  type TrendingHeroResponse,
   type UserSession,
 } from "@/lib/api";
 import { useMounted } from "@/lib/useMounted";
@@ -731,7 +733,23 @@ export default function RecommendationsView({
   }, [session.profile, generate]);
 
 
-  const { shelves, heroMovies } = useMemo(() => buildShelves(stacks, preferences), [stacks, preferences]);
+  // ── Trending hero: fetch TMDB trending movies for hero blend ──
+  const [trendingHero, setTrendingHero] = useState<TrendingHeroResponse | null>(null);
+  useEffect(() => {
+    // Fire once preferences are known — non-blocking, graceful degradation.
+    if (!preferences.languages) return;
+    let cancelled = false;
+    apiTrendingHero(preferences.languages, preferences.genres, preferences.region)
+      .then((data) => {
+        if (!cancelled) setTrendingHero(data);
+      });
+    return () => { cancelled = true; };
+  }, [preferences.languages, preferences.genres, preferences.region]);
+
+  const { shelves, heroMovies } = useMemo(
+    () => buildShelves(stacks, preferences, trendingHero),
+    [stacks, preferences, trendingHero]
+  );
 
   // Eagerly prefetch horizontal backdrops for the Hero Carousel
   useEffect(() => {

@@ -11,7 +11,6 @@ import { triggerHaptic, hapticTap, hapticWatchlist } from "@/lib/haptics";
 const ROTATE_MS = 8000;
 const MAX_ITEMS = 5;
 
-/** "142" → "2h 22m"; empty string hides the segment when runtime unknown. */
 function formatRuntime(minutes?: number | string | null): string {
   if (!minutes) return "";
   const num = typeof minutes === "number" ? minutes : parseFloat(String(minutes).replace(/[^\d.]/g, ""));
@@ -325,7 +324,13 @@ function HeroSlide({
           exit={{ opacity: 0, y: -6 }}
           transition={{ duration: 0.35, ease: "easeOut" }}
         >
-          <div className="hero-kicker">Featured for you</div>
+          <div className="hero-kicker">
+            {movie.reason === "trending" ? (
+              <><span aria-hidden></span> Trending Now</>
+            ) : (
+              <>Picked for You</>
+            )}
+          </div>
 
           <div
             style={{

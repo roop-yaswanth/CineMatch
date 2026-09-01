@@ -879,6 +879,40 @@ export async function apiDiscover(filters: DiscoverFilters): Promise<ExploreResp
   return res.json();
 }
 
+/** Response shape from /api/tmdb/hero — trending movies + rotation epoch. */
+export interface TrendingHeroResponse {
+  results: Recommendation[];
+  epoch: number;
+}
+
+/** Fetch trending / recently released movies for the hero carousel, personalised
+ *  by the user's preferred languages and region. Falls back to empty results on
+ *  any failure — the hero will use personal recommendation picks instead. */
+export async function apiTrendingHero(
+  languages: string[],
+  genres: string[],
+  region: string
+): Promise<TrendingHeroResponse> {
+  try {
+    const params = new URLSearchParams();
+    if (languages.length > 0) params.set("languages", languages.join(","));
+    if (region) params.set("region", region);
+    // genres param reserved for future server-side filtering
+    void genres;
+    const res = await fetch(`/api/tmdb/hero?${params.toString()}`, {
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (!res.ok) return { results: [], epoch: 0 };
+    const data = await res.json();
+    return {
+      results: (data.results ?? []) as Recommendation[],
+      epoch: typeof data.epoch === "number" ? data.epoch : 0,
+    };
+  } catch {
+    return { results: [], epoch: 0 };
+  }
+}
+
 export interface CastMember {
   id: number;
   name: string;

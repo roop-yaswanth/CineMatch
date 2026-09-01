@@ -5,6 +5,7 @@ import {
   recommendationId,
   type Recommendation,
   type RecommendationPreferences,
+  type TrendingHeroResponse,
 } from "@/lib/api";
 
 export interface StackLike {
@@ -132,7 +133,8 @@ const GENRE_SHELF_TITLES: Record<string, string> = {
 
 export function buildShelves(
   stacks: StackLike[],
-  preferences: RecommendationPreferences
+  preferences: RecommendationPreferences,
+  trendingHero?: TrendingHeroResponse | null
 ): { heroMovies: Recommendation[]; shelves: Shelf[] } {
   const byId = new Map<string, StackLike>();
   for (const s of stacks) byId.set(s.id, s);
@@ -256,24 +258,89 @@ export function buildShelves(
       ? acclaimedCandidates
       : [...curatedSource].sort((a, b) => normProminence(b) - normProminence(a));
 
-  const heroMovies = acclaimedPool.slice(0, 5);
+  /* ── Hero billboard ──────────────────────────
+     When TMDB trending data is available, the hero interleaves trending/recent
+     OTT movies with personal recommendation picks (3 trending + 2 personal).
+     The epoch-seeded shuffle rotates the selection every 12 hours so returning
+     users see fresh content. Falls back to the original acclaimed-pool hero
+     when trending data is unavailable. ── */
+  let heroMovies: Recommendation[];
 
-  // Guarantee the billboard features at least one CURRENT-YEAR release —
-  // a wall of back-catalogue classics makes the product feel stale.
-  if (!heroMovies.some((m) => yearOf(m) === CURRENT_YEAR)) {
-    const freshYearBest = [...curatedSource]
-      .filter((m) => !usedIds.has(recommendationId(m)) && yearOf(m) === CURRENT_YEAR)
-      .sort((a, b) => normProminence(b) - normProminence(a))[0];
-    if (freshYearBest) {
-      heroMovies.splice(Math.min(2, heroMovies.length), 0, freshYearBest);
-      if (heroMovies.length > 5) heroMovies.length = 5; // keep the billboard tight
-    } else {
-      // fall back to the newest available year
-      const maxYear = Math.max(...curatedSource.map(yearOf), 0);
-      const newest = [...curatedSource]
-        .filter((m) => !usedIds.has(recommendationId(m)) && yearOf(m) === maxYear)
+  const trendingCandidates = trendingHero?.results ?? [];
+  const trendingEpoch = trendingHero?.epoch ?? 0;
+
+  if (trendingCandidates.length >= 3) {
+    // Epoch-seeded deterministic shuffle — stable within a 12h window,
+    // changes every rotation without requiring localStorage or extra state.
+    const epochShuffle = <T>(arr: T[], seed: number): T[] => {
+      const out = [...arr];
+      let h = seed;
+      for (let i = out.length - 1; i > 0; i--) {
+        h = ((h * 1103515245 + 12345) >>> 0);
+        const j = h % (i + 1);
+        [out[i], out[j]] = [out[j], out[i]];
+      }
+      return out;
+    };
+
+    // Dedupe trending against the user's recommendation pool to avoid repeats
+    const recsIds = new Set(curatedSource.map(recommendationId));
+    const uniqueTrending = trendingCandidates.filter(
+      (m) => !recsIds.has(recommendationId(m))
+    );
+
+    // If too few unique trending remain after dedup, fall back to all trending
+    const trendPool = uniqueTrending.length >= 3 ? uniqueTrending : trendingCandidates;
+
+    // Shuffle with epoch seed and take top 3
+    const shuffled = epochShuffle(trendPool, trendingEpoch);
+    const trendingPicks = shuffled.slice(0, 3).map((m) => ({
+      ...m,
+      // Tag for the HeroCarousel kicker text distinction
+      reason: "trending",
+    }));
+
+    // 2 personal picks from the acclaimed pool
+    const trendingIds = new Set(trendingPicks.map(recommendationId));
+    const personalPicks = acclaimedPool
+      .filter((m) => !trendingIds.has(recommendationId(m)))
+      .slice(0, 2)
+      .map((m) => ({ ...m, reason: m.reason || "personal" }));
+
+    // Interleave: trending, personal, trending, personal, trending
+    heroMovies = [];
+    let ti = 0, pi = 0;
+    for (let slot = 0; slot < 5; slot++) {
+      if (slot % 2 === 0 && ti < trendingPicks.length) {
+        heroMovies.push(trendingPicks[ti++]);
+      } else if (pi < personalPicks.length) {
+        heroMovies.push(personalPicks[pi++]);
+      } else if (ti < trendingPicks.length) {
+        heroMovies.push(trendingPicks[ti++]);
+      } else if (pi < personalPicks.length) {
+        heroMovies.push(personalPicks[pi++]);
+      }
+    }
+  } else {
+    // Fallback: original acclaimed-pool hero (no trending data available)
+    heroMovies = acclaimedPool.slice(0, 5);
+
+    // Guarantee the billboard features at least one CURRENT-YEAR release —
+    // a wall of back-catalogue classics makes the product feel stale.
+    if (!heroMovies.some((m) => yearOf(m) === CURRENT_YEAR)) {
+      const freshYearBest = [...curatedSource]
+        .filter((m) => !usedIds.has(recommendationId(m)) && yearOf(m) === CURRENT_YEAR)
         .sort((a, b) => normProminence(b) - normProminence(a))[0];
-      if (newest) heroMovies.splice(Math.min(2, heroMovies.length), 0, newest);
+      if (freshYearBest) {
+        heroMovies.splice(Math.min(2, heroMovies.length), 0, freshYearBest);
+        if (heroMovies.length > 5) heroMovies.length = 5;
+      } else {
+        const maxYear = Math.max(...curatedSource.map(yearOf), 0);
+        const newest = [...curatedSource]
+          .filter((m) => !usedIds.has(recommendationId(m)) && yearOf(m) === maxYear)
+          .sort((a, b) => normProminence(b) - normProminence(a))[0];
+        if (newest) heroMovies.splice(Math.min(2, heroMovies.length), 0, newest);
+      }
     }
   }
 
