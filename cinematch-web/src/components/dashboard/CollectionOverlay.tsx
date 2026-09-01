@@ -9,6 +9,7 @@ import { recommendationId, type Recommendation } from "@/lib/api";
 import { pushBackHandler } from "@/lib/backStack";
 import { useMounted } from "@/lib/useMounted";
 import { ShelfCardGridItem } from "./ShelfRow";
+import { SkeletonCard } from "@/components/ui/Skeleton";
 
 export interface Collection {
   id: string;
@@ -168,19 +169,31 @@ export default function CollectionOverlay({ collection, onBack, onMovieClick, on
             />
           ))}
         </AnimatePresence>
-        {/* Infinite-scroll sentinel + status row */}
-        <div ref={sentinelRef} style={{ height: 8 }} />
-        {loadingMore && (
-          <div style={{ display: "flex", justifyContent: "center", padding: "18px 0 26px" }}>
-            <div className="skeleton-shimmer" style={{ width: 120, height: 26, borderRadius: 999 }} />
-          </div>
-        )}
+
+        {loadingMore &&
+          Array.from({ length: items.length === 0 ? 12 : 6 }).map((_, i) => (
+            <SkeletonCard key={`collection-skel-${i}`} compact />
+          ))}
+
+        {/* Infinite-scroll sentinel */}
+        <div ref={sentinelRef} style={{ gridColumn: "1 / -1", height: 1, margin: 0 }} />
+
         {exhausted && items.length > 0 && (
-          <div style={{ textAlign: "center", padding: "16px 0 30px", color: "rgba(255,255,255,0.45)", fontSize: 13 }}>
+          <div
+            style={{
+              gridColumn: "1 / -1",
+              textAlign: "center",
+              padding: "24px 0 36px",
+              color: "rgba(255, 255, 255, 0.45)",
+              fontSize: 13,
+              fontWeight: 500,
+            }}
+          >
             You&apos;ve reached the end — {items.length} titles
           </div>
         )}
-        {items.length === 0 && (
+
+        {items.length === 0 && !loadingMore && exhausted && (
           <p style={{ fontSize: 13, color: "var(--color-text-muted)", gridColumn: "1 / -1" }}>
             Nothing here yet.
           </p>
