@@ -1,13 +1,23 @@
-/**
- * HapticsService — Encapsulated wrapper around the Web Vibration API / haptics lib.
- * Components call `haptics.light()` etc., not `navigator.vibrate` directly.
- * If the haptics library is removed, only this file changes.
- */
+import { triggerHaptic, type HapticType } from "@/lib/haptics";
 
-export type HapticKind = "light" | "medium" | "heavy" | "success" | "selection" | "watchlist";
+export type HapticKind =
+  | "light"
+  | "medium"
+  | "heavy"
+  | "success"
+  | "selection"
+  | "watchlist"
+  | "tap"
+  | "love"
+  | "like"
+  | "dislike"
+  | "skip"
+  | "undo"
+  | "remove"
+  | "error";
 
 export interface HapticsPort {
-  trigger(kind: HapticKind): void;
+  trigger(kind: HapticKind | string): void;
   light(): void;
   medium(): void;
   heavy(): void;
@@ -16,16 +26,8 @@ export interface HapticsPort {
 }
 
 class WebHaptics implements HapticsPort {
-  trigger(kind: HapticKind): void {
-    try {
-      const map: Record<HapticKind, number | number[]> = {
-        light: 10, medium: 20, heavy: 30, success: [10, 30, 10], selection: 8, watchlist: 15,
-      };
-      const pattern = map[kind];
-      if (typeof navigator !== "undefined" && "vibrate" in navigator) {
-        navigator.vibrate(pattern as number);
-      }
-    } catch {}
+  trigger(kind: HapticKind | string): void {
+    triggerHaptic(kind as HapticType);
   }
   light() { this.trigger("light"); }
   medium() { this.trigger("medium"); }
@@ -36,8 +38,8 @@ class WebHaptics implements HapticsPort {
 
 export const haptics: HapticsPort = new WebHaptics();
 
-// Backward-compat helpers used by older components (will be phased out)
-export const triggerHaptic = (action: string) => {
-  const m: Record<string, HapticKind> = { love: "heavy", like: "light", dislike: "light", watchlist: "watchlist", skip: "selection" };
-  haptics.trigger(m[action] ?? "light");
+// Backward-compat helpers used by older components
+export const triggerHapticCompat = (action: string) => {
+  haptics.trigger(action);
 };
+
