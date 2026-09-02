@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import MovieCard from "@/components/MovieCard";
@@ -9,9 +9,12 @@ import MobileMenu from "@/components/MobileMenu";
 import PageHeader from "@/components/ui/PageHeader";
 import EmptyState from "@/components/ui/EmptyState";
 import { SkeletonGrid } from "@/components/ui/Skeleton";
+import { IconClose } from "@/components/shared/icons";
 
 const MovieDetailModal = dynamic(() => import("@/components/modals/MovieDetailModal"), { ssr: false });
 import { useSession } from "@/context/SessionContext";
+import { useAuthGuard } from "@/hooks/useAuthGuard";
+import { buildReactionsMap, type UserReactionEntry } from "@/hooks/useMovieActions";
 import {
   apiDiscover,
   apiExplore,
@@ -21,8 +24,6 @@ import {
   invalidateHistoryCache,
   readHistoryCache,
   writeHistoryCache,
-  LANGUAGE_LABELS,
-  languageLabel,
   type DiscoverFilters,
   type DiscoverSort,
   type ExploreCategory,
@@ -32,29 +33,36 @@ import {
   type Recommendation,
   type TmdbGenre,
 } from "@/lib/api";
+// Domain SSOT imports — SRP: definitions live in domain, pages import them.
+import { LANGUAGE_OPTIONS } from "@/domain/config/appConfig";
 
 type MovieLike = Movie | Recommendation | ExploreMovie;
 
-interface UserReactionEntry {
-  rating?: "love" | "like" | "dislike" | null;
-  watchlist?: boolean;
+// ── Filter State (useReducer: 3 related booleans → 1 reducer for clarity) ──
+interface FilterState {
+  language: string;
+  genre: string;
+  sortBy: DiscoverSort;
+}
+type FilterAction =
+  | { type: "SET_LANGUAGE"; payload: string }
+  | { type: "SET_GENRE"; payload: string }
+  | { type: "SET_SORT"; payload: DiscoverSort }
+  | { type: "RESET" };
+
+const DEFAULT_FILTERS: FilterState = { language: "", genre: "", sortBy: "popularity.desc" };
+
+function filterReducer(state: FilterState, action: FilterAction): FilterState {
+  switch (action.type) {
+    case "SET_LANGUAGE": return { ...state, language: action.payload };
+    case "SET_GENRE":    return { ...state, genre: action.payload };
+    case "SET_SORT":     return { ...state, sortBy: action.payload };
+    case "RESET":        return DEFAULT_FILTERS;
+    default:             return state;
+  }
 }
 
-function buildReactionsMap(items: HistoryItem[]): Record<number, UserReactionEntry> {
-  const map: Record<number, UserReactionEntry> = {};
-  for (const item of items) {
-    if (!map[item.tmdb_id]) {
-      map[item.tmdb_id] = {};
-    }
-    const r = (item.rating || "").toLowerCase();
-    if (r === "love" || r === "like" || r === "dislike") {
-      map[item.tmdb_id].rating = r as "love" | "like" | "dislike";
-    } else if (r === "watchlist") {
-      map[item.tmdb_id].watchlist = true;
-    }
-  }
-  return map;
-}
+// ── Page constants ─────────────────────────────────────────────────────────
 
 interface CategoryDef {
   id: ExploreCategory;
@@ -90,14 +98,9 @@ const SORT_OPTIONS: Array<{ value: DiscoverSort; label: string }> = [
   { value: "title.asc", label: "Title (A–Z)" },
 ];
 
-const LANGUAGE_OPTIONS = ["", "en", "te", "hi", "ta", "ml", "kn", "ja", "ko", "zh", "es", "fr", "de", "it", "pt", "ru"];
-
+/** toDetailMovie — maps ExploreMovie to the DetailMovie shape expected by MovieDetailModal. */
 function toDetailMovie(m: ExploreMovie): DetailMovie {
-  return {
-    ...m,
-    id: m.tmdb_id,
-    runtime: m.runtime ?? undefined,
-  };
+  return { ...m, id: m.tmdb_id, runtime: m.runtime ?? undefined };
 }
 
 export default function ExplorePage() {
@@ -141,16 +144,7 @@ function ExplorePageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { session, isLoading, logout } = useSession();
-
-  useEffect(() => {
-    if (!isLoading && !session) {
-      if (typeof window !== "undefined") {
-        window.location.replace("/login");
-      } else {
-        router.replace("/login");
-      }
-    }
-  }, [session, isLoading, router]);
+  useAuthGuard();
 
   const initialTab: TabId = (() => {
     const t = searchParams?.get("tab") || "";
@@ -165,10 +159,9 @@ function ExplorePageInner() {
     window.history.replaceState(null, "", url);
   };
 
-  // Global Explore Filters
-  const [selectedLanguage, setSelectedLanguage] = useState<string>("");
-  const [selectedGenre, setSelectedGenre] = useState<string>("");
-  const [sortByFilter, setSortByFilter] = useState<DiscoverSort>("popularity.desc");
+  // Filter state consolidated into one reducer (SRP: one state unit, one reducer to change)
+  const [filters, dispatchFilter] = useReducer(filterReducer, DEFAULT_FILTERS);
+  const { language: selectedLanguage, genre: selectedGenre, sortBy: sortByFilter } = filters;
   const [genresList, setGenresList] = useState<TmdbGenre[]>([]);
 
   useEffect(() => {
@@ -260,50 +253,35 @@ function ExplorePageInner() {
     };
   }, [session?.session_id]);
 
-  const handleQuickAction = useCallback(
-    async (m: MovieLike, action: "love" | "like" | "dislike" | "watchlist") => {
+  // Unified action handler (SRP: one handler, not two with duplicate logic)
+  // handleQuickAction and handleAction were identical in behavior; merged here.
+  const handleMovieAction = useCallback(
+    async (m: MovieLike | DetailMovie, action: "love" | "like" | "dislike" | "watchlist" | "skip") => {
       if (!session) return;
-      const targetId = ("tmdb_id" in m && m.tmdb_id) ? m.tmdb_id : m.id;
-      setUserReactions((prev) => {
-        const cur = prev[targetId] || {};
-        if (action === "watchlist") {
-          return { ...prev, [targetId]: { ...cur, watchlist: !cur.watchlist } };
-        } else {
-          return { ...prev, [targetId]: { ...cur, rating: action } };
-        }
-      });
-      try {
-        await apiRecommendationAction(session.session_id, targetId, action);
-        invalidateHistoryCache(session.session_id);
-      } catch {
-        /* ignore */
-      }
-    },
-    [session]
-  );
-
-  const handleAction = useCallback(
-    async (action: "love" | "like" | "dislike" | "watchlist" | "skip") => {
-      if (!session || !active) return;
-      const targetId = active.tmdb_id ?? active.id;
+      const targetId = ("tmdb_id" in m && m.tmdb_id) ? m.tmdb_id : (m as { id: number }).id;
       if (action !== "skip") {
         setUserReactions((prev) => {
           const cur = prev[targetId] || {};
-          if (action === "watchlist") {
-            return { ...prev, [targetId]: { ...cur, watchlist: !cur.watchlist } };
-          } else {
-            return { ...prev, [targetId]: { ...cur, rating: action } };
-          }
+          if (action === "watchlist") return { ...prev, [targetId]: { ...cur, watchlist: !cur.watchlist } };
+          return { ...prev, [targetId]: { ...cur, rating: action } };
         });
       }
       try {
         await apiRecommendationAction(session.session_id, targetId, action);
         invalidateHistoryCache(session.session_id);
-      } catch {
-        /* ignore */
-      }
+      } catch { /* ignore — optimistic update already applied */ }
     },
-    [session, active]
+    [session]
+  );
+
+  // Narrow type wrappers for children that have tighter prop signatures
+  const handleQuickAction = useCallback(
+    (m: MovieLike, action: "love" | "like" | "dislike" | "watchlist") => void handleMovieAction(m, action),
+    [handleMovieAction]
+  );
+  const handleAction = useCallback(
+    (action: "love" | "like" | "dislike" | "watchlist" | "skip") => active && void handleMovieAction(active, action),
+    [handleMovieAction, active]
   );
 
   if (isLoading || !session) {
@@ -351,10 +329,10 @@ function ExplorePageInner() {
                   padding: "6px 14px",
                   borderRadius: "999px",
                   background: active
-                    ? "rgba(var(--rgb-accent), 0.18)"
+                    ? "rgba(255, 255, 255, 0.16)"
                     : "rgba(255, 255, 255, 0.04)",
                   border: active
-                    ? "1px solid rgba(var(--rgb-accent), 0.55)"
+                    ? "1px solid rgba(255, 255, 255, 0.35)"
                     : "1px solid var(--hairline)",
                   color: active ? "#ffffff" : "var(--color-text-secondary)",
                   fontWeight: active ? 700 : 500,
@@ -362,6 +340,7 @@ function ExplorePageInner() {
                   cursor: "pointer",
                   whiteSpace: "nowrap",
                   flexShrink: 0,
+                  boxShadow: active ? "0 1px 0 0 rgba(255, 255, 255, 0.15) inset, 0 2px 8px rgba(0, 0, 0, 0.25)" : "none",
                   transition: "all var(--dur-base) var(--ease-out)",
                 }}
               >
@@ -386,17 +365,14 @@ function ExplorePageInner() {
             {/* Language filter */}
             <PillSelect
               value={selectedLanguage}
-              onChange={setSelectedLanguage}
-              options={LANGUAGE_OPTIONS.map((code) => ({
-                value: code,
-                label: code ? `${languageLabel(code)}` : "All Languages",
-              }))}
+              onChange={(v) => dispatchFilter({ type: "SET_LANGUAGE", payload: v })}
+              options={LANGUAGE_OPTIONS}
             />
 
             {/* Genre filter */}
             <PillSelect
               value={selectedGenre}
-              onChange={setSelectedGenre}
+              onChange={(v) => dispatchFilter({ type: "SET_GENRE", payload: v })}
               options={[
                 { value: "", label: "All Genres" },
                 ...genresList.map((g) => ({ value: String(g.id), label: g.name })),
@@ -406,20 +382,16 @@ function ExplorePageInner() {
             {/* Sort by filter */}
             <PillSelect
               value={sortByFilter}
-              onChange={(v) => setSortByFilter(v as DiscoverSort)}
+              onChange={(v) => dispatchFilter({ type: "SET_SORT", payload: v as DiscoverSort })}
               options={SORT_OPTIONS}
               active={sortByFilter !== "popularity.desc"}
             />
 
-            {/* Clear button if any filter is set */}
+            {/* Clear button if any filter is set — IconClose from shared SSOT */}
             {hasActiveFilters && (
               <button
                 type="button"
-                onClick={() => {
-                  setSelectedLanguage("");
-                  setSelectedGenre("");
-                  setSortByFilter("popularity.desc");
-                }}
+                onClick={() => dispatchFilter({ type: "RESET" })}
                 style={{
                   background: "rgba(255, 255, 255, 0.08)",
                   border: "1px solid var(--hairline)",
@@ -436,9 +408,7 @@ function ExplorePageInner() {
                   gap: "4px",
                 }}
               >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
+                <IconClose size={12} aria-hidden />
                 Reset
               </button>
             )}
@@ -682,10 +652,7 @@ function Discover({
               onChange={(v) => setFilters((f) => ({ ...f, with_original_language: v || undefined }))}
               options={[
                 { value: "", label: "Any Language" },
-                ...LANGUAGE_OPTIONS.filter((c) => c !== "").map((c) => ({
-                  value: c,
-                  label: LANGUAGE_LABELS[c] || languageLabel(c),
-                })),
+                ...LANGUAGE_OPTIONS.filter((o) => o.value !== "all"),
               ]}
             />
           </FilterField>
@@ -735,15 +702,16 @@ function Discover({
                     padding: "6px 13px",
                     borderRadius: "var(--radius-pill)",
                     border: isActive
-                      ? "1px solid rgba(var(--rgb-accent), 0.45)"
+                      ? "1px solid rgba(255, 255, 255, 0.35)"
                       : "1px solid var(--hairline)",
                     background: isActive
-                      ? "rgba(var(--rgb-accent), 0.14)"
+                      ? "rgba(255, 255, 255, 0.16)"
                       : "var(--glass-chrome)",
-                    color: isActive ? "var(--color-accent)" : "var(--color-text-muted)",
+                    color: isActive ? "#ffffff" : "var(--color-text-muted)",
                     fontSize: "12px",
                     fontWeight: isActive ? 600 : 500,
                     cursor: "pointer",
+                    boxShadow: isActive ? "0 1px 0 0 rgba(255, 255, 255, 0.15) inset, 0 2px 8px rgba(0, 0, 0, 0.25)" : "none",
                     transition: "all var(--dur-base) var(--ease-out)",
                   }}
                 >

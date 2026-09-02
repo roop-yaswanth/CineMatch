@@ -1,9 +1,26 @@
 "use client";
 
+/**
+ * MobileMenu — hamburger sheet (mobile) + account dropdown (desktop).
+ * Icons come from the shared SSOT; DesktopNavTabs is a separate shared component.
+ * SRP: one reason to change — account/session menu behavior or styling.
+ */
+
 import { useState, useEffect, useRef } from "react";
-import { useRouter, usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { useSession } from "@/context/SessionContext";
+import {
+  IconSettings as IconPreferences,
+  IconReset,
+  IconLogOut,
+  IconUser,
+  IconHelp,
+  IconChevronDown,
+} from "@/components/shared/icons";
+
+// Re-export DesktopNavTabs so existing import sites are not broken.
+// (PageHeader and RecommendationsView import { DesktopNavTabs } from "@/components/MobileMenu")
+export { DesktopNavTabs } from "@/components/shared/DesktopNavTabs";
 
 interface MobileMenuProps {
   onLogout: () => void;
@@ -14,138 +31,6 @@ interface MobileMenuProps {
   onTutorial?: () => void;
 }
 
-const IconCompass = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="10" />
-    <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" />
-  </svg>
-);
-
-const IconHome = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-    <polyline points="9 22 9 12 15 12 15 22" />
-  </svg>
-);
-
-const IconBookmark = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M19 21l-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
-  </svg>
-);
-
-const IconReset = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-    <path d="M3 3v5h5" />
-  </svg>
-);
-
-const IconPreferences = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="4" y1="21" x2="4" y2="14" />
-    <line x1="4" y1="10" x2="4" y2="3" />
-    <line x1="12" y1="21" x2="12" y2="12" />
-    <line x1="12" y1="8" x2="12" y2="3" />
-    <line x1="20" y1="21" x2="20" y2="16" />
-    <line x1="20" y1="12" x2="20" y2="3" />
-    <line x1="1" y1="14" x2="7" y2="14" />
-    <line x1="9" y1="8" x2="15" y2="8" />
-    <line x1="17" y1="16" x2="23" y2="16" />
-  </svg>
-);
-
-const IconLogOut = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-    <polyline points="16 17 21 12 16 7" />
-    <line x1="21" y1="12" x2="9" y2="12" />
-  </svg>
-);
-
-const IconUser = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-    <circle cx="12" cy="7" r="4" />
-  </svg>
-);
-
-const IconHelp = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="10" />
-    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-    <line x1="12" y1="17" x2="12.01" y2="17" />
-  </svg>
-);
-
-const IconChevronDown = () => (
-  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="6 9 12 15 18 9" />
-  </svg>
-);
-
-export function DesktopNavTabs({
-  onPreferences,
-  onWatchlist,
-}: {
-  onPreferences?: () => void;
-  onWatchlist?: () => void;
-}) {
-  const router = useRouter();
-  const { openPreferences, isPreferencesOpen } = useSession();
-  const pathname = usePathname() ?? "/";
-
-  const isDashboardActive = pathname.startsWith("/dashboard");
-  const isExploreActive = pathname.startsWith("/explore");
-  const isWatchlistActive = pathname.startsWith("/your-likes");
-  const isPreferencesActive = isPreferencesOpen;
-
-  return (
-    <nav className="desktop-center-nav" aria-label="Primary Navigation">
-      <button
-        data-tour="nav-dashboard"
-        className={`desktop-center-tab ${isDashboardActive ? "active" : ""}`}
-        onClick={() => router.push("/dashboard")}
-      >
-        <span className="desktop-tab-icon"><IconHome /></span>
-        <span>Dashboard</span>
-      </button>
-
-      <button
-        data-tour="nav-explore"
-        className={`desktop-center-tab ${isExploreActive ? "active" : ""}`}
-        onClick={() => router.push("/explore")}
-      >
-        <span className="desktop-tab-icon"><IconCompass /></span>
-        <span>Explore</span>
-      </button>
-
-      <button
-        data-tour="nav-watchlist"
-        className={`desktop-center-tab ${isWatchlistActive ? "active" : ""}`}
-        onClick={() => {
-          if (onWatchlist) onWatchlist();
-          else router.push("/your-likes?filter=watchlist");
-        }}
-      >
-        <span className="desktop-tab-icon"><IconBookmark /></span>
-        <span>Watchlist</span>
-      </button>
-
-      <button
-        data-tour="nav-preferences"
-        className={`desktop-center-tab ${isPreferencesActive ? "active" : ""}`}
-        onClick={() => {
-          if (onPreferences) onPreferences();
-          else openPreferences();
-        }}
-      >
-        <span className="desktop-tab-icon"><IconPreferences /></span>
-        <span>Preferences</span>
-      </button>
-    </nav>
-  );
-}
 
 export default function MobileMenu({
   onLogout,

@@ -134,7 +134,8 @@ const GENRE_SHELF_TITLES: Record<string, string> = {
 export function buildShelves(
   stacks: StackLike[],
   preferences: RecommendationPreferences,
-  trendingHero?: TrendingHeroResponse | null
+  trendingHero?: TrendingHeroResponse | null,
+  seenIds?: Set<number>
 ): { heroMovies: Recommendation[]; shelves: Shelf[] } {
   const byId = new Map<string, StackLike>();
   for (const s of stacks) byId.set(s.id, s);
@@ -170,7 +171,7 @@ export function buildShelves(
   // reserves) is marked used globally, so a title can never appear on two
   // stacks. Rails unable to field at least MIN_SHELF unused items are skipped
   // outright — sparse "5 movies" rails are structurally impossible now.
-  const usedIds = new Set<number>();
+  const usedIds = new Set<number>(seenIds ? Array.from(seenIds) : []);
   const takeFrom = (
     pool: Recommendation[],
     visibleCap: number,

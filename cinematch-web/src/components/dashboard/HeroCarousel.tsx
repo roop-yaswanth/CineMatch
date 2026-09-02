@@ -40,9 +40,9 @@ export default function HeroCarousel({ movies, onOpenDetail, onWatchlist, onLike
 
   const [liveLogos, setLiveLogos] = useState<Record<number, string | null>>({});
 
-  // Reset when the movie list itself changes (e.g. new recommendations).
+  // Clamp index when the movie list itself changes (e.g. rated movie removed).
   useEffect(() => {
-    Promise.resolve().then(() => setIndex(0));
+    Promise.resolve().then(() => setIndex((prev) => Math.min(prev, Math.max(0, items.length - 1))));
     wasInteractedRef.current = false;
 
     // Fetch live title logos from TMDB for the hero items
@@ -137,16 +137,16 @@ export default function HeroCarousel({ movies, onOpenDetail, onWatchlist, onLike
       style={{
         position: "relative",
         width: "100%",
-        height: "min(68vh, 620px)",
-        minHeight: 440,
+        height: "clamp(460px, 58vh, 640px)",
+        minHeight: 420,
         overflow: "hidden",
         touchAction: "pan-y",
         userSelect: "none",
         WebkitUserSelect: "none",
         WebkitMaskImage:
-          "linear-gradient(180deg, #000 0%, #000 74%, transparent 100%)",
+          "linear-gradient(180deg, #000 0%, #000 82%, transparent 100%)",
         maskImage:
-          "linear-gradient(180deg, #000 0%, #000 74%, transparent 100%)",
+          "linear-gradient(180deg, #000 0%, #000 82%, transparent 100%)",
       }}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
@@ -174,7 +174,7 @@ export default function HeroCarousel({ movies, onOpenDetail, onWatchlist, onLike
         <div
           style={{
             position: "absolute",
-            bottom: 28,
+            bottom: "clamp(16px, 3vh, 24px)",
             left: "var(--rail-x)",
             zIndex: 10,
             display: "flex",
@@ -290,7 +290,7 @@ function HeroSlide({
             width: "100%",
             height: "100%",
             objectFit: "cover",
-            objectPosition: "center 18%",
+            objectPosition: "center 22%",
             ...(!hasRealBackdrop && { filter: "blur(24px) saturate(1.4)", transform: "scale(1.1)" }),
           }}
         />
@@ -300,7 +300,7 @@ function HeroSlide({
             position: "absolute",
             inset: 0,
             background:
-              "linear-gradient(180deg, rgba(0,0,0,0) 45%, rgba(11,11,19,0.45) 75%, rgba(11,11,19,0.92) 100%), linear-gradient(90deg, rgba(11,11,19,0.78) 0%, rgba(11,11,19,0.32) 36%, rgba(0,0,0,0) 65%)",
+              "linear-gradient(180deg, rgba(5,5,7,0.45) 0%, rgba(5,5,7,0.02) 20%, rgba(5,5,7,0.0) 42%, rgba(5,5,7,0.35) 62%, rgba(5,5,7,0.85) 84%, var(--color-bg) 100%), radial-gradient(ellipse 100% 70% at 50% 30%, transparent 45%, rgba(5,5,7,0.45) 100%)",
           }}
         />
       </motion.div>
@@ -311,7 +311,7 @@ function HeroSlide({
           position: "relative",
           zIndex: 2,
           height: "100%",
-          padding: "0 var(--rail-x) 68px",
+          padding: "0 var(--rail-x) clamp(44px, 6.5vh, 60px)",
           display: "flex",
           flexDirection: "column",
           justifyContent: "flex-end",
@@ -327,10 +327,10 @@ function HeroSlide({
 
           <div
             style={{
-              minHeight: "74px",
+              minHeight: "54px",
               display: "flex",
               alignItems: "flex-end",
-              margin: "6px 0 10px",
+              margin: "4px 0 8px",
             }}
           >
             {liveLogo ? (
@@ -338,24 +338,24 @@ function HeroSlide({
                 src={posterUrl(liveLogo, "w500")}
                 alt={movie.title}
                 style={{
-                  maxHeight: "74px",
-                  maxWidth: "min(360px, 80vw)",
+                  maxHeight: "clamp(50px, 8.5vw, 68px)",
+                  maxWidth: "min(320px, 78vw)",
                   width: "auto",
                   height: "auto",
                   objectFit: "contain",
-                  filter: "drop-shadow(0 4px 16px rgba(0,0,0,0.9))",
+                  filter: "drop-shadow(0 4px 18px rgba(0,0,0,0.95)) drop-shadow(0 1px 4px rgba(0,0,0,0.8))",
                 }}
               />
             ) : (
               <h1
                 style={{
                   margin: 0,
-                  fontSize: "clamp(28px, 5.5vw, 44px)",
+                  fontSize: "clamp(24px, 5vw, 40px)",
                   fontWeight: 800,
                   letterSpacing: "-0.03em",
-                  lineHeight: 1.05,
+                  lineHeight: 1.1,
                   color: "#fff",
-                  textShadow: "0 2px 14px rgba(0,0,0,0.7)",
+                  textShadow: "0 2px 14px rgba(0,0,0,0.85)",
                   maxWidth: 620,
                 }}
               >

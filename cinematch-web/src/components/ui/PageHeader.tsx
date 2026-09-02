@@ -7,7 +7,8 @@
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import BackButton from "@/components/ui/BackButton";
-import { DesktopNavTabs } from "@/components/MobileMenu";
+import { DesktopNavTabs } from "@/components/shared/DesktopNavTabs";
+import { IconCineMatch } from "@/components/shared/icons";
 
 interface Props {
   title: ReactNode;
@@ -68,14 +69,23 @@ export default function PageHeader({
           minHeight: "48px",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", minWidth: "44px", zIndex: 10 }}>
-          {!hideBackButton ? (
+        <div className="page-header-left" style={{ display: "flex", alignItems: "center", minWidth: "44px", zIndex: 10 }}>
+          {!hideBackButton && (
             <div className={showNavTabs ? "mobile-only" : undefined}>
               <BackButton href={backHref} onClick={onBack} ariaLabel={backAriaLabel} />
             </div>
-          ) : (
-            <div style={{ width: "44px" }} />
           )}
+          {showNavTabs && (
+            <div
+              className="heading-display dash-brand desktop-only"
+              onClick={() => router.push("/dashboard")}
+              style={{ cursor: "pointer" }}
+            >
+              <IconCineMatch size={22} />
+              <span className="dash-brand-text">CineMatch</span>
+            </div>
+          )}
+          {hideBackButton && !showNavTabs && <div style={{ width: "44px" }} />}
         </div>
 
         <div className="page-header-center">
@@ -97,6 +107,7 @@ export default function PageHeader({
 
         {/* Right Column: search button on desktop + rightSlot */}
         <div
+          className="page-header-right"
           style={{
             display: "flex",
             alignItems: "center",
@@ -111,12 +122,13 @@ export default function PageHeader({
               type="button"
               className="dash-search desktop-only"
               onClick={() => router.push("/search")}
+              aria-label="Search movies"
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <circle cx="11" cy="11" r="8" />
                 <line x1="21" y1="21" x2="16.65" y2="16.65" />
               </svg>
-              Search movies…
+              <span className="dash-search-text">Search movies…</span>
             </button>
           )}
           {rightSlot ?? <div style={{ width: "44px" }} />}

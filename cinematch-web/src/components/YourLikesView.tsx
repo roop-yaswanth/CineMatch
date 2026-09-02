@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence } from "framer-motion";
+import { MovieCard } from "@/components/MovieCard";
 
 import dynamic from "next/dynamic";
 import {
@@ -13,7 +14,6 @@ import {
   writeHistoryCache,
   type HistoryItem,
 } from "@/lib/api";
-import { usePoster } from "@/lib/usePoster";
 import PageHeader from "@/components/ui/PageHeader";
 import EmptyState from "@/components/ui/EmptyState";
 import { useRouter } from "next/navigation";
@@ -21,6 +21,7 @@ import MobileMenu from "@/components/MobileMenu";
 import { useSession } from "@/context/SessionContext";
 import type { DetailMovie } from "@/components/modals/MovieDetailModal";
 import { hapticTap, hapticSelection } from "@/lib/haptics";
+import { toDetailMovie } from "@/domain/types/movie";
 
 const MovieDetailModal = dynamic(() => import("@/components/modals/MovieDetailModal"), { ssr: false });
 
@@ -31,54 +32,8 @@ interface Props {
 }
 
 type InteractionFilter = "all" | "love" | "like" | "dislike" | "not_watched" | "watchlist";
-type HistoryListItem = HistoryItem & { genres?: string[] };
-
-const RATING_CONFIG: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
-  love: {
-    label: "Loved",
-    color: "#30d158",
-    icon: <span style={{ fontSize: "13px", lineHeight: 1 }}>😍</span>,
-  },
-  like: {
-    label: "Liked",
-    color: "#facc15",
-    icon: <span style={{ fontSize: "13px", lineHeight: 1 }}>😀</span>,
-  },
-  dislike: {
-    label: "Disliked",
-    color: "#ef4444",
-    icon: <span style={{ fontSize: "13px", lineHeight: 1 }}>🙁</span>,
-  },
-  not_watched: {
-    label: "Skipped",
-    color: "var(--color-text-muted)",
-    icon: (
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-        <polygon points="5 4 15 12 5 20 5 4" fill="currentColor" />
-        <line x1="19" y1="5" x2="19" y2="19" />
-      </svg>
-    ),
-  },
-  skip: {
-    label: "Skipped",
-    color: "var(--color-text-muted)",
-    icon: (
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-        <polygon points="5 4 15 12 5 20 5 4" fill="currentColor" />
-        <line x1="19" y1="5" x2="19" y2="19" />
-      </svg>
-    ),
-  },
-  watchlist: {
-    label: "Watchlist",
-    color: "var(--color-accent)",
-    icon: (
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
-      </svg>
-    ),
-  },
-};
+// Exported so we can cast it when using domain functions
+export type HistoryListItem = HistoryItem & { genres?: string[] };
 
 const INTERACTION_FILTERS: Array<{ value: InteractionFilter; label: string }> = [
   { value: "all", label: "All Reactions" },
@@ -88,19 +43,6 @@ const INTERACTION_FILTERS: Array<{ value: InteractionFilter; label: string }> = 
   { value: "not_watched", label: "Skipped" },
   { value: "watchlist", label: "Watchlist" },
 ];
-
-function toDetailMovie(item: HistoryListItem): DetailMovie {
-  return {
-    id: item.tmdb_id,
-    tmdb_id: item.tmdb_id,
-    title: item.title,
-    poster_path: item.poster_path, // maybe undefined
-    year: item.year,
-    original_language: item.original_language,
-    primary_genre: item.primary_genre,
-    genres: item.genres,
-  };
-}
 
 export default function YourLikesView({ sessionId, onClose, initialFilter = "all" }: Props) {
   const { logout } = useSession();
@@ -547,15 +489,25 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
                 }}
               >
                 {filteredItems.map((item, idx) => (
-                  <MovieCard
+                  <div
                     key={`${item.tmdb_id}-${idx}`}
-                    item={item}
-                    idx={idx}
                     onClick={() => {
                       hapticTap();
-                      setActiveMovie(toDetailMovie(item));
+                      setActiveMovie(toDetailMovie({ ...item, id: item.tmdb_id }));
                     }}
-                  />
+                    style={{ cursor: "pointer" }}
+                  >
+                    <MovieCard
+                      movie={{ ...item, id: item.tmdb_id }}
+                      compact
+                      userRating={
+                        item.rating === "love" || item.rating === "like" || item.rating === "dislike"
+                          ? item.rating
+                          : null
+                      }
+                      isWatchlist={item.rating === "watchlist"}
+                    />
+                  </div>
                 ))}
               </div>
             </AnimatePresence>
@@ -571,13 +523,6 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
           sessionId={sessionId}
           onAction={async (action) => {
             const targetId = activeMovie.id || activeMovie.tmdb_id!;
-            // Optimistic local update so the grid reflects the new rating
-            // *before* the server round-trip and refetch return. Without
-            // this, on slow connections (or whenever the SW serves the
-            // /api/history response from its 5-min cache) the rated movie
-            // visibly stays in the previous filter bucket until the next
-            // full page refresh — which is exactly the "I have to refresh
-            // to see it disappear" symptom.
             setItems((prev) => {
               const next = prev.map((it) =>
                 it.tmdb_id === targetId ? { ...it, rating: action } : it
@@ -635,91 +580,5 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
         }
       `}</style>
     </>
-  );
-}
-
-/* ─── Movie Card Component ─── */
-
-function MovieCard({ item, idx, onClick }: { item: HistoryItem; idx: number; onClick: () => void }) {
-  const poster = usePoster(item.poster_path, item.tmdb_id, "w342");
-  const config = RATING_CONFIG[item.rating] || {
-    label: item.rating,
-    color: "var(--color-text-muted)",
-    icon: null,
-  };
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.94 }}
-      // Tightened: was `delay: idx * 0.02, duration: 0.3`. With 24+ cards
-      // the last card was waiting almost 0.8s before settling, which
-      // looks "slow" on a fast device. Cap the stagger and shorten the
-      // duration so the whole grid lands in well under 250 ms.
-      transition={{ delay: Math.min(idx, 12) * 0.012, duration: 0.18, ease: "easeOut" }}
-      className="glass-card likes-card"
-      onClick={onClick}
-      style={{
-        borderRadius: "16px",
-        overflow: "hidden",
-        cursor: "pointer",
-        // Off-screen cards skip layout/paint work until they scroll near
-        // the viewport — big win on long collections.
-        contentVisibility: "auto",
-        containIntrinsicSize: "240px",
-      }}
-    >
-      {/* Poster */}
-      <div
-        style={{
-          position: "relative",
-          width: "100%",
-          paddingBottom: "150%",
-          background: "var(--color-surface)",
-          overflow: "hidden",
-        }}
-      >
-        <img
-          src={poster}
-          alt={item.title}
-          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
-        />
-
-        {/* Rating Badge */}
-        <div
-          style={{
-            position: "absolute",
-            top: "8px",
-            right: "8px",
-            padding: "6px 10px",
-            borderRadius: "8px",
-            background: "rgba(0, 0, 0, 0.75)",
-            backdropFilter: "blur(8px)",
-            display: "flex",
-            alignItems: "center",
-            gap: "4px",
-            fontSize: "11px",
-            fontWeight: 600,
-            color: config.color,
-          }}
-        >
-          <span style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>{config.icon}</span>
-          {config.label}
-        </div>
-      </div>
-
-      {/* Info — same global title/meta treatment as every other surface */}
-      <div style={{ padding: "12px" }}>
-        <p className="poster-info-title">
-          {item.title}
-        </p>
-        {item.year && (
-          <p className="poster-info-meta-text" style={{ marginTop: "5px" }}>
-            {item.year}
-          </p>
-        )}
-      </div>
-    </motion.div>
   );
 }

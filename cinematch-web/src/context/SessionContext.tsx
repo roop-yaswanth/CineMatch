@@ -2,15 +2,13 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
 import { AnimatePresence } from "framer-motion";
+import { refreshSession, signOut } from "@/domain/services/authService";
 import {
-  apiAuthRefresh,
-  apiLogout,
   apiUpdatePreferences,
   isSessionExpiredError,
-  preferencesFromProfile,
-  type UserSession,
-  type RecommendationPreferences,
 } from "@/lib/api";
+import type { UserSession, RecommendationPreferences } from "@/domain/types/movie";
+import { preferencesFromProfile } from "@/domain/types/movie";
 import PreferencesModal from "@/components/PreferencesModal";
 import TutorialOverlay from "@/components/TutorialOverlay";
 
@@ -47,11 +45,7 @@ function readCachedSession(): UserSession | null {
   }
 }
 
-/**
- * Runtime guard against malformed session objects. One poisoned response used
- * to reach setSession() and linger in memory (session_id: null), making every
- * subsequent dashboard poll POST a 422 until the user reloaded.
- */
+
 function isValidUserSession(s: unknown): s is UserSession {
   return Boolean(
     s &&
@@ -157,7 +151,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(() => {
     const sid = session?.session_id;
     clearSession();
-    if (sid) void apiLogout(sid).catch(() => { /* non-fatal */ });
+    // Use domain service (DIP: no direct @/lib/api import in this layer)
+    if (sid) void signOut(sid).catch(() => { /* non-fatal */ });
     if (typeof window !== "undefined") {
       window.location.replace("/login");
     }
@@ -209,7 +204,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
       if (cached.auth_token) {
         try {
-          const fresh = await apiAuthRefresh(cached.auth_token);
+          const fresh = await refreshSession(cached.auth_token);
           const next = profileOptimisticActive() && cached.profile
             ? { ...fresh, profile: cached.profile, auth_token: fresh.auth_token ?? cached.auth_token }
             : fresh;

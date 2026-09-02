@@ -45,14 +45,14 @@
   --color-text-faint: #55555c;
 
   /* ─── Brand accent ───────────────────────────────────────────
-     Periwinkle/indigo — the one signature color on the near-black
-     canvas. Use for active states, focus, links, match badges.
-     Rating semantics (green/blue/red) stay untouched. */
-  --color-accent: #a5b4fc;
-  --color-accent-strong: #818cf8;
-  --rgb-accent: 165, 180, 252;
+     Apple HIG monochrome white accent for active selection, focus,
+     and highlights on the dark canvas. Rating semantics
+     (green/yellow/red) stay untouched. */
+  --color-accent: #ffffff;
+  --color-accent-strong: #ffffff;
+  --rgb-accent: 255, 255, 255;
   --color-accent-warm: #ffb84d;
-  --gradient-brand: linear-gradient(135deg, #ffffff 0%, #d8dcff 45%, #a5b4fc 100%);
+  --gradient-brand: linear-gradient(135deg, #ffffff 0%, #e5e5ea 50%, #ffffff 100%);
 
   /* ─── Interactive / System Tints ─── */
   --color-blue: #0a84ff;
@@ -1977,6 +1977,13 @@ a[role="button"]:active,
   white-space: nowrap;
   cursor: pointer;
   letter-spacing: -0.03em;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #ffffff;
+}
+
+.dash-brand-text {
   background: linear-gradient(92deg, #ffffff 30%, var(--color-accent) 70%, var(--color-accent-warm));
   -webkit-background-clip: text;
   background-clip: text;
@@ -2155,6 +2162,31 @@ a[role="button"]:active,
 }
 
 @media (min-width: 900px) {
+  .page-header-top-row {
+    display: grid !important;
+    grid-template-columns: 1fr auto 1fr !important;
+    align-items: center !important;
+    gap: 16px !important;
+    padding: 10px var(--rail-x) !important;
+  }
+
+  .page-header-left {
+    justify-self: start;
+  }
+
+  .page-header-center {
+    position: static !important;
+    left: auto !important;
+    transform: none !important;
+    justify-self: center !important;
+    max-width: 100% !important;
+    width: auto !important;
+  }
+
+  .page-header-right {
+    justify-self: end;
+  }
+
   .page-header-title {
     font-size: 19px;
   }
@@ -2168,6 +2200,25 @@ a[role="button"]:active,
     max-height: none !important;
     opacity: 1 !important;
     pointer-events: auto !important;
+  }
+}
+
+@media (min-width: 900px) and (max-width: 1200px) {
+  .dash-search {
+    min-width: 38px !important;
+    width: 38px !important;
+    height: 38px !important;
+    padding: 0 !important;
+    justify-content: center !important;
+    border-radius: 999px !important;
+  }
+  .dash-search-text {
+    display: none !important;
+  }
+  .desktop-center-tab {
+    padding: 6px 10px !important;
+    font-size: 12.5px !important;
+    gap: 4px !important;
   }
 }
 

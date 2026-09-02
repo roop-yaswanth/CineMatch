@@ -1,4 +1,18 @@
-/* ─── CineMatch API Client ─────────────────────────────────────
+/* ─── CineMatch API Client — FACADE ─────────────────────────────────────
+ * Strict Layered Architecture:
+ *   Presentation (app/components) → Domain (domain/*) → Data (data/*) → Infrastructure (infrastructure/*)
+ *
+ * This file is kept for backward compatibility (dozens of imports still use "@/lib/api").
+ * New code SHOULD import from the layered modules directly:
+ *   - Domain types:  "@/domain/types/movie" / "@/domain/types/search"
+ *   - Domain config: "@/domain/config/appConfig" (SSOT for LANGUAGE_LABELS etc.)
+ *   - Repositories:  "@/domain/repositories/MovieRepository" (ports)
+ *   - Data adapters: "@/data/repositories/HttpMovieRepository" (adapters)
+ *   - Infra:         "@/infrastructure/http/HttpClient", "@/infrastructure/storage/StorageService"
+ *
+ * SRP: This facade will be incrementally split — each section below has a single reason to change
+ * and will be extracted to its own module (client/types/cache/endpoints). For now it delegates
+ * to the new layered implementations where possible, re-exporting for compatibility.
  * ──────────────────────────────────────────────────────────── */
 
 const API_BASE = "";
@@ -272,71 +286,17 @@ export interface HistoryItem {
   primary_genre?: string;
 }
 
-/* ─── Constants ─────────────────────────────────────────────── */
 
-export const REGION_OPTIONS = [
-  "India", "USA", "Canada", "UK", "Europe", "Latin-America",
-  "East Asia", "South-East Asia", "Middle-East", "Africa", "Other",
-] as const;
+export {
+  REGION_OPTIONS,
+  AGE_GROUP_OPTIONS,
+  REGION_LANGUAGE_MAP,
+  LANGUAGE_LABELS,
+  languageLabel,
+  regionLanguages,
+} from "@/domain/config/appConfig";
 
-export const AGE_GROUP_OPTIONS = [
-  "18-24", "25-34", "35-44", "45-54", "55+", "Prefer not to say",
-] as const;
-
-export const REGION_LANGUAGE_MAP: Record<string, string[]> = {
-  India: ["hi", "te", "ta", "ml", "kn"],
-  USA: ["en"],
-  Canada: ["en", "fr"],
-  UK: ["en"],
-  Europe: ["fr", "de", "it", "es"],
-  "Latin-America": ["es", "pt"],
-  "East Asia": ["ja", "ko", "zh", "cn"],
-  "South-East Asia": ["th", "id"],
-  "Middle-East": ["ar", "fa", "tr"],
-  Africa: ["ar", "en", "fr"],
-  Other: ["en"],
-};
-
-export const LANGUAGE_LABELS: Record<string, string> = {
-  ar: "Arabic", bn: "Bengali", cn: "Cantonese", da: "Danish",
-  de: "German", el: "Greek", en: "English", es: "Spanish",
-  fa: "Persian", fi: "Finnish", fr: "French", he: "Hebrew",
-  hi: "Hindi", id: "Indonesian", it: "Italian", ja: "Japanese",
-  kn: "Kannada", ko: "Korean", ml: "Malayalam", mr: "Marathi",
-  nl: "Dutch", no: "Norwegian", pl: "Polish", pt: "Portuguese",
-  ro: "Romanian", ru: "Russian", sv: "Swedish", ta: "Tamil",
-  te: "Telugu", th: "Thai", tr: "Turkish", uk: "Ukrainian",
-  ur: "Urdu", zh: "Mandarin",
-};
-
-export function languageLabel(code: string): string {
-  if (!code) return "Unknown";
-  return LANGUAGE_LABELS[code.toLowerCase()] || code.toUpperCase();
-}
-
-export function recommendationId(
-  movie: Pick<Movie, "id" | "tmdb_id"> | Pick<Recommendation, "id" | "tmdb_id">
-): number {
-  return movie.tmdb_id ?? movie.id;
-}
-
-export function preferencesFromProfile(
-  profile?: UserProfile | null
-): RecommendationPreferences {
-  const savedGenres = profile?.preferred_genres ?? profile?.genre_picks ?? [];
-  return {
-    languages: profile?.preferred_languages?.filter(Boolean) ?? [],
-    genres: savedGenres.filter(Boolean),
-    semantic_index: "tmdb_bge",
-    include_classics: profile?.include_classics ?? false,
-    age_group: profile?.age_group ?? "25-34",
-    region: profile?.region ?? "USA",
-  };
-}
-
-export function regionLanguages(region?: string): string[] {
-  return REGION_LANGUAGE_MAP[region || "Other"] ?? ["en"];
-}
+export { recommendationId, preferencesFromProfile } from "@/domain/types/movie";
 
 /* ─── Endpoints ─────────────────────────────────────────────── */
 

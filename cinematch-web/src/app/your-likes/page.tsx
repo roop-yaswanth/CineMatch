@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, Suspense } from "react";
+import { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import YourLikesView from "@/components/YourLikesView";
 import { useSession } from "@/context/SessionContext";
+import { useAuthGuard } from "@/hooks/useAuthGuard";
 
 function YourLikesContent() {
   const router = useRouter();
@@ -11,17 +12,7 @@ function YourLikesContent() {
   const rawFilter = searchParams.get("filter");
   const filter = (rawFilter ?? "all") as "watchlist" | "love" | "like" | "dislike" | "not_watched" | "all";
   const { session, isLoading } = useSession();
-
-  // Route protection
-  useEffect(() => {
-    if (!isLoading && !session) {
-      if (typeof window !== "undefined") {
-        window.location.replace("/login");
-      } else {
-        router.replace("/login");
-      }
-    }
-  }, [session, isLoading, router]);
+  useAuthGuard();
 
   if (isLoading || !session) {
     return <div style={{ minHeight: "100dvh", background: "var(--color-bg)" }} />;

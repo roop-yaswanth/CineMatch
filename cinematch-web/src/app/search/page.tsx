@@ -11,6 +11,8 @@ import MobileMenu from "@/components/MobileMenu";
 import PageHeader from "@/components/ui/PageHeader";
 import type { DetailMovie } from "@/components/modals/MovieDetailModal";
 import { useSession } from "@/context/SessionContext";
+import { useAuthGuard } from "@/hooks/useAuthGuard";
+import { useMovieActions } from "@/hooks/useMovieActions";
 
 const MovieDetailModal = dynamic(() => import("@/components/modals/MovieDetailModal"), { ssr: false });
 import {
@@ -18,8 +20,6 @@ import {
   languageLabel,
   peekMultiSearchCache,
   posterUrl,
-  apiRecommendationAction,
-  invalidateHistoryCache,
   type MultiSearchMovie,
   type MultiSearchPerson,
   type MultiSearchResponse,
@@ -45,18 +45,7 @@ function SearchPage() {
   const router = useRouter();
   const params = useSearchParams();
   const { session, isLoading, logout } = useSession();
-
-  // Auth gate: this is an app page, so require a logged-in session (it must not
-  // be reachable by typing the URL while signed out).
-  useEffect(() => {
-    if (!isLoading && !session) {
-      if (typeof window !== "undefined") {
-        window.location.replace("/login");
-      } else {
-        router.replace("/login");
-      }
-    }
-  }, [session, isLoading, router]);
+  useAuthGuard();
 
   const initialQ = params.get("q") || "";
 
@@ -154,17 +143,14 @@ function SearchPage() {
     });
   }, []);
 
+  const { act: handleMovieAction } = useMovieActions();
   const handleAction = useCallback(
     async (action: "love" | "like" | "dislike" | "watchlist" | "skip") => {
       if (!session || !active) return;
-      try {
-        await apiRecommendationAction(session.session_id, active.id, action);
-        invalidateHistoryCache(session.session_id);
-      } catch (err) {
-        console.error("Action failed:", err);
-      }
+      // Unified action path — handles haptics, cache invalidation, session refresh.
+      await handleMovieAction(active as unknown as import("@/lib/api").Movie, action);
     },
-    [session, active]
+    [session, active, handleMovieAction]
   );
 
   if (isLoading || !session) {
