@@ -48,19 +48,19 @@ CLAUDE.md
 # env files
 .env*
 
-Data/
-Test/
-models/ 
-RecBole-GNN/
-.agents/
+/Data/
+/Test/
+/models/
+/RecBole-GNN/
+/.agents/
 
 
 
 
 #temp
-Cinematchapi/
-cinematchproapi/
+/Cinematchapi/
+/cinematchproapi/
 minimal *
 report.tex
-admin_cleanup/
+/admin_cleanup/
 issues.md
