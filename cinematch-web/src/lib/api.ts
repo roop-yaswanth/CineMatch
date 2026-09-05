@@ -601,7 +601,9 @@ export async function apiRecommendationAction(
 export async function apiGetHistory(
   sessionId: string
 ): Promise<HistoryItem[]> {
-  return request<HistoryItem[]>(`/api/history?session_id=${sessionId}`);
+  return request<HistoryItem[]>(`/api/history`, {
+    headers: { "X-Session-Id": sessionId }
+  });
 }
 
 /* ─── History cache (localStorage mirror of /api/history) ───

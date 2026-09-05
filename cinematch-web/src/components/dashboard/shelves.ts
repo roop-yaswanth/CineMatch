@@ -171,7 +171,7 @@ export function buildShelves(
   // reserves) is marked used globally, so a title can never appear on two
   // stacks. Rails unable to field at least MIN_SHELF unused items are skipped
   // outright — sparse "5 movies" rails are structurally impossible now.
-  const usedIds = new Set<number>(seenIds ? Array.from(seenIds) : []);
+  const usedIds = new Set<number>(seenIds ? Array.from(seenIds).map(Number) : []);
   const takeFrom = (
     pool: Recommendation[],
     visibleCap: number,
@@ -252,12 +252,14 @@ export function buildShelves(
     langPercentile.get(recommendationId(m)) ?? 0;
 
   const acclaimedCandidates = [...curatedSource]
-    .filter((m) => ratingOf(m) >= 7.0)
+    .filter((m) => !usedIds.has(Number(recommendationId(m))) && ratingOf(m) >= 7.0)
     .sort((a, b) => normProminence(b) - normProminence(a));
   const acclaimedPool =
     acclaimedCandidates.length >= 10
       ? acclaimedCandidates
-      : [...curatedSource].sort((a, b) => normProminence(b) - normProminence(a));
+      : [...curatedSource]
+          .filter((m) => !usedIds.has(Number(recommendationId(m))))
+          .sort((a, b) => normProminence(b) - normProminence(a));
 
   /* ── Hero billboard ──────────────────────────
      When TMDB trending data is available, the hero interleaves trending/recent
@@ -267,7 +269,9 @@ export function buildShelves(
      when trending data is unavailable. ── */
   let heroMovies: Recommendation[];
 
-  const trendingCandidates = trendingHero?.results ?? [];
+  const trendingCandidates = (trendingHero?.results ?? []).filter(
+    (m) => !usedIds.has(Number(recommendationId(m)))
+  );
   const trendingEpoch = trendingHero?.epoch ?? 0;
 
   if (trendingCandidates.length >= 3) {
@@ -285,9 +289,9 @@ export function buildShelves(
     };
 
     // Dedupe trending against the user's recommendation pool to avoid repeats
-    const recsIds = new Set(curatedSource.map(recommendationId));
+    const recsIds = new Set(curatedSource.map((m) => Number(recommendationId(m))));
     const uniqueTrending = trendingCandidates.filter(
-      (m) => !recsIds.has(recommendationId(m))
+      (m) => !recsIds.has(Number(recommendationId(m)))
     );
 
     // If too few unique trending remain after dedup, fall back to all trending
@@ -302,9 +306,9 @@ export function buildShelves(
     }));
 
     // 2 personal picks from the acclaimed pool
-    const trendingIds = new Set(trendingPicks.map(recommendationId));
+    const trendingIds = new Set(trendingPicks.map((m) => Number(recommendationId(m))));
     const personalPicks = acclaimedPool
-      .filter((m) => !trendingIds.has(recommendationId(m)))
+      .filter((m) => !trendingIds.has(Number(recommendationId(m))))
       .slice(0, 2)
       .map((m) => ({ ...m, reason: m.reason || "personal" }));
 
@@ -330,7 +334,7 @@ export function buildShelves(
     // a wall of back-catalogue classics makes the product feel stale.
     if (!heroMovies.some((m) => yearOf(m) === CURRENT_YEAR)) {
       const freshYearBest = [...curatedSource]
-        .filter((m) => !usedIds.has(recommendationId(m)) && yearOf(m) === CURRENT_YEAR)
+        .filter((m) => !usedIds.has(Number(recommendationId(m))) && yearOf(m) === CURRENT_YEAR)
         .sort((a, b) => normProminence(b) - normProminence(a))[0];
       if (freshYearBest) {
         heroMovies.splice(Math.min(2, heroMovies.length), 0, freshYearBest);
@@ -338,11 +342,32 @@ export function buildShelves(
       } else {
         const maxYear = Math.max(...curatedSource.map(yearOf), 0);
         const newest = [...curatedSource]
-          .filter((m) => !usedIds.has(recommendationId(m)) && yearOf(m) === maxYear)
+          .filter((m) => !usedIds.has(Number(recommendationId(m))) && yearOf(m) === maxYear)
           .sort((a, b) => normProminence(b) - normProminence(a))[0];
         if (newest) heroMovies.splice(Math.min(2, heroMovies.length), 0, newest);
       }
     }
+  }
+
+  // Ensure heroMovies strictly contains no seen / rated movies
+  heroMovies = heroMovies.filter((m) => !usedIds.has(Number(recommendationId(m))));
+
+  // If rated movies were removed, backfill fresh items from acclaimedPool so hero has up to 5 cards
+  if (heroMovies.length < 5) {
+    const existingHeroIds = new Set(heroMovies.map((m) => Number(recommendationId(m))));
+    const fillCandidates = acclaimedPool.filter(
+      (m) => !usedIds.has(Number(recommendationId(m))) && !existingHeroIds.has(Number(recommendationId(m)))
+    );
+    for (const m of fillCandidates) {
+      if (heroMovies.length >= 5) break;
+      heroMovies.push({ ...m, reason: m.reason || "personal" });
+      existingHeroIds.add(Number(recommendationId(m)));
+    }
+  }
+
+  // Mark all hero movies as used so they never duplicate on the rails below
+  for (const m of heroMovies) {
+    usedIds.add(Number(recommendationId(m)));
   }
 
   /* ── 1 · Ranked Top 10 — highest-prominence matches ── */

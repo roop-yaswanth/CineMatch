@@ -6,6 +6,8 @@ import {
   apiRecommendationAction,
   apiAnalyticsSwipe,
   apiTrendingHero,
+  apiGetHistory,
+  readHistoryCache,
   invalidateHistoryCache,
   isSessionExpiredError,
   languageLabel,
@@ -201,8 +203,22 @@ export function useRecommendations(
   const actionCountRef = useRef({ positive: 0, negative: 0, total: 0 });
   const countedActionsRef = useRef<Set<number>>(new Set());
 
-  const seenIdsRef = useRef<Set<number>>(new Set(initialCache?.seenIds ?? []));
-  const [seenMovieIds, setSeenMovieIds] = useState<Set<number>>(() => new Set(initialCache?.seenIds ?? []));
+  // Track permanently rated IDs so they are never forgotten or wiped on reset
+  const [initialRatedIds] = useState<Set<number>>(() => {
+    const fromHistory = typeof window !== "undefined" && session?.session_id ? readHistoryCache(session.session_id) : null;
+    const historyIds = fromHistory ? fromHistory.map((h) => Number(h.tmdb_id)).filter(Boolean) : [];
+    return new Set(historyIds);
+  });
+  const ratedIdsRef = useRef<Set<number>>(new Set(initialRatedIds));
+
+  const [initialSeenIds] = useState<Set<number>>(() => {
+    const set = new Set<number>((initialCache?.seenIds ?? []).map(Number));
+    initialRatedIds.forEach((id) => set.add(id));
+    return set;
+  });
+
+  const seenIdsRef = useRef<Set<number>>(new Set(initialSeenIds));
+  const [seenMovieIds, setSeenMovieIds] = useState<Set<number>>(() => new Set(initialSeenIds));
 
   const displayedIdsRef = useRef<Set<number>>(new Set(initialCache?.displayedIds ?? []));
   const bucketCacheRef = useRef<StackCache>(initialCache?.bucketCache ?? EMPTY_CACHE());
@@ -320,8 +336,8 @@ export function useRecommendations(
         (m) => !seenIdsRef.current.has(recommendationId(m))
       );
       if (!hasUnseen && totalMovies.length > 0) {
-        seenIdsRef.current = new Set();
-        setSeenMovieIds(new Set());
+        seenIdsRef.current = new Set(ratedIdsRef.current);
+        setSeenMovieIds(new Set(ratedIdsRef.current));
         actionCountRef.current = { positive: 0, negative: 0, total: 0 }; countedActionsRef.current = new Set();
       }
 
@@ -354,8 +370,8 @@ export function useRecommendations(
         setStacks([]);
         setMovies([]);
         bucketCacheRef.current = EMPTY_CACHE();
-        seenIdsRef.current = new Set();
-        setSeenMovieIds(new Set());
+        seenIdsRef.current = new Set(ratedIdsRef.current);
+        setSeenMovieIds(new Set(ratedIdsRef.current));
         displayedIdsRef.current = new Set();
         actionCountRef.current = { positive: 0, negative: 0, total: 0 }; countedActionsRef.current = new Set();
       }
@@ -488,8 +504,10 @@ export function useRecommendations(
 
   const handleAction = useCallback(
     async (movie: Recommendation | DetailMovie, action: RecommendationAction) => {
-      const tmdbId = "tmdb_id" in movie && movie.tmdb_id ? movie.tmdb_id : movie.id;
+      const rawId = "tmdb_id" in movie && movie.tmdb_id ? movie.tmdb_id : movie.id;
+      const tmdbId = Number(rawId);
 
+      ratedIdsRef.current.add(tmdbId);
       seenIdsRef.current.add(tmdbId);
       setSeenMovieIds((prev) => {
         const next = new Set(prev);
@@ -502,19 +520,29 @@ export function useRecommendations(
         if (!prev) return null;
         return {
           ...prev,
-          results: prev.results.filter((m) => recommendationId(m) !== tmdbId),
+          results: prev.results.filter((m) => Number(recommendationId(m)) !== tmdbId),
         };
       });
 
-      setMovies((prev) => prev.filter((m) => recommendationId(m) !== tmdbId));
+      setMovies((prev) => prev.filter((m) => Number(recommendationId(m)) !== tmdbId));
       let targetStackId: StackId | null = null;
+
+      // Purge rated item from bucket cache so it cannot be popped back into stacks
+      Object.keys(bucketCacheRef.current).forEach((key) => {
+        const k = key as StackId;
+        if (bucketCacheRef.current[k]) {
+          bucketCacheRef.current[k] = bucketCacheRef.current[k].filter(
+            (m) => Number(recommendationId(m)) !== tmdbId
+          );
+        }
+      });
 
       setStacks((prev) =>
         prev.map((s) => {
-          const inThis = s.movies.some((m) => recommendationId(m) === tmdbId);
+          const inThis = s.movies.some((m) => Number(recommendationId(m)) === tmdbId);
           if (!inThis) return s;
           targetStackId = s.id as StackId;
-          const remaining = s.movies.filter((m) => recommendationId(m) !== tmdbId);
+          const remaining = s.movies.filter((m) => Number(recommendationId(m)) !== tmdbId);
           const cache = bucketCacheRef.current[s.id as StackId];
           const needed = BUCKET_DISPLAY - remaining.length;
           const toAdd = needed > 0 && cache && cache.length > 0 ? cache.splice(0, needed) : [];
@@ -596,11 +624,48 @@ export function useRecommendations(
   }, [session.profile, generate]);
 
   useEffect(() => {
+    if (!session?.session_id) return;
+    let cancelled = false;
+    apiGetHistory(session.session_id)
+      .then((history) => {
+        if (cancelled || !Array.isArray(history)) return;
+        const ids = history.map((h) => Number(h.tmdb_id)).filter(Boolean);
+        if (ids.length === 0) return;
+        for (const id of ids) {
+          ratedIdsRef.current.add(id);
+          seenIdsRef.current.add(id);
+        }
+        setSeenMovieIds((prev) => {
+          const next = new Set(prev);
+          for (const id of ids) next.add(id);
+          return next;
+        });
+        setTrendingHero((prev) => {
+          if (!prev) return null;
+          const idSet = new Set(ids);
+          return {
+            ...prev,
+            results: prev.results.filter((m) => !idSet.has(Number(recommendationId(m)))),
+          };
+        });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.session_id]);
+
+  useEffect(() => {
     if (!preferences.languages) return;
     let cancelled = false;
     apiTrendingHero(preferences.languages, preferences.genres, preferences.region)
       .then((data) => {
-        if (!cancelled) setTrendingHero(data);
+        if (!cancelled) {
+          const filteredResults = (data.results ?? []).filter(
+            (m) => !seenIdsRef.current.has(Number(recommendationId(m)))
+          );
+          setTrendingHero({ ...data, results: filteredResults });
+        }
       });
     return () => { cancelled = true; };
   }, [preferences.languages, preferences.genres, preferences.region]);

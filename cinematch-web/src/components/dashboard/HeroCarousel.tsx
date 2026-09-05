@@ -24,14 +24,28 @@ function formatRuntime(minutes?: number | string | null): string {
 
 interface Props {
   movies: Recommendation[];
+  seenIds?: Set<number>;
   onOpenDetail: (movie: Recommendation) => void;
   onWatchlist?: (movie: Recommendation) => void;
   onLike?: (movie: Recommendation) => void;
   onAction?: (movie: Recommendation, action: "dislike" | "like" | "love" | "watchlist") => void;
 }
 
-export default function HeroCarousel({ movies, onOpenDetail, onWatchlist, onLike, onAction }: Props) {
-  const items = useMemo(() => movies.slice(0, MAX_ITEMS), [movies]);
+export default function HeroCarousel({ movies, seenIds, onOpenDetail, onWatchlist, onLike, onAction }: Props) {
+  const [dismissedIds, setDismissedIds] = useState<Set<number>>(new Set());
+
+  const activeMovies = useMemo(
+    () =>
+      movies.filter((m) => {
+        const id = Number(recommendationId(m));
+        if (dismissedIds.has(id)) return false;
+        if (seenIds && seenIds.has(id)) return false;
+        return true;
+      }),
+    [movies, dismissedIds, seenIds]
+  );
+  const items = useMemo(() => activeMovies.slice(0, MAX_ITEMS), [activeMovies]);
+
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
   const wasInteractedRef = useRef(false);
@@ -39,9 +53,11 @@ export default function HeroCarousel({ movies, onOpenDetail, onWatchlist, onLike
 
   const [liveLogos, setLiveLogos] = useState<Record<number, string | null>>({});
 
-  // Clamp index when the movie list itself changes (e.g. rated movie removed).
+  // Clamp index to valid bounds
+  const safeIndex = items.length > 0 ? Math.min(index, items.length - 1) : 0;
+  const movie = items[safeIndex];
+
   useEffect(() => {
-    Promise.resolve().then(() => setIndex((prev) => Math.min(prev, Math.max(0, items.length - 1))));
     wasInteractedRef.current = false;
 
     // Fetch live title logos from TMDB for the hero items
@@ -71,9 +87,40 @@ export default function HeroCarousel({ movies, onOpenDetail, onWatchlist, onLike
   const goTo = useCallback(
     (targetIndex: number) => {
       wasInteractedRef.current = true;
+      if (items.length === 0) return;
       setIndex(((targetIndex % items.length) + items.length) % items.length);
     },
     [items.length]
+  );
+
+  const handleActionInternal = useCallback(
+    (m: Recommendation, action: "dislike" | "like" | "love" | "watchlist") => {
+      const id = Number(recommendationId(m));
+      if (id) {
+        setDismissedIds((prev) => new Set(prev).add(id));
+      }
+      if (onAction) {
+        onAction(m, action);
+      } else if (action === "watchlist" && onWatchlist) {
+        onWatchlist(m);
+      } else if (onLike) {
+        onLike(m);
+      }
+    },
+    [onAction, onWatchlist, onLike]
+  );
+
+  const handleWatchlistInternal = useCallback(
+    (m: Recommendation) => {
+      const id = Number(recommendationId(m));
+      if (id) {
+        setDismissedIds((prev) => new Set(prev).add(id));
+      }
+      if (onWatchlist) {
+        onWatchlist(m);
+      }
+    },
+    [onWatchlist]
   );
 
   // Parallax: translate the backdrop at a fraction of scroll. rAF-throttled,
@@ -117,9 +164,9 @@ export default function HeroCarousel({ movies, onOpenDetail, onWatchlist, onLike
     // Minimum swipe threshold (40px); horizontal swipe must beat vertical.
     if (Math.abs(deltaX) > 40 && Math.abs(deltaX) > Math.abs(deltaY)) {
       if (deltaX < 0) {
-        goTo(index + 1); // Swiped left -> next title
+        goTo(safeIndex + 1); // Swiped left -> next title
       } else {
-        goTo(index - 1); // Swiped right -> previous title
+        goTo(safeIndex - 1); // Swiped right -> previous title
       }
     }
     touchStartXRef.current = null;
@@ -127,7 +174,6 @@ export default function HeroCarousel({ movies, onOpenDetail, onWatchlist, onLike
   };
 
   if (items.length === 0) return null;
-  const movie = items[index];
 
   return (
     <section
@@ -155,13 +201,13 @@ export default function HeroCarousel({ movies, onOpenDetail, onWatchlist, onLike
         <AnimatePresence mode="popLayout">
           {movie && (
             <HeroSlide
-              key={movie.id}
+              key={recommendationId(movie)}
               movie={movie}
               liveLogo={liveLogos[movie.id] ?? null}
               onOpenDetail={onOpenDetail}
-              onWatchlist={onWatchlist}
-              onLike={onLike}
-              onAction={onAction}
+              onWatchlist={handleWatchlistInternal}
+              onLike={(m) => handleActionInternal(m, "like")}
+              onAction={handleActionInternal}
             />
           )}
         </AnimatePresence>
@@ -199,17 +245,17 @@ export default function HeroCarousel({ movies, onOpenDetail, onWatchlist, onLike
                 style={{
                   position: "relative",
                   display: "block",
-                  width: i === index ? 26 : 8,
+                  width: i === safeIndex ? 26 : 8,
                   height: 4,
                   borderRadius: 999,
                   overflow: "hidden",
-                  background: i === index ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.30)",
+                  background: i === safeIndex ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.30)",
                   transition: "width 240ms ease, background 240ms ease",
                 }}
               >
-                {i === index && !paused && !reduceMotion && (
+                {i === safeIndex && !paused && !reduceMotion && (
                   <motion.span
-                    key={`prog-${index}`}
+                    key={`prog-${safeIndex}`}
                     initial={{ scaleX: 0 }}
                     animate={{ scaleX: 1 }}
                     transition={{ duration: ROTATE_MS / 1000, ease: "linear" }}
@@ -222,7 +268,7 @@ export default function HeroCarousel({ movies, onOpenDetail, onWatchlist, onLike
                     }}
                   />
                 )}
-                {i === index && (paused || reduceMotion) && (
+                {i === safeIndex && (paused || reduceMotion) && (
                   <span style={{ position: "absolute", inset: 0, borderRadius: 999, background: "rgba(255,255,255,0.95)" }} />
                 )}
               </span>
@@ -264,7 +310,7 @@ function HeroSlide({
 
   return (
     <motion.div
-      key={movie.id}
+      key={recommendationId(movie)}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}

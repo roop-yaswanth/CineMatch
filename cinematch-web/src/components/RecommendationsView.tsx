@@ -287,6 +287,7 @@ export default function RecommendationsView({
           {!showEmpty && (
             <HeroCarousel
               movies={heroMovies}
+              seenIds={seenMovieIds}
               onOpenDetail={openMovieDetail}
               onWatchlist={(m) => handleAction(m, "watchlist")}
               onLike={(m) => handleAction(m, "like")}

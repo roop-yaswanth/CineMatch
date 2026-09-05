@@ -54,7 +54,7 @@ const nextConfig: NextConfig = {
     // token XHRs (connect-src).
     const csp = [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com https://accounts.google.com",
+      "script-src 'self' 'unsafe-inline' https://va.vercel-scripts.com https://accounts.google.com",
       "style-src 'self' 'unsafe-inline' https://accounts.google.com",
       "img-src 'self' data: blob: https://image.tmdb.org https://www.themoviedb.org https://http.cat https://m.media-amazon.com",
       "font-src 'self' data:",

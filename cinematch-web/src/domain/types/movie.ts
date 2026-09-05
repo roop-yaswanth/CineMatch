@@ -103,7 +103,7 @@ export interface MultiBucketResponse {
 
 // --- Helpers (pure, explicit inputs/outputs, no hidden globals) ---
 export function recommendationId(movie: Pick<Movie, "id" | "tmdb_id">): number {
-  return movie.tmdb_id ?? movie.id;
+  return Number(movie.tmdb_id ?? movie.id);
 }
 
 export function preferencesFromProfile(profile?: UserProfile | null): RecommendationPreferences {

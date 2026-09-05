@@ -61,6 +61,8 @@ async function proxy(
   }
   if (!headers["content-type"]) headers["content-type"] = "application/json";
   if (HF_TOKEN) headers["authorization"] = `Bearer ${HF_TOKEN}`;
+  const authToken = req.cookies.get("auth_token")?.value;
+  if (authToken) headers["x-auth-token"] = authToken;
 
   let body: ArrayBuffer | undefined;
   if (req.method !== "GET" && req.method !== "HEAD") {
@@ -111,11 +113,43 @@ async function proxy(
     }
   }
 
-  const data = await upstream.arrayBuffer();
-  return new NextResponse(data, {
+  let data = await upstream.arrayBuffer();
+
+  const response = new NextResponse(data, {
     status: upstream.status,
     headers: responseHeaders,
   });
+
+  if (upstream.status === 200 && isLogin) {
+    try {
+      const text = new TextDecoder().decode(data);
+      const json = JSON.parse(text);
+      if (json.auth_token) {
+        const isSecure = req.nextUrl.protocol === "https:";
+        response.cookies.set("auth_token", json.auth_token, {
+          httpOnly: true,
+          secure: isSecure,
+          sameSite: "lax",
+          path: "/",
+          maxAge: 7 * 24 * 60 * 60, // 7 days
+        });
+        delete json.auth_token;
+        const newBody = new TextEncoder().encode(JSON.stringify(json));
+        return new NextResponse(newBody, {
+          status: upstream.status,
+          headers: responseHeaders,
+        });
+      }
+    } catch {
+      // Ignore JSON parse errors
+    }
+  }
+
+  if (upstream.status === 200 && segments[0] === "logout") {
+    response.cookies.delete("auth_token");
+  }
+
+  return response;
 }
 
 export async function GET(
