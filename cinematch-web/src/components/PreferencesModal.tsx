@@ -5,7 +5,6 @@ import { Modal } from "@/design-system/components/Modal";
 import { Button } from "@/design-system/components/Button";
 import { REGION_OPTIONS, AGE_GROUP_OPTIONS } from "@/lib/api";
 import { LANGUAGES, GENRES } from "@/lib/preferences";
-import { hapticSelection, hapticSuccess } from "@/lib/haptics";
 
 interface Preferences {
   languages: string[];
@@ -27,7 +26,6 @@ export default function PreferencesModal({ preferences, onUpdate, onClose, mode 
   const [localPrefs, setLocalPrefs] = useState<Preferences>(preferences);
 
   const toggle = useCallback((field: "languages" | "genres", value: string) => {
-    hapticSelection();
     setLocalPrefs((prev) => {
       const arr = prev[field];
       return { ...prev, [field]: arr.includes(value) ? arr.filter((v) => v !== value) : [...arr, value] };
@@ -35,7 +33,6 @@ export default function PreferencesModal({ preferences, onUpdate, onClose, mode 
   }, []);
 
   const handleApply = useCallback(() => {
-    hapticSuccess();
     onUpdate(localPrefs);
     onClose();
   }, [localPrefs, onUpdate, onClose]);

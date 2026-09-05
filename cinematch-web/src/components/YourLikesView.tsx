@@ -20,7 +20,6 @@ import { useRouter } from "next/navigation";
 import MobileMenu from "@/components/MobileMenu";
 import { useSession } from "@/context/SessionContext";
 import type { DetailMovie } from "@/components/modals/MovieDetailModal";
-import { hapticTap, hapticSelection } from "@/lib/haptics";
 import { toDetailMovie } from "@/domain/types/movie";
 
 const MovieDetailModal = dynamic(() => import("@/components/modals/MovieDetailModal"), { ssr: false });
@@ -344,7 +343,6 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
           <select
             value={interactionFilter}
             onChange={(e) => {
-              hapticSelection();
               setInteractionFilter(e.target.value as InteractionFilter);
             }}
             className="filter-select"
@@ -492,7 +490,6 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
                   <div
                     key={`${item.tmdb_id}-${idx}`}
                     onClick={() => {
-                      hapticTap();
                       setActiveMovie(toDetailMovie({ ...item, id: item.tmdb_id }));
                     }}
                     style={{ cursor: "pointer" }}

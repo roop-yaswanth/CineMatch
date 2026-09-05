@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence, useMotionValue } from "framer-motion";
-import { triggerHaptic, hapticSuccess } from "@/lib/haptics";
 
 const SWIPE_STEPS = [
   {
@@ -111,7 +110,6 @@ export default function MobileSwipeTutorial({ onDismiss }: { onDismiss: () => vo
     const y = info.offset.y;
 
     if (s.isValid(x, y)) {
-      triggerHaptic(s.action);
       setExitingStep(step);
       setTimeout(() => {
         setExitingStep(null);
@@ -120,7 +118,6 @@ export default function MobileSwipeTutorial({ onDismiss }: { onDismiss: () => vo
         setDragProgress(0);
         if (step >= SWIPE_STEPS.length - 1) {
           setIsCompleted(true);
-          hapticSuccess();
         } else {
           setStep((prev) => prev + 1);
         }
@@ -540,7 +537,6 @@ export default function MobileSwipeTutorial({ onDismiss }: { onDismiss: () => vo
           animate={{ opacity: 1, scale: 1, y: 0 }}
           whileTap={{ scale: 0.96 }}
           onClick={() => {
-            hapticSuccess();
             onDismiss();
           }}
           style={{

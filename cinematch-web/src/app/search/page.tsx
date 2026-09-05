@@ -147,7 +147,7 @@ function SearchPage() {
   const handleAction = useCallback(
     async (action: "love" | "like" | "dislike" | "watchlist" | "skip") => {
       if (!session || !active) return;
-      // Unified action path — handles haptics, cache invalidation, session refresh.
+      // Unified action path — handles cache invalidation, session refresh.
       await handleMovieAction(active as unknown as import("@/lib/api").Movie, action);
     },
     [session, active, handleMovieAction]

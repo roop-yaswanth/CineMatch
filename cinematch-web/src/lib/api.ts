@@ -473,6 +473,50 @@ export async function apiGenerateRecommendations(
   });
 }
 
+// ── Multi-recommendations SWR cache (sessionStorage) ─────────────────────────────
+// On revisit within MULTI_RECS_SWR_TTL_MS the dashboard paints instantly from
+// the cached response; a background revalidation runs regardless so the next
+// paint gets fresh personalised data.
+const MULTI_RECS_SWR_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+function _multiRecsKey(
+  sessionId: string,
+  prefs: Parameters<typeof apiMultiRecommendations>[1]
+): string {
+  // Derive a short deterministic key from preferences so different pref
+  // combinations get separate cache slots.
+  const sig = [
+    prefs.languages.slice().sort().join(","),
+    prefs.genres.slice().sort().join(","),
+    prefs.age_group,
+    prefs.region,
+    prefs.include_classics ? "1" : "0",
+    prefs.semantic_index,
+    String(prefs.per_bucket_k ?? 50),
+  ].join("|");
+  return `multi_recs:${sessionId}:${sig}`;
+}
+
+function _multiRecsCacheRead(key: string): MultiBucketResponse | null {
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return null;
+    const { ts, data } = JSON.parse(raw) as { ts: number; data: MultiBucketResponse };
+    if (Date.now() - ts > MULTI_RECS_SWR_TTL_MS) return null;
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+function _multiRecsCacheWrite(key: string, data: MultiBucketResponse): void {
+  try {
+    sessionStorage.setItem(key, JSON.stringify({ ts: Date.now(), data }));
+  } catch {
+    // sessionStorage quota exceeded or unavailable — ignore gracefully.
+  }
+}
+
 export async function apiMultiRecommendations(
   sessionId: string,
   preferences: {
@@ -484,17 +528,58 @@ export async function apiMultiRecommendations(
     semantic_index: string;
     per_bucket_k?: number;
     exclude_ids?: number[];
-  }
+  },
+  { revalidate = false }: { revalidate?: boolean } = {}
 ): Promise<MultiBucketResponse> {
-  return request<MultiBucketResponse>("/api/recommendations/multi", {
+  const cacheKey = typeof sessionStorage !== "undefined"
+    ? _multiRecsKey(sessionId, preferences)
+    : "";
+
+  // ── Stale-while-revalidate: return cached immediately if fresh enough ──
+  if (!revalidate && cacheKey) {
+    const cached = _multiRecsCacheRead(cacheKey);
+    if (cached) {
+      // Kick off background revalidation without blocking the caller.
+      void request<MultiBucketResponse>("/api/recommendations/multi", {
+        method: "POST",
+        body: JSON.stringify({ session_id: sessionId ?? "", ...preferences }),
+        retries: 2,
+        timeout: 20000,
+      }).then((fresh) => {
+        if (cacheKey) _multiRecsCacheWrite(cacheKey, fresh);
+      }).catch(() => { /* background refresh failure is silent */ });
+      return cached;
+    }
+  }
+
+  const result = await request<MultiBucketResponse>("/api/recommendations/multi", {
     method: "POST",
     body: JSON.stringify({ session_id: sessionId ?? "", ...preferences }),
     retries: 2,
     timeout: 20000,
   });
+  if (cacheKey) _multiRecsCacheWrite(cacheKey, result);
+  return result;
 }
 
 
+
+export async function apiAnalyticsSwipe(
+  sessionId: string,
+  tmdbId: number,
+  action: string,
+  dwellMs: number = 0
+): Promise<{ status: string; should_rerun: boolean }> {
+  return request<{ status: string; should_rerun: boolean }>("/api/analytics/swipe", {
+    method: "POST",
+    body: JSON.stringify({
+      session_id: sessionId,
+      tmdb_id: tmdbId,
+      action,
+      dwell_ms: dwellMs,
+    }),
+  });
+}
 
 export async function apiRecommendationAction(
   sessionId: string,

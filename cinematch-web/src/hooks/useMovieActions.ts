@@ -2,12 +2,11 @@
 
 /**
  * useMovieActions — Presentation hook that composes domain services.
- * Depends on abstractions (RecommendationRepository, HapticsPort), not concretions.
  * The concrete HttpRecommendationRepository is injected via the composition root
  * (data/repositories/HttpMovieRepository). Swap the adapter, no UI change.
  *
  * SRP: this hook has one reason to change — the movie-action user flow.
- * It does not own HTTP, storage, or haptics — it delegates to injected ports.
+ * It delegates to injected domain services and repositories.
  */
 
 import { useCallback, useState } from "react";
@@ -16,7 +15,6 @@ import { useSession } from "@/context/SessionContext";
 // New layered imports — presentation depends on domain abstractions, not data concretions
 import { movieRepositories } from "@/data/repositories/HttpMovieRepository";
 import { localStore } from "@/infrastructure/storage/StorageService";
-import { haptics } from "@/infrastructure/haptics/HapticsService";
 import { executeMovieAction } from "@/domain/services/movieActionService";
 
 export type MovieLike = Movie | Recommendation | ExploreMovie;
@@ -30,7 +28,6 @@ export type UserReactionEntry = {
 /**
  * Unified movie-action handler.
  * Single place that owns:
- * - haptics
  * - API call
  * - history-cache invalidation
  * - session-expiry handling
@@ -55,7 +52,6 @@ export function useMovieActions(opts?: {
       const result = await executeMovieAction(movie, action, {
         recommendationRepo: movieRepositories.recommendations,
         historyCache: localStore,
-        haptics,
         sessionId: session.session_id,
         onSessionRefresh: (s) => updateSession(s),
         onSessionExpired: opts?.onSessionExpired,

@@ -1,40 +1,74 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="CineMatch icon">
+<svg viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="cStroke" x1="180" y1="120" x2="860" y2="940" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#ff4f3a" />
-      <stop offset="1" stop-color="#ff1f2f" />
+    <!-- Premium dark background gradient -->
+    <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2A2B36"/>
+      <stop offset="100%" stop-color="#0E0F14"/>
     </linearGradient>
-    <filter id="softGlow" x="-30%" y="-30%" width="160%" height="160%" color-interpolation-filters="sRGB">
-      <feGaussianBlur stdDeviation="28" result="blur" />
-      <feMerge>
-        <feMergeNode in="blur" />
-        <feMergeNode in="SourceGraphic" />
-      </feMerge>
+
+    <!-- Vibrant, modern red/orange gradient for the film ring -->
+    <linearGradient id="ring-grad" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#FF2D55"/>
+      <stop offset="100%" stop-color="#FF5E3A"/>
+    </linearGradient>
+
+    <!-- Subtle gradient for the play button to make it pop -->
+    <linearGradient id="play-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#EBEBEB"/>
+    </linearGradient>
+
+    <!-- Smooth drop shadows for depth -->
+    <filter id="shadow-sm" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000000" flood-opacity="0.3"/>
     </filter>
+    
+    <filter id="shadow-lg" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.5"/>
+    </filter>
+
+    <!-- Mask to punch out the sprocket holes from the film ring -->
+    <mask id="sprocket-holes">
+      <rect width="400" height="400" fill="white"/>
+      <g fill="black">
+        <rect x="-11.88" y="-6.00" width="23.76" height="12.00" rx="4" ry="4" transform="translate(295.13,309.43) rotate(49.00)"/>
+        <rect x="-11.88" y="-6.00" width="23.76" height="12.00" rx="4" ry="4" transform="translate(260.42,331.81) rotate(65.38)"/>
+        <rect x="-11.88" y="-6.00" width="23.76" height="12.00" rx="4" ry="4" transform="translate(220.81,343.50) rotate(81.75)"/>
+        <rect x="-11.88" y="-6.00" width="23.76" height="12.00" rx="4" ry="4" transform="translate(179.51,343.54) rotate(98.12)"/>
+        <rect x="-11.88" y="-6.00" width="23.76" height="12.00" rx="4" ry="4" transform="translate(139.87,331.94) rotate(114.50)"/>
+        <rect x="-11.88" y="-6.00" width="23.76" height="12.00" rx="4" ry="4" transform="translate(105.11,309.64) rotate(130.88)"/>
+        <rect x="-11.88" y="-6.00" width="23.76" height="12.00" rx="4" ry="4" transform="translate(78.05,278.44) rotate(147.25)"/>
+        <rect x="-11.88" y="-6.00" width="23.76" height="12.00" rx="4" ry="4" transform="translate(60.88,240.88) rotate(163.62)"/>
+        <rect x="-11.88" y="-6.00" width="23.76" height="12.00" rx="4" ry="4" transform="translate(55.00,200.00) rotate(180.00)"/>
+        <rect x="-11.88" y="-6.00" width="23.76" height="12.00" rx="4" ry="4" transform="translate(60.88,159.12) rotate(196.38)"/>
+        <rect x="-11.88" y="-6.00" width="23.76" height="12.00" rx="4" ry="4" transform="translate(78.05,121.56) rotate(212.75)"/>
+        <rect x="-11.88" y="-6.00" width="23.76" height="12.00" rx="4" ry="4" transform="translate(105.11,90.36) rotate(229.12)"/>
+        <rect x="-11.88" y="-6.00" width="23.76" height="12.00" rx="4" ry="4" transform="translate(139.87,68.06) rotate(245.50)"/>
+        <rect x="-11.88" y="-6.00" width="23.76" height="12.00" rx="4" ry="4" transform="translate(179.51,56.46) rotate(261.88)"/>
+        <rect x="-11.88" y="-6.00" width="23.76" height="12.00" rx="4" ry="4" transform="translate(220.81,56.50) rotate(278.25)"/>
+        <rect x="-11.88" y="-6.00" width="23.76" height="12.00" rx="4" ry="4" transform="translate(260.42,68.19) rotate(294.62)"/>
+        <rect x="-11.88" y="-6.00" width="23.76" height="12.00" rx="4" ry="4" transform="translate(295.13,90.57) rotate(311.00)"/>
+      </g>
+    </mask>
   </defs>
 
-  <rect width="1024" height="1024" fill="#0b0f15" />
+  <!-- App-icon background (with gradient) -->
+  <rect x="8" y="8" width="384" height="384" rx="86" fill="url(#bg-grad)"/>
+  
+  <!-- Subtle inner border for an iOS-style glossy edge -->
+  <rect x="9" y="9" width="382" height="382" rx="85" fill="none" stroke="#FFFFFF" stroke-opacity="0.06" stroke-width="2"/>
 
-  <path
-    d="M 800 250 A 330 330 0 1 0 800 774"
-    fill="none"
-    stroke="url(#cStroke)"
-    stroke-width="128"
-    stroke-linecap="round"
-    opacity="0.35"
-    filter="url(#softGlow)"
-  />
+  <!-- Dark medallion disc with drop shadow -->
+  <circle cx="200" cy="200" r="148" fill="#13141A" filter="url(#shadow-sm)"/>
 
-  <path
-    d="M 800 250 A 330 330 0 1 0 800 774"
-    fill="none"
-    stroke="url(#cStroke)"
-    stroke-width="108"
-    stroke-linecap="round"
-  />
+  <!-- Red film-reel ring (gradient, drop shadowed, and masked to punch holes) -->
+  <path d="M 331.76,310.56 A 172.00 172.00 0 1 1 331.76,89.44 L 290.39,124.15 A 118.00 118.00 0 1 0 290.39,275.85 Z" 
+        fill="url(#ring-grad)" 
+        mask="url(#sprocket-holes)"
+        filter="url(#shadow-lg)"/>
 
-  <path
-    d="M 462 334 L 462 690 C 462 704 478 712 491 704 L 777 540 C 789 533 789 516 777 510 L 491 320 C 478 313 462 321 462 334 Z"
-    fill="#f3f4f6"
-  />
+  <!-- Play triangle with gradient and shadow -->
+  <path d="M 245.22,192.73 L 174.78,145.27 Q 164.00,138.00 164.00,151.00 L 164.00,249.00 Q 164.00,262.00 174.78,254.73 L 245.22,207.27 Q 256.00,200.00 245.22,192.73 Z" 
+        fill="url(#play-grad)" 
+        filter="url(#shadow-sm)"/>
 </svg>

@@ -6,7 +6,6 @@ import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 
 import { posterUrl, languageLabel, recommendationId, type Recommendation } from "@/lib/api";
 import { useBackdrop, usePoster } from "@/lib/usePoster";
-import { triggerHaptic, hapticTap, hapticWatchlist } from "@/lib/haptics";
 
 const ROTATE_MS = 8000;
 const MAX_ITEMS = 5;
@@ -71,7 +70,6 @@ export default function HeroCarousel({ movies, onOpenDetail, onWatchlist, onLike
 
   const goTo = useCallback(
     (targetIndex: number) => {
-      hapticTap();
       wasInteractedRef.current = true;
       setIndex(((targetIndex % items.length) + items.length) % items.length);
     },
@@ -399,7 +397,6 @@ function HeroSlide({
               className="btn btn-primary"
               style={{ minHeight: 44, padding: "0 clamp(12px, 3vw, 20px)", whiteSpace: "nowrap" }}
               onClick={() => {
-                hapticTap();
                 onOpenDetail(movie);
               }}
             >
@@ -416,7 +413,6 @@ function HeroSlide({
                 className="btn btn-secondary"
                 style={{ minHeight: 44, padding: "0 clamp(12px, 2.5vw, 18px)", whiteSpace: "nowrap" }}
                 onClick={() => {
-                  hapticWatchlist();
                   onWatchlist(movie);
                 }}
               >
@@ -481,7 +477,6 @@ function HeroReactionButton({
   }, [isOpen]);
 
   const handleSelect = (action: "dislike" | "like" | "love") => {
-    triggerHaptic(action);
     setIsOpen(false);
     if (onAction) onAction(movie, action);
     else if (onLike) onLike(movie);

@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Button } from "./Button";
-import { triggerHaptic } from "@/lib/haptics";
 import { RatingButton, Badge } from "@/design-system";
 import type { Movie, Recommendation, ExploreMovie } from "@/lib/api";
 
@@ -180,7 +179,6 @@ export function MovieActions({
     (e: React.MouseEvent, action: ActionType) => {
       e.stopPropagation();
       (document.activeElement as HTMLElement)?.blur();
-      triggerHaptic(action);
 
       setFeedbackSplash(action);
       if (splashTimerRef.current) clearTimeout(splashTimerRef.current);

@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { hapticSelection, hapticTap, hapticSuccess } from "@/lib/haptics";
 import { REGION_OPTIONS, AGE_GROUP_OPTIONS, type preferencesFromProfile } from "@/lib/api";
 
 type Prefs = ReturnType<typeof preferencesFromProfile>;
@@ -62,7 +61,6 @@ export default function OnboardingPreferencesStep({
   const isLast = step === WIZARD_STEPS.length - 1;
 
   const go = (delta: number) => {
-    hapticTap();
     setDir(delta);
     setStep((s) => Math.min(WIZARD_STEPS.length - 1, Math.max(0, s + delta)));
   };
@@ -100,7 +98,7 @@ export default function OnboardingPreferencesStep({
               }}
               transition={{ duration: 0.3, ease }}
               style={{ height: 8, borderRadius: 4, cursor: "pointer" }}
-              onClick={() => { hapticTap(); setDir(i > step ? 1 : -1); setStep(i); }}
+              onClick={() => { setDir(i > step ? 1 : -1); setStep(i); }}
             />
           ))}
         </div>
@@ -139,7 +137,7 @@ export default function OnboardingPreferencesStep({
                         key={region}
                         label={region}
                         active={preferences.region === region}
-                        onClick={() => { hapticSelection(); setPreferences((p) => ({ ...p, region })); }}
+                        onClick={() => { setPreferences((p) => ({ ...p, region })); }}
                       />
                     ))}
                   </div>
@@ -150,7 +148,7 @@ export default function OnboardingPreferencesStep({
                         key={age}
                         label={age}
                         active={preferences.age_group === age}
-                        onClick={() => { hapticSelection(); setPreferences((p) => ({ ...p, age_group: age })); }}
+                        onClick={() => { setPreferences((p) => ({ ...p, age_group: age })); }}
                       />
                     ))}
                   </div>
@@ -166,7 +164,6 @@ export default function OnboardingPreferencesStep({
                         key={code}
                         whileTap={{ scale: 0.96 }}
                         onClick={() => {
-                          hapticSelection();
                           setPreferences((p) => ({
                             ...p,
                             languages: active ? p.languages.filter((l) => l !== code) : [...p.languages, code],
@@ -214,7 +211,6 @@ export default function OnboardingPreferencesStep({
                           label={genre}
                           active={active}
                           onClick={() => {
-                            hapticSelection();
                             setPreferences((p) => ({
                               ...p,
                               genres: active ? p.genres.filter((g) => g !== genre) : [...p.genres, genre],
@@ -227,7 +223,6 @@ export default function OnboardingPreferencesStep({
                   {/* Classics toggle */}
                   <button
                     onClick={() => {
-                      hapticSelection();
                       setPreferences((p) => ({ ...p, include_classics: !p.include_classics }));
                     }}
                     style={{
@@ -279,7 +274,6 @@ export default function OnboardingPreferencesStep({
           whileTap={{ scale: 0.98 }}
           onClick={() => {
             if (isLast) {
-              hapticSuccess();
               onStart();
             } else {
               go(1);

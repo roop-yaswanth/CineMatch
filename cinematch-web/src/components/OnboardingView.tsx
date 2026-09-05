@@ -12,7 +12,6 @@ import {
   type UserSession,
   type OnboardingState,
 } from "@/lib/api";
-import { triggerHaptic, hapticUndo } from "@/lib/haptics";
 import OnboardingPreferencesStep from "./onboarding/OnboardingPreferencesStep";
 import OnboardingRatingStep from "./onboarding/OnboardingRatingStep";
 
@@ -98,7 +97,6 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
     async (rating: string) => {
       if (!state?.movie || loading || inFlightRef.current) return;
       inFlightRef.current = true;
-      triggerHaptic(rating);
       const dwellMs = Math.max(0, Date.now() - cardShownAtRef.current);
       setLastSwipe(ratingDirection(rating));
       setOptimisticRemoved(true);
@@ -165,7 +163,6 @@ export default function OnboardingView({ session, onComplete, onLogout, forcePre
     const idx = state?.session?.onboarding_index ?? 0;
     if (loading || inFlightRef.current || idx <= 0) return;
     inFlightRef.current = true;
-    hapticUndo();
     setLoading(true);
     try {
       const result = await apiUndoOnboarding(session.session_id);

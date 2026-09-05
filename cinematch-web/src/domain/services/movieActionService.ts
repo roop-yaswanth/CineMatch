@@ -1,12 +1,10 @@
 import type { MovieLike, ActionType } from "@/hooks/useMovieActions";
 import type { RecommendationRepository } from "../repositories/MovieRepository";
-import type { HapticsPort } from "@/infrastructure/haptics/HapticsService";
 import type { StorageService } from "@/infrastructure/storage/StorageService";
 
 export interface MovieActionDeps {
   recommendationRepo: RecommendationRepository;
   historyCache: StorageService;
-  haptics: HapticsPort;
   sessionId: string;
   onSessionRefresh?: (session: import("../types/movie").UserSession) => void;
   onSessionExpired?: () => void;
@@ -24,8 +22,6 @@ export async function executeMovieAction(
 ): Promise<MovieActionResult> {
   const tmdbId = (movie as { tmdb_id?: number; id: number }).tmdb_id ?? (movie as { id: number }).id;
   if (!tmdbId) return { ok: false, error: new Error("Missing tmdbId") };
-
-  deps.haptics.trigger(action as never);
 
   try {
     const res = await deps.recommendationRepo.submitAction(deps.sessionId, tmdbId, action);

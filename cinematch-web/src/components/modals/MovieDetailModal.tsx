@@ -6,7 +6,6 @@ import { posterUrl, languageLabel, apiSimilarMovies, apiCredits, apiImdbTitle, t
 import { PersonDetailOverlay } from "./PersonDetailOverlay";
 import WatchProvidersPanel, { REGION_TO_COUNTRY, fetchWatchProviders } from "@/components/WatchProvidersPanel";
 import { pushBackHandler } from "@/lib/backStack";
-import { triggerHaptic, hapticTap, hapticSelection } from "@/lib/haptics";
 
 const NOW_MS = new Date().getTime();
 
@@ -220,14 +219,12 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
 
   const handleActionClick = (action: "love" | "like" | "dislike" | "watchlist" | "skip") => {
     if (!onAction) return;
-    triggerHaptic(action);
     onAction(action);
     setSuccessAction(action);
     setTimeout(() => setSuccessAction(null), 2500);
   };
 
   const handleWatchTrailer = (langKey?: string) => {
-    hapticTap();
     if (langKey) { setShowTrailerPlayer(true); setSelectedTrailerLang(langKey); return; }
     if (trailerFetched && !trailerLoading) {
       if (trailerKey) { setShowTrailerPlayer(true); }
@@ -534,7 +531,6 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
               <span key={`${d.id}-${i}`}>
                 <button
                   onClick={() => {
-                    hapticSelection();
                     setActivePersonId(d.id);
                   }}
                   style={{ padding: 0, background: "none", border: "none", cursor: "pointer", color: "inherit", textDecoration: "none", fontSize: "inherit", fontFamily: "inherit", fontWeight: "inherit" }}

@@ -97,6 +97,20 @@ async function proxy(
   }
   if (!responseHeaders["content-type"]) responseHeaders["content-type"] = "application/json";
 
+  // Add edge-cache headers for public, non-personalized GET endpoints.
+  // These query results are identical across users for the same params —
+  // Vercel's CDN serves them without hitting HF Spaces after the first request.
+  // Personalized endpoints (recommendations, history, preferences) are POSTs
+  // and are intentionally excluded from caching.
+  if (req.method === "GET" && upstream.status === 200) {
+    const CACHEABLE_GET_PREFIXES = ["search", "imdb/title", "movies/similar", "imdb/search"];
+    const isCacheable = CACHEABLE_GET_PREFIXES.some((pfx) => path.startsWith(pfx));
+    if (isCacheable) {
+      // 5-min edge cache; serve stale for up to 1 hour while async refresh runs.
+      responseHeaders["Cache-Control"] = "public, s-maxage=300, stale-while-revalidate=3600";
+    }
+  }
+
   const data = await upstream.arrayBuffer();
   return new NextResponse(data, {
     status: upstream.status,

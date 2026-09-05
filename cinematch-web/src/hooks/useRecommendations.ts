@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   apiMultiRecommendations,
   apiRecommendationAction,
+  apiAnalyticsSwipe,
   apiTrendingHero,
   invalidateHistoryCache,
   isSessionExpiredError,
@@ -538,6 +539,8 @@ export function useRecommendations(
         actionCountRef.current = { positive: 0, negative: 0, total: 0 }; countedActionsRef.current = new Set();
         setIsUpdating(true);
         try {
+          // On heavy rerun, we still use the full action endpoint to get the updated session
+          // and rebuild the pool on the backend.
           const actionPromise = apiRecommendationAction(session.session_id, tmdbId, action)
             .then((result) => {
               invalidateHistoryCache(session.session_id);
@@ -557,10 +560,14 @@ export function useRecommendations(
         return;
       }
 
-      apiRecommendationAction(session.session_id, tmdbId, action)
+      // Normal path: lightweight swipe logging.
+      apiAnalyticsSwipe(session.session_id, tmdbId, action)
         .then((result) => {
-          onSessionUpdate(result.session);
           invalidateHistoryCache(session.session_id);
+          
+          if (result.should_rerun) {
+             void silentRefresh(preferences);
+          }
 
           if (targetStackId) {
             const st = stacksRef.current.find(s => s.id === targetStackId);
@@ -570,9 +577,9 @@ export function useRecommendations(
             }
           }
         })
-        .catch((err) => {
+        .catch((err: unknown) => {
           if (isSessionExpiredError(err)) { onLogout(); return; }
-          console.error("Recommendation action failed:", err);
+          console.error("Analytics swipe failed:", err);
         });
     },
     [generate, onLogout, onSessionUpdate, preferences, session.session_id, silentRefresh]
