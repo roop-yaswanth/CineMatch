@@ -36,9 +36,13 @@ const nextConfig: NextConfig = {
 
   // Enforce strict security headers across the entire app
   async headers() {
+    const isDev = process.env.NODE_ENV === "development";
+
     // Content Security Policy.
     //   default-src 'self'         — only own origin by default.
     //   script-src                 — Next.js needs inline bootstrap; framer-motion is fine with 'self'.
+    //                                'unsafe-eval' is added in dev only: React dev mode uses eval()
+    //                                for callstack reconstruction — it is never present in production.
     //   style-src 'unsafe-inline'  — required because we use inline style={} extensively.
     //   img-src                    — TMDB posters, http.cat error illustrations, IMDb/Amazon poster art.
     //   frame-src youtube-nocookie — for trailer embeds.
@@ -52,9 +56,15 @@ const nextConfig: NextConfig = {
     // sign-in: the gsi/client script (script-src), the button stylesheet it
     // injects (style-src), the button/One-Tap iframe (frame-src), and its
     // token XHRs (connect-src).
+    const scriptSrc = isDev
+      // 'unsafe-eval' only in development — React dev mode needs it for
+      // callstack reconstruction; never shipped to production users.
+      ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com https://accounts.google.com"
+      : "script-src 'self' 'unsafe-inline' https://va.vercel-scripts.com https://accounts.google.com";
+
     const csp = [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' https://va.vercel-scripts.com https://accounts.google.com",
+      scriptSrc,
       "style-src 'self' 'unsafe-inline' https://accounts.google.com",
       "img-src 'self' data: blob: https://image.tmdb.org https://www.themoviedb.org https://http.cat https://m.media-amazon.com",
       "font-src 'self' data:",
