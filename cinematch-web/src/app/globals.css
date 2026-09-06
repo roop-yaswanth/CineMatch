@@ -478,8 +478,8 @@ html {
   /* Same canvas as body so iOS rubber-band overscroll never flashes a
      different color above/below the page. */
   background: var(--color-bg);
-  min-width: 360px;
-  overflow-x: auto;
+  /* Prevent browser pull-to-refresh without breaking vertical page scrolling */
+  overscroll-behavior-y: none;
 }
 
 body {
@@ -487,9 +487,8 @@ body {
   color: var(--color-text-primary);
   min-height: 100dvh;
   min-width: 360px;
-  overflow-x: hidden;
-  overscroll-behavior: none;
-  /* Prevent iOS bounce/rubber-banding to top pill */
+  /* overflow-x: clip prevents horizontal blowout without creating a nested scroll container that locks vertical scroll */
+  overflow-x: clip;
   position: relative;
   /* No top inset here: sticky headers pin to the viewport top when scrolled,
      so they own their env(safe-area-inset-top) padding themselves. Padding

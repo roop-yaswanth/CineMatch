@@ -103,7 +103,7 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
       /* eslint-enable react-hooks/set-state-in-effect */
     }
     return () => {
-      document.body.style.overflow = "auto";
+      document.body.style.overflow = "";
     };
   }, [isOpen]);
 

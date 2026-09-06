@@ -81,11 +81,6 @@ export default function AppBottomNav() {
     }
   }, [activeIndex, rawPos]);
 
-  useEffect(() => {
-    NAV_ITEMS.forEach((item) => {
-      try { router.prefetch(item.href); } catch { }
-    });
-  }, [router]);
 
   const bubbleX = useTransform(springPos, (val) => `${val * 100}%`);
 
@@ -223,7 +218,7 @@ export default function AppBottomNav() {
               key={item.id}
               data-tour={`bottom-${item.id}`}
               href={item.href}
-              prefetch
+              prefetch={false}
               onClick={(e) => {
                 if (isDraggingRef.current) {
                   e.preventDefault();
