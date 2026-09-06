@@ -148,11 +148,20 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setSession(null);
   }, []);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
     const sid = session?.session_id;
     clearSession();
-    // Use domain service (DIP: no direct @/lib/api import in this layer)
-    if (sid) void signOut(sid).catch(() => { /* non-fatal */ });
+    // Invalidate server session & delete cookies before navigating, with 400ms safety cap
+    if (sid) {
+      try {
+        await Promise.race([
+          signOut(sid),
+          new Promise((resolve) => setTimeout(resolve, 400)),
+        ]);
+      } catch {
+        /* non-fatal */
+      }
+    }
     if (typeof window !== "undefined") {
       window.location.replace("/login");
     }

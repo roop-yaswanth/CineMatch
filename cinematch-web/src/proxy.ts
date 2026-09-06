@@ -8,8 +8,8 @@ const PROTECTED = ["/dashboard", "/onboarding", "/your-likes", "/search", "/expl
 
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  const authToken = req.cookies.get("auth_token")?.value;
-  const signedIn = Boolean(authToken);
+  const cmAuth = req.cookies.get("cm_auth")?.value;
+  const signedIn = Boolean(cmAuth);
 
   if (PROTECTED.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
     if (!signedIn) {

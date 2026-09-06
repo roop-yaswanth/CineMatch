@@ -16,7 +16,6 @@ import {
 } from "@/lib/api";
 import PageHeader from "@/components/ui/PageHeader";
 import EmptyState from "@/components/ui/EmptyState";
-import { useRouter } from "next/navigation";
 import MobileMenu from "@/components/MobileMenu";
 import { useSession } from "@/context/SessionContext";
 import type { DetailMovie } from "@/components/modals/MovieDetailModal";
@@ -45,7 +44,6 @@ const INTERACTION_FILTERS: Array<{ value: InteractionFilter; label: string }> = 
 
 export default function YourLikesView({ sessionId, onClose, initialFilter = "all" }: Props) {
   const { logout } = useSession();
-  const router = useRouter();
   const [items, setItems] = useState<HistoryListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeMovie, setActiveMovie] = useState<DetailMovie | null>(null);
@@ -248,7 +246,7 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
                   </button>
                 )}
               </div>
-              <MobileMenu onLogout={() => { logout(); router.replace("/login"); }} />
+              <MobileMenu onLogout={logout} />
             </div>
           }
         />

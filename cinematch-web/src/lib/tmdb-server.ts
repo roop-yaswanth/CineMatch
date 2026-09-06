@@ -39,15 +39,15 @@ export function sanitizeQuery(raw: string | null, maxLen = 200): string {
 
 /**
  * Build a Cache-Control header for proxied TMDB responses.
+ * - `max-age`: browser disk/memory cache TTL
  * - `s-maxage`: edge/CDN cache TTL
  * - `stale-while-revalidate`: serve stale while async refresh
  *
- * Browsers also honor s-maxage as max-age for shared caches; we explicitly set
- * `public` so Vercel's edge can cache user-agnostic data.
+ * We explicitly set `public` and `max-age` so both browsers and CDNs cache user-agnostic data.
  */
 export function tmdbCacheHeaders(sMaxAgeSeconds: number, swrSeconds = sMaxAgeSeconds * 24): HeadersInit {
   return {
-    "Cache-Control": `public, s-maxage=${sMaxAgeSeconds}, stale-while-revalidate=${swrSeconds}`,
+    "Cache-Control": `public, max-age=${sMaxAgeSeconds}, s-maxage=${sMaxAgeSeconds}, stale-while-revalidate=${swrSeconds}`,
   };
 }
 

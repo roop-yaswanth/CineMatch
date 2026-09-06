@@ -2563,78 +2563,71 @@ a[role="button"]:active,
 }
 
 /* Active / Reacted State on Buttons */
-.shelf-action-btn--loved {
-  background: rgba(236, 72, 153, 0.35) !important;
-  border-color: rgba(244, 114, 182, 0.8) !important;
-  box-shadow: 0 0 14px rgba(236, 72, 153, 0.5);
-}
-
-.shelf-action-btn--liked {
-  background: rgba(16, 185, 129, 0.35) !important;
-  border-color: rgba(52, 211, 153, 0.8) !important;
-  box-shadow: 0 0 14px rgba(16, 185, 129, 0.5);
-}
-
+.shelf-action-btn--loved,
+.shelf-action-btn--liked,
 .shelf-action-btn--disliked {
-  background: rgba(239, 68, 68, 0.35) !important;
-  border-color: rgba(248, 113, 113, 0.8) !important;
-  box-shadow: 0 0 14px rgba(239, 68, 68, 0.5);
+  background: rgba(255, 255, 255, 0.16) !important;
+  border-color: rgba(255, 255, 255, 0.45) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
 }
 
 .shelf-action-btn--watchlisted {
-  background: linear-gradient(135deg, #6366f1, #4f46e5) !important;
-  border-color: rgba(199, 210, 254, 0.75) !important;
+  background: rgba(255, 255, 255, 0.22) !important;
+  border-color: rgba(255, 255, 255, 0.55) !important;
   color: #ffffff !important;
-  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.35) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4) !important;
 }
 
 /* Persistent Action Badges on Posters */
-.poster-action-badge {
+.poster-badges-group {
   position: absolute;
-  bottom: 8px;
-  left: 8px;
-  z-index: 5;
+  bottom: 10px;
+  left: 10px;
+  z-index: 8;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 3px 8px;
+  gap: 6px;
+  pointer-events: none;
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.shelf-card:has(.shelf-card-actions):hover .poster-badges-group,
+.card-hover:has(.shelf-card-actions):hover .poster-badges-group {
+  opacity: 0;
+  transform: translateY(4px);
+  pointer-events: none;
+}
+
+.poster-action-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
   border-radius: 999px;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
+  background: rgba(10, 12, 18, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.65);
+  font-size: 22px;
+  line-height: 1;
   color: #ffffff;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.25);
   pointer-events: none;
   animation: badge-pop 250ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.poster-action-badge:not(.poster-badges-group *) {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  z-index: 5;
 }
 
 @keyframes badge-pop {
   0% { transform: scale(0.6); opacity: 0; }
   100% { transform: scale(1); opacity: 1; }
-}
-
-.poster-action-badge--love {
-  background: linear-gradient(135deg, rgba(236, 72, 153, 0.95), rgba(219, 39, 119, 0.95));
-  border-color: rgba(244, 114, 182, 0.7);
-}
-
-.poster-action-badge--like {
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.95), rgba(5, 150, 105, 0.95));
-  border-color: rgba(52, 211, 153, 0.7);
-}
-
-.poster-action-badge--dislike {
-  background: linear-gradient(135deg, rgba(239, 68, 68, 0.95), rgba(220, 38, 38, 0.95));
-  border-color: rgba(248, 113, 113, 0.7);
-}
-
-.poster-action-badge--watchlist {
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.95), rgba(79, 70, 229, 0.95));
-  border-color: rgba(199, 210, 254, 0.7);
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
 }
 
 /* Reaction group containing trigger + floating reaction tray */

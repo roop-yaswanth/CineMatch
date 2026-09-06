@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useReducer, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import MovieCard from "@/components/MovieCard";
 import type { DetailMovie } from "@/components/modals/MovieDetailModal";
@@ -141,7 +141,6 @@ function PillSelect({
 }
 
 function ExplorePageInner() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const { session, isLoading, logout } = useSession();
   useAuthGuard();
@@ -300,7 +299,7 @@ function ExplorePageInner() {
         showSearchButton
         rightSlot={
           session ? (
-            <MobileMenu onLogout={() => { logout(); router.replace("/login"); }} />
+            <MobileMenu onLogout={logout} />
           ) : null
         }
       />

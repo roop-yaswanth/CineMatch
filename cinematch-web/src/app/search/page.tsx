@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -42,7 +42,6 @@ export default function SearchPageWrapper() {
 }
 
 function SearchPage() {
-  const router = useRouter();
   const params = useSearchParams();
   const { session, isLoading, logout } = useSession();
   useAuthGuard();
@@ -167,7 +166,7 @@ function SearchPage() {
         hideBackButton
         showNavTabs
         rightSlot={
-          session ? <MobileMenu onLogout={() => { logout(); router.replace("/login"); }} /> : null
+          session ? <MobileMenu onLogout={logout} /> : null
         }
       >
         {/* Search input */}

@@ -127,7 +127,7 @@ export default function PersonPage() {
           </span>
         }
         rightSlot={
-          session ? <MobileMenu onLogout={() => { logout(); router.replace("/login"); }} /> : null
+          session ? <MobileMenu onLogout={logout} /> : null
         }
       />
 

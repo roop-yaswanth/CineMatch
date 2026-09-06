@@ -130,27 +130,32 @@ async function proxy(
       const text = new TextDecoder().decode(data);
       const json = JSON.parse(text);
       if (json.auth_token) {
+        const token = json.auth_token;
+        delete json.auth_token;
+        
+        const newBody = new TextEncoder().encode(JSON.stringify(json));
+        const newResponse = new NextResponse(newBody, {
+          status: upstream.status,
+          headers: responseHeaders,
+        });
+
         const isSecure = req.nextUrl.protocol === "https:" || req.headers.get("x-forwarded-proto") === "https";
-        response.cookies.set("auth_token", json.auth_token, {
+        newResponse.cookies.set("auth_token", token, {
           httpOnly: true,
           secure: isSecure,
           sameSite: "lax",
           path: "/",
           maxAge: 7 * 24 * 60 * 60, // 7 days
         });
-        response.cookies.set("cm_auth", "1", {
+        newResponse.cookies.set("cm_auth", "1", {
           httpOnly: false,
           secure: isSecure,
           sameSite: "lax",
           path: "/",
           maxAge: 7 * 24 * 60 * 60, // 7 days
         });
-        delete json.auth_token;
-        const newBody = new TextEncoder().encode(JSON.stringify(json));
-        return new NextResponse(newBody, {
-          status: upstream.status,
-          headers: responseHeaders,
-        });
+        
+        return newResponse;
       }
     } catch {
       // Ignore JSON parse errors
