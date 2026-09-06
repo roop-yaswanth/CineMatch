@@ -519,13 +519,14 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
           onAction={async (action) => {
             const targetId = activeMovie.id || activeMovie.tmdb_id!;
             setItems((prev) => {
-              const next = prev.map((it) =>
-                it.tmdb_id === targetId ? { ...it, rating: action } : it
-              );
+              const next = action === "remove"
+                ? prev.filter((it) => it.tmdb_id !== targetId)
+                : prev.map((it) =>
+                    it.tmdb_id === targetId ? { ...it, rating: action } : it
+                  );
               writeHistoryCache(sessionId, next);
               return next;
             });
-            if (action !== "watchlist") setActiveMovie(null);
 
             // Persist + reconcile against the server in the background.
             try {

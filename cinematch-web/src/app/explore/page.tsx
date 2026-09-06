@@ -255,13 +255,18 @@ function ExplorePageInner() {
   // Unified action handler (SRP: one handler, not two with duplicate logic)
   // handleQuickAction and handleAction were identical in behavior; merged here.
   const handleMovieAction = useCallback(
-    async (m: MovieLike | DetailMovie, action: "love" | "like" | "dislike" | "watchlist" | "skip") => {
+    async (m: MovieLike | DetailMovie, action: "love" | "like" | "dislike" | "watchlist" | "skip" | "remove") => {
       if (!session) return;
       const targetId = ("tmdb_id" in m && m.tmdb_id) ? m.tmdb_id : (m as { id: number }).id;
       if (action !== "skip") {
         setUserReactions((prev) => {
           const cur = prev[targetId] || {};
           if (action === "watchlist") return { ...prev, [targetId]: { ...cur, watchlist: !cur.watchlist } };
+          if (action === "remove") {
+            const next = { ...prev };
+            delete next[targetId];
+            return next;
+          }
           return { ...prev, [targetId]: { ...cur, rating: action } };
         });
       }
@@ -279,7 +284,7 @@ function ExplorePageInner() {
     [handleMovieAction]
   );
   const handleAction = useCallback(
-    (action: "love" | "like" | "dislike" | "watchlist" | "skip") => active && void handleMovieAction(active, action),
+    (action: "love" | "like" | "dislike" | "watchlist" | "skip" | "remove") => active && void handleMovieAction(active, action),
     [handleMovieAction, active]
   );
 

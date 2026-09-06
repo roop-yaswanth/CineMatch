@@ -101,6 +101,7 @@ const nextConfig: NextConfig = {
               "battery=()",
               "browsing-topics=()",
               "camera=()",
+              "compute-pressure=()",
               "display-capture=()",
               "document-domain=()",
               "encrypted-media=(self \"https://www.youtube-nocookie.com\" \"https://www.youtube.com\")",

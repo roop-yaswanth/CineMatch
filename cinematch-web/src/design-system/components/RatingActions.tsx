@@ -78,8 +78,9 @@ interface SplashOverlayProps {
 function SplashOverlayComponent({ feedbackSplash }: SplashOverlayProps) {
   if (!feedbackSplash) return null;
 
-  const config = feedbackSplash === "watchlist" 
-    ? { emoji: "🔖", color: "var(--color-accent)", rgb: "var(--rgb-accent)" }
+  const isWatchlist = feedbackSplash === "watchlist";
+  const config = isWatchlist 
+    ? { emoji: "", color: "var(--color-accent)", rgb: "var(--rgb-accent)" }
     : (RATING_CONFIGS[feedbackSplash as RatingType] || RATING_CONFIGS.like);
 
   return (
@@ -109,9 +110,15 @@ function SplashOverlayComponent({ feedbackSplash }: SplashOverlayProps) {
         initial={{ scale: 0.5, rotate: -15 }}
         animate={{ scale: [0.5, 1.28, 1], rotate: [0, 8, 0] }}
         transition={{ duration: 0.35 }}
-        style={{ fontSize: "38px", filter: "drop-shadow(0 6px 16px rgba(0,0,0,0.7))" }}
+        style={{ fontSize: "38px", filter: "drop-shadow(0 6px 16px rgba(0,0,0,0.7))", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
       >
-        {config.emoji}
+        {isWatchlist ? (
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="#ffffff" stroke="#ffffff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+          </svg>
+        ) : (
+          config.emoji
+        )}
       </motion.span>
       <span
         style={{

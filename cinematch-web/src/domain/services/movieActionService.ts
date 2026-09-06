@@ -47,6 +47,11 @@ export function optimisticReactionUpdate(
 ): Record<number, { rating?: string | null; watchlist?: boolean }> {
   const cur = prev[tmdbId] ?? {};
   if (action === "watchlist") return { ...prev, [tmdbId]: { ...cur, watchlist: !cur.watchlist } };
+  if (action === "remove") {
+    const next = { ...prev };
+    delete next[tmdbId];
+    return next;
+  }
   if (action === "skip") return prev; // no optimistic change for skip
   return { ...prev, [tmdbId]: { ...cur, rating: action } };
 }

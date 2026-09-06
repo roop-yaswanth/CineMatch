@@ -8,6 +8,7 @@ import {
   apiTrendingHero,
   apiGetHistory,
   readHistoryCache,
+  writeHistoryCache,
   invalidateHistoryCache,
   isSessionExpiredError,
   languageLabel,
@@ -629,6 +630,7 @@ export function useRecommendations(
     apiGetHistory(session.session_id)
       .then((history) => {
         if (cancelled || !Array.isArray(history)) return;
+        writeHistoryCache(session.session_id, history);
         const ids = history.map((h) => Number(h.tmdb_id)).filter(Boolean);
         if (ids.length === 0) return;
         for (const id of ids) {

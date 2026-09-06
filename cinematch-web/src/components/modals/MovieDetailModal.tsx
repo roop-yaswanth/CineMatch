@@ -2,7 +2,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState, useRef } from "react";
 
 import { createPortal } from "react-dom";
-import { posterUrl, languageLabel, apiSimilarMovies, apiCredits, apiImdbTitle, type Recommendation, type CastMember, type CrewMember, type ImdbTitle } from "@/lib/api";
+import { posterUrl, languageLabel, apiSimilarMovies, apiCredits, apiImdbTitle, readHistoryCache, writeHistoryCache, apiGetHistory, type Recommendation, type CastMember, type CrewMember, type ImdbTitle, type HistoryItem } from "@/lib/api";
 import { PersonDetailOverlay } from "./PersonDetailOverlay";
 import WatchProvidersPanel, { REGION_TO_COUNTRY, fetchWatchProviders } from "@/components/WatchProvidersPanel";
 import { pushBackHandler } from "@/lib/backStack";
@@ -32,13 +32,15 @@ export interface DetailMovie {
   runtime?: number | null;
   score?: number;
   reason?: string;
+  userRating?: "love" | "like" | "dislike" | null;
+  isWatchlist?: boolean;
 }
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
   movie: DetailMovie | null;
-  onAction?: (action: "love" | "like" | "dislike" | "watchlist" | "skip") => void;
+  onAction?: (action: "love" | "like" | "dislike" | "watchlist" | "skip" | "remove") => void;
   onMovieSelect?: (movie: DetailMovie) => void;
   sessionId?: string | null;
   userRegion?: string | null;
@@ -47,6 +49,8 @@ interface Props {
 export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onMovieSelect, sessionId, userRegion }: Props) {
   const [showWatchProviders, setShowWatchProviders] = useState(false);
   const [successAction, setSuccessAction] = useState<string | null>(null);
+  const [userRating, setUserRating] = useState<"love" | "like" | "dislike" | null>(null);
+  const [isWatchlisted, setIsWatchlisted] = useState<boolean>(false);
   const [similar, setSimilar] = useState<Recommendation[]>([]);
   const [similarLoading, setSimilarLoading] = useState(false);
   const [cast, setCast] = useState<CastMember[]>([]);
@@ -217,8 +221,161 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
     fetchWatchProviders(id).catch(() => { });
   }, [movie?.id, movie?.tmdb_id, isOpen]);
 
+  // Sync active rating and watchlist status whenever modal opens or movie changes
+  useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect */
+    if (!isOpen || !movie) {
+      setUserRating(null);
+      setIsWatchlisted(false);
+      return;
+    }
+
+    const movieId = Number(movie.tmdb_id ?? movie.id);
+    let initialRating: "love" | "like" | "dislike" | null =
+      movie.userRating === "love" || movie.userRating === "like" || movie.userRating === "dislike"
+        ? movie.userRating
+        : ((movie as unknown as { rating?: string }).rating === "love" ||
+           (movie as unknown as { rating?: string }).rating === "like" ||
+           (movie as unknown as { rating?: string }).rating === "dislike"
+            ? ((movie as unknown as { rating?: string }).rating as "love" | "like" | "dislike")
+            : null);
+
+    let initialWatchlist: boolean =
+      Boolean(movie.isWatchlist) ||
+      ((movie as unknown as { rating?: string }).rating === "watchlist");
+
+    if (sessionId) {
+      const cached = readHistoryCache<HistoryItem>(sessionId);
+      if (Array.isArray(cached)) {
+        for (const item of cached) {
+          if (Number(item.tmdb_id) === movieId) {
+            const r = (item.rating || "").toLowerCase();
+            if (r === "love" || r === "like" || r === "dislike") {
+              initialRating = r as "love" | "like" | "dislike";
+            } else if (r === "watchlist") {
+              initialWatchlist = true;
+            }
+          }
+        }
+      } else {
+        apiGetHistory(sessionId)
+          .then((history) => {
+            if (Array.isArray(history)) {
+              writeHistoryCache(sessionId, history);
+              for (const item of history) {
+                if (Number(item.tmdb_id) === movieId) {
+                  const r = (item.rating || "").toLowerCase();
+                  if (r === "love" || r === "like" || r === "dislike") {
+                    setUserRating(r as "love" | "like" | "dislike");
+                  } else if (r === "watchlist") {
+                    setIsWatchlisted(true);
+                  }
+                }
+              }
+            }
+          })
+          .catch(() => {});
+      }
+    }
+
+    setUserRating(initialRating);
+    setIsWatchlisted(initialWatchlist);
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [isOpen, movie, sessionId]);
+
   const handleActionClick = (action: "love" | "like" | "dislike" | "watchlist" | "skip") => {
-    if (!onAction) return;
+    if (!onAction || !movie) return;
+    const movieId = Number(movie.tmdb_id ?? movie.id);
+
+    if (action === "watchlist") {
+      if (isWatchlisted) {
+        // Toggling off watchlist -> remove from watchlist
+        onAction("remove");
+        setIsWatchlisted(false);
+        setSuccessAction(null);
+
+        if (sessionId) {
+          const cached = readHistoryCache<HistoryItem>(sessionId);
+          if (cached) {
+            const next = cached.filter(
+              (it) => !(Number(it.tmdb_id) === movieId && it.rating === "watchlist")
+            );
+            writeHistoryCache(sessionId, next);
+          }
+        }
+      } else {
+        // Adding to watchlist
+        onAction("watchlist");
+        setIsWatchlisted(true);
+        setSuccessAction("watchlist");
+        setTimeout(() => setSuccessAction(null), 2000);
+
+        if (sessionId) {
+          const cached = readHistoryCache<HistoryItem>(sessionId) || [];
+          const next = cached.filter(
+            (it) => !(Number(it.tmdb_id) === movieId && it.rating === "watchlist")
+          );
+          next.push({
+            tmdb_id: movieId,
+            title: movie.title,
+            poster_path: movie.poster_path,
+            rating: "watchlist",
+            context: "recommendation",
+            year: typeof movie.year === "number" ? movie.year : undefined,
+            original_language: movie.original_language,
+            primary_genre: movie.primary_genre,
+          });
+          writeHistoryCache(sessionId, next);
+        }
+      }
+      return;
+    }
+
+    if (action === "love" || action === "like" || action === "dislike") {
+      if (userRating === action) {
+        // Toggling off active rating -> remove rating
+        onAction("remove");
+        setUserRating(null);
+        setSuccessAction(null);
+
+        if (sessionId) {
+          const cached = readHistoryCache<HistoryItem>(sessionId);
+          if (cached) {
+            const next = cached.filter(
+              (it) => !(Number(it.tmdb_id) === movieId && (it.rating === "love" || it.rating === "like" || it.rating === "dislike"))
+            );
+            writeHistoryCache(sessionId, next);
+          }
+        }
+      } else {
+        // Setting or switching rating
+        onAction(action);
+        setUserRating(action);
+        setSuccessAction(action);
+        setTimeout(() => setSuccessAction(null), 2000);
+
+        if (sessionId) {
+          const cached = readHistoryCache<HistoryItem>(sessionId) || [];
+          const next = cached.filter(
+            (it) => !(Number(it.tmdb_id) === movieId && (it.rating === "love" || it.rating === "like" || it.rating === "dislike"))
+          );
+          next.push({
+            tmdb_id: movieId,
+            title: movie.title,
+            poster_path: movie.poster_path,
+            rating: action,
+            context: "recommendation",
+            year: typeof movie.year === "number" ? movie.year : undefined,
+            original_language: movie.original_language,
+            primary_genre: movie.primary_genre,
+          });
+          writeHistoryCache(sessionId, next);
+        }
+      }
+      return;
+    }
+
+    // Skip action
     onAction(action);
     setSuccessAction(action);
     setTimeout(() => setSuccessAction(null), 2500);
@@ -504,7 +661,8 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
     </p>
   );
 
-  const reasonNode = movie.reason ? (
+  const isGenericTag = !movie.reason || movie.reason.toLowerCase() === "trending" || movie.reason.toLowerCase() === "personal";
+  const reasonNode = !isGenericTag ? (
     <div style={{
       padding: "12px 14px", borderRadius: "12px",
       background: "rgba(255, 255, 255, 0.05)",
@@ -580,39 +738,56 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
     label: string,
     color: string,
     icon: React.ReactNode,
-  ) => (
-    <button
-      onClick={() => handleActionClick(action)}
-      aria-label={label}
-      title={label}
-      style={{
-        flex: 1,
-        height: "46px",
-        borderRadius: "14px",
-        background: "rgba(255, 255, 255, 0.08)",
-        border: "1px solid rgba(255, 255, 255, 0.12)",
-        color: color,
-        cursor: "pointer",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        transition: "background 0.15s, transform 0.1s, border-color 0.15s",
-      }}
-      onPointerDown={(e) => { (e.currentTarget as HTMLElement).style.transform = "scale(0.94)"; }}
-      onPointerUp={(e) => { (e.currentTarget as HTMLElement).style.transform = ""; }}
-      onPointerLeave={(e) => { (e.currentTarget as HTMLElement).style.transform = ""; }}
-    >
-      <AnimatePresence mode="wait">
-        {successAction === action ? (
-          <motion.svg key="done" initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.5, opacity: 0 }} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></motion.svg>
-        ) : (
-          <motion.span key="icon" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ display: "flex" }}>
-            {icon}
-          </motion.span>
-        )}
-      </AnimatePresence>
-    </button>
-  );
+  ) => {
+    const isRated = userRating === action;
+    const buttonTitle = isRated
+      ? `Rated ${label} — click to remove`
+      : userRating
+      ? `Change rating to ${label}`
+      : `Rate ${label}`;
+
+    return (
+      <button
+        onClick={() => handleActionClick(action)}
+        aria-label={buttonTitle}
+        aria-pressed={isRated}
+        title={buttonTitle}
+        style={{
+          flex: 1,
+          height: "46px",
+          borderRadius: "14px",
+          background: isRated ? "#ffffff" : "rgba(255, 255, 255, 0.08)",
+          border: isRated ? "1.5px solid #ffffff" : "1px solid rgba(255, 255, 255, 0.12)",
+          color: isRated ? "#0a0a0f" : color,
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          boxShadow: isRated
+            ? "0 0 18px rgba(255, 255, 255, 0.45), 0 4px 12px rgba(0, 0, 0, 0.5)"
+            : "none",
+          transform: isRated ? "scale(1.04)" : "scale(1)",
+          transition: "background 0.2s ease, transform 0.15s ease, border-color 0.2s ease, box-shadow 0.2s ease",
+        }}
+        onPointerDown={(e) => { (e.currentTarget as HTMLElement).style.transform = isRated ? "scale(0.98)" : "scale(0.94)"; }}
+        onPointerUp={(e) => { (e.currentTarget as HTMLElement).style.transform = isRated ? "scale(1.04)" : ""; }}
+        onPointerLeave={(e) => { (e.currentTarget as HTMLElement).style.transform = isRated ? "scale(1.04)" : ""; }}
+      >
+        <motion.span
+          animate={{ scale: isRated ? 1.08 : 1 }}
+          transition={{ type: "spring", stiffness: 400, damping: 25 }}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            filter: isRated ? "drop-shadow(0 2px 4px rgba(0,0,0,0.25))" : undefined,
+          }}
+        >
+          {icon}
+        </motion.span>
+      </button>
+    );
+  };
 
   const pillAction = (
     action: "watchlist" | "skip",
@@ -620,44 +795,66 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
     doneLabel: string,
     icon: React.ReactNode,
     flex: number = 1,
-  ) => (
-    <button
-      onClick={() => handleActionClick(action)}
-      style={{
-        flex,
-        height: "42px",
-        borderRadius: "24px",
-        background: "rgba(255, 255, 255, 0.08)",
-        border: "1px solid rgba(255, 255, 255, 0.12)",
-        color: "#ffffff",
-        fontSize: "13px",
-        fontWeight: 600,
-        cursor: "pointer",
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: "7px",
-        transition: "background 0.15s, transform 0.1s, border-color 0.15s",
-      }}
-      onPointerDown={(e) => { (e.currentTarget as HTMLElement).style.transform = "scale(0.95)"; }}
-      onPointerUp={(e) => { (e.currentTarget as HTMLElement).style.transform = ""; }}
-      onPointerLeave={(e) => { (e.currentTarget as HTMLElement).style.transform = ""; }}
-    >
-      <AnimatePresence mode="wait">
-        {successAction === action ? (
-          <motion.span key="done" initial={{ scale: 0.7, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.7, opacity: 0 }} style={{ display: "inline-flex", alignItems: "center", gap: "6px", color: "var(--color-success)" }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-            {doneLabel}
-          </motion.span>
-        ) : (
-          <motion.span key="icon" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ display: "inline-flex", alignItems: "center", gap: "7px" }}>
-            {icon}
-            {label}
-          </motion.span>
-        )}
-      </AnimatePresence>
-    </button>
-  );
+  ) => {
+    const isWatchlistAction = action === "watchlist";
+    const isActiveWatchlist = isWatchlistAction && isWatchlisted;
+
+    const displayLabel = isActiveWatchlist ? "Watchlisted" : label;
+    const buttonTitle = isActiveWatchlist
+      ? "Remove from watchlist"
+      : isWatchlistAction
+      ? "Add to watchlist"
+      : label;
+
+    const displayIcon = isActiveWatchlist ? (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="#ffffff" stroke="#ffffff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+      </svg>
+    ) : icon;
+
+    return (
+      <button
+        onClick={() => handleActionClick(action)}
+        aria-label={buttonTitle}
+        aria-pressed={isActiveWatchlist}
+        title={buttonTitle}
+        style={{
+          flex,
+          height: "42px",
+          borderRadius: "24px",
+          background: isActiveWatchlist ? "rgba(255, 255, 255, 0.18)" : "rgba(255, 255, 255, 0.08)",
+          border: isActiveWatchlist ? "1.5px solid rgba(255, 255, 255, 0.38)" : "1px solid rgba(255, 255, 255, 0.12)",
+          color: "#ffffff",
+          fontSize: "13px",
+          fontWeight: 600,
+          cursor: "pointer",
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: "7px",
+          boxShadow: isActiveWatchlist ? "0 2px 10px rgba(0, 0, 0, 0.4)" : "none",
+          transition: "background 0.15s, transform 0.1s, border-color 0.15s, box-shadow 0.15s",
+        }}
+        onPointerDown={(e) => { (e.currentTarget as HTMLElement).style.transform = "scale(0.95)"; }}
+        onPointerUp={(e) => { (e.currentTarget as HTMLElement).style.transform = ""; }}
+        onPointerLeave={(e) => { (e.currentTarget as HTMLElement).style.transform = ""; }}
+      >
+        <AnimatePresence mode="wait">
+          {!isWatchlistAction && successAction === action ? (
+            <motion.span key="done" initial={{ scale: 0.7, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.7, opacity: 0 }} style={{ display: "inline-flex", alignItems: "center", gap: "6px", color: "var(--color-success)" }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+              {doneLabel}
+            </motion.span>
+          ) : (
+            <motion.span key={isActiveWatchlist ? "active" : "inactive"} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ display: "inline-flex", alignItems: "center", gap: "7px" }}>
+              {displayIcon}
+              {displayLabel}
+            </motion.span>
+          )}
+        </AnimatePresence>
+      </button>
+    );
+  };
 
   const rateSection = onAction ? (
     <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>

@@ -437,13 +437,13 @@ function HeroSlide({
             </p>
           )}
 
-          <div style={{ display: "flex", alignItems: "center", gap: "clamp(6px, 2vw, 10px)", marginTop: 18, flexWrap: "nowrap" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px 10px", marginTop: 18, flexWrap: "wrap" }}>
             <button
               type="button"
               className="btn btn-primary"
               style={{ minHeight: 44, padding: "0 clamp(12px, 3vw, 20px)", whiteSpace: "nowrap" }}
               onClick={() => {
-                onOpenDetail(movie);
+                onOpenDetail({ ...movie, reason: undefined });
               }}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden>

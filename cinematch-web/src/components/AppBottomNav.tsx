@@ -165,7 +165,7 @@ export default function AppBottomNav() {
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
-        padding: "0 16px calc(14px + env(safe-area-inset-bottom, 0px))",
+        padding: "0 clamp(8px, 2.5vw, 16px) calc(14px + env(safe-area-inset-bottom, 0px))",
         pointerEvents: "auto",
       }}
     >
@@ -183,6 +183,7 @@ export default function AppBottomNav() {
           alignItems: "center",
           width: "100%",
           maxWidth: "430px",
+          minWidth: "320px",
           padding: "5px 6px",
           borderRadius: "999px",
           background: "rgba(18, 19, 24, 0.94)",
@@ -245,13 +246,14 @@ export default function AppBottomNav() {
                 gap: "2px",
                 minWidth: 0,
                 minHeight: "48px",
-                padding: "6px 4px",
+                padding: "6px 2px",
                 borderRadius: "999px",
                 textDecoration: "none",
                 color: isActive ? "#ffffff" : "rgba(255, 255, 255, 0.65)",
                 transition: "color 180ms ease",
                 cursor: "pointer",
                 zIndex: 1,
+                overflow: "hidden",
               }}
             >
               <span
@@ -268,12 +270,18 @@ export default function AppBottomNav() {
               </span>
               <span
                 style={{
-                  fontSize: "10.5px",
+                  fontSize: "10px",
                   fontWeight: isActive ? 600 : 500,
                   letterSpacing: "-0.01em",
-                  lineHeight: 1.1,
+                  lineHeight: 1.15,
                   color: isActive ? "#ffffff" : "rgba(255, 255, 255, 0.55)",
                   transition: "color 180ms ease, font-weight 180ms ease",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                  maxWidth: "100%",
+                  textAlign: "center",
+                  display: "block",
                 }}
               >
                 {item.label}

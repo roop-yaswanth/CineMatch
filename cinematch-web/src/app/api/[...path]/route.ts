@@ -78,14 +78,11 @@ async function proxy(
   }
 
   let upstream: Response;
-  // 12s timeout — HuggingFace free-tier Spaces hibernate when inactive; a truly
-  // sleeping Space needs minutes, so it still trips this and returns
-  // SERVER_SLEEPING for the retry page. The longer ceiling exists because the
-  // deep multi-bucket request (up to ~6 language buckets × 90-150 movies)
-  // legitimately takes 5-6s warm on CPU; aborting at 6s turned slow-but-alive
-  // responses into spurious error pages.
+  // 20s timeout — HuggingFace free-tier Spaces hibernate when inactive; a waking Space
+  // or deep multi-bucket generation (up to ~6 language buckets × 90-150 movies)
+  // can legitimately take 12-14s on CPU. Giving 20s prevents premature 12s aborts.
   const controller = new AbortController();
-  const upstreamTimeout = setTimeout(() => controller.abort(), 12_000);
+  const upstreamTimeout = setTimeout(() => controller.abort(), 20_000);
   try {
     upstream = await fetch(url, { method: req.method, headers, body, signal: controller.signal });
   } catch {

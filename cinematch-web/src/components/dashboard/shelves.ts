@@ -34,8 +34,8 @@ export interface Shelf {
   hideSeeAll?: boolean;
 }
 
-/** A rail with fewer than this many cards feels sparse/broken. Enforces robust depth. */
-const MIN_SHELF = 15;
+/** Graceful floor: rails stay alive as items are rated, avoiding abrupt collapse */
+const MIN_SHELF = 2;
 
 /** Visible card cap for identity rails (language / Hollywood / World cinema). */
 const IDENTITY_VISIBLE = 24;
@@ -258,8 +258,8 @@ export function buildShelves(
     acclaimedCandidates.length >= 10
       ? acclaimedCandidates
       : [...curatedSource]
-          .filter((m) => !usedIds.has(Number(recommendationId(m))))
-          .sort((a, b) => normProminence(b) - normProminence(a));
+        .filter((m) => !usedIds.has(Number(recommendationId(m))))
+        .sort((a, b) => normProminence(b) - normProminence(a));
 
   /* ── Hero billboard ──────────────────────────
      When TMDB trending data is available, the hero interleaves trending/recent
@@ -299,18 +299,14 @@ export function buildShelves(
 
     // Shuffle with epoch seed and take top 3
     const shuffled = epochShuffle(trendPool, trendingEpoch);
-    const trendingPicks = shuffled.slice(0, 3).map((m) => ({
-      ...m,
-      // Tag for the HeroCarousel kicker text distinction
-      reason: "trending",
-    }));
+    const trendingPicks = shuffled.slice(0, 3).map((m) => ({ ...m, reason: undefined }));
 
     // 2 personal picks from the acclaimed pool
     const trendingIds = new Set(trendingPicks.map((m) => Number(recommendationId(m))));
     const personalPicks = acclaimedPool
       .filter((m) => !trendingIds.has(Number(recommendationId(m))))
       .slice(0, 2)
-      .map((m) => ({ ...m, reason: m.reason || "personal" }));
+      .map((m) => ({ ...m, reason: undefined }));
 
     // Interleave: trending, personal, trending, personal, trending
     heroMovies = [];
@@ -360,10 +356,11 @@ export function buildShelves(
     );
     for (const m of fillCandidates) {
       if (heroMovies.length >= 5) break;
-      heroMovies.push({ ...m, reason: m.reason || "personal" });
+      heroMovies.push({ ...m, reason: undefined });
       existingHeroIds.add(Number(recommendationId(m)));
     }
   }
+  heroMovies = heroMovies.map((m) => ({ ...m, reason: undefined }));
 
   // Mark all hero movies as used so they never duplicate on the rails below
   for (const m of heroMovies) {

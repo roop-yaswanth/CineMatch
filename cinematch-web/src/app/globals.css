@@ -478,12 +478,15 @@ html {
   /* Same canvas as body so iOS rubber-band overscroll never flashes a
      different color above/below the page. */
   background: var(--color-bg);
+  min-width: 360px;
+  overflow-x: auto;
 }
 
 body {
   background: var(--color-bg);
   color: var(--color-text-primary);
   min-height: 100dvh;
+  min-width: 360px;
   overflow-x: hidden;
   overscroll-behavior: none;
   /* Prevent iOS bounce/rubber-banding to top pill */
@@ -1459,8 +1462,9 @@ input[type="number"]::-webkit-inner-spin-button {
   right: 12px;
 }
 
-@media (hover: none) {
-  .carousel-btn {
+@media (max-width: 640px), (hover: none) {
+  .carousel-btn,
+  .carousel-scrim {
     display: none !important;
   }
 }
