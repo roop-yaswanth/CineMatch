@@ -46,12 +46,11 @@ export function isSessionExpiredError(err: unknown): boolean {
   if (typeof e.name === "string" && e.name === "SessionExpiredError") return true;
   const msg = typeof e.message === "string" ? e.message : "";
   return (
-    msg.includes("Session not found") ||
-    msg.includes("session not found") ||
-    msg.includes("Session expired") ||
-    msg.includes("session has expired") ||
-    msg.includes("session expired") ||
-    msg.includes("Invalid session")
+    /Session (not found|expired)/i.test(msg) ||
+    /invalid session/i.test(msg) ||
+    /401/.test(msg) ||
+    /unauthorized/i.test(msg) ||
+    /authentication token/i.test(msg)
   );
 }
 
@@ -111,14 +110,7 @@ async function request<T>(
             text.includes("Session expired") ||
             text.includes("session expired")
           )) ||
-          (res.status === 401 && (
-            text.includes("Session expired") ||
-            text.includes("session expired") ||
-            text.includes("Invalid Google credential") ||
-            text.includes("Invalid token issuer") ||
-            text.includes("Unauthorized") ||
-            text.includes("Not authenticated")
-          ));
+          res.status === 401;
 
         if (isSessionDead) {
           if (typeof window !== "undefined") {

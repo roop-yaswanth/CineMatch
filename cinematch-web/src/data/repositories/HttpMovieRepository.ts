@@ -31,7 +31,9 @@ export class HttpRecommendationRepository implements RecommendationRepository {
     });
   }
   async getHistory(sessionId: string): Promise<HistoryItem[]> {
-    return httpRequest<HistoryItem[]>(`/api/history?session_id=${sessionId}`);
+    return httpRequest<HistoryItem[]>(`/api/history?session_id=${sessionId}`, {
+      headers: { "X-Session-Id": sessionId },
+    });
   }
 }
 

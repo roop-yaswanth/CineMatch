@@ -16,8 +16,13 @@ const generalLimiter = createRateLimiter(40, 2);
 const SAFE_SEGMENT = /^[A-Za-z0-9_.-]+$/;
 
 // Allow-listed request headers forwarded to upstream. Everything else
-// (Cookie, X-Forwarded-*, custom headers a script might set) is dropped.
-const FORWARD_REQ_HEADERS = ["content-type", "accept", "accept-language"];
+const FORWARD_REQ_HEADERS = [
+  "content-type",
+  "accept",
+  "accept-language",
+  "x-session-id",
+  "x-auth-token",
+];
 
 // Headers we copy from upstream back to the client. `set-cookie`, `server`,
 // and any other identifying upstream metadata are deliberately stripped.
@@ -61,7 +66,7 @@ async function proxy(
   }
   if (!headers["content-type"]) headers["content-type"] = "application/json";
   if (HF_TOKEN) headers["authorization"] = `Bearer ${HF_TOKEN}`;
-  const authToken = req.cookies.get("auth_token")?.value;
+  const authToken = req.cookies.get("auth_token")?.value || req.headers.get("x-auth-token");
   if (authToken) headers["x-auth-token"] = authToken;
 
   let body: ArrayBuffer | undefined;
@@ -113,7 +118,7 @@ async function proxy(
     }
   }
 
-  let data = await upstream.arrayBuffer();
+  const data = await upstream.arrayBuffer();
 
   const response = new NextResponse(data, {
     status: upstream.status,
@@ -125,9 +130,16 @@ async function proxy(
       const text = new TextDecoder().decode(data);
       const json = JSON.parse(text);
       if (json.auth_token) {
-        const isSecure = req.nextUrl.protocol === "https:";
+        const isSecure = req.nextUrl.protocol === "https:" || req.headers.get("x-forwarded-proto") === "https";
         response.cookies.set("auth_token", json.auth_token, {
           httpOnly: true,
+          secure: isSecure,
+          sameSite: "lax",
+          path: "/",
+          maxAge: 7 * 24 * 60 * 60, // 7 days
+        });
+        response.cookies.set("cm_auth", "1", {
+          httpOnly: false,
           secure: isSecure,
           sameSite: "lax",
           path: "/",
@@ -145,8 +157,9 @@ async function proxy(
     }
   }
 
-  if (upstream.status === 200 && segments[0] === "logout") {
+  if (upstream.status === 401 || (upstream.status === 200 && segments[0] === "logout")) {
     response.cookies.delete("auth_token");
+    response.cookies.delete("cm_auth");
   }
 
   return response;

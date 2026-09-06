@@ -29,7 +29,13 @@ export function isSessionExpiredError(err: unknown): boolean {
   if (e.isSessionExpired === true) return true;
   if (typeof e.name === "string" && e.name === "SessionExpiredError") return true;
   const msg = typeof e.message === "string" ? e.message : "";
-  return msg.includes("Session not found") || msg.includes("session expired") || msg.includes("Invalid session");
+  return (
+    /Session (not found|expired)/i.test(msg) ||
+    /invalid session/i.test(msg) ||
+    /401/.test(msg) ||
+    /unauthorized/i.test(msg) ||
+    /authentication token/i.test(msg)
+  );
 }
 
 export interface RequestOptions extends RequestInit {
@@ -54,7 +60,7 @@ export async function httpRequest<T>(path: string, options: RequestOptions = {})
       if (text.includes("SERVER_SLEEPING") || text.includes("Upstream unavailable")) throw new ServerSleepingError();
       const isDead =
         (res.status === 404 && /Session (not found|expired)/i.test(text)) ||
-        (res.status === 401 && /Session expired|Invalid|Unauthorized|Not authenticated/i.test(text));
+        res.status === 401;
       if (isDead) {
         try { window.dispatchEvent(new CustomEvent("cinematch:session_expired")); } catch {}
         throw new SessionExpiredError(`API ${res.status}: ${text}`);
