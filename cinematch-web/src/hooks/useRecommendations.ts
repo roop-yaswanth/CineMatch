@@ -23,8 +23,7 @@ import { preferencesFromProfile, recommendationId } from "@/domain/types/movie";
 import type { Collection } from "@/components/dashboard/CollectionOverlay";
 import type { DetailMovie } from "@/components/modals/MovieDetailModal";
 
-// Exported types from the hook
-export type RecommendationAction = "love" | "like" | "dislike" | "remove" | "watchlist" | "skip";
+export type RecommendationAction = "love" | "like" | "dislike" | "remove" | "watchlist" | "skip" | "remove_rating" | "remove_watchlist";
 export type StackId = "hollywood" | "matched" | "other" | string;
 
 export interface Stack {
@@ -552,7 +551,8 @@ export function useRecommendations(
       );
 
       const counted = countedActionsRef.current;
-      const isFirstForMovie = !counted.has(tmdbId);
+      const isUntoggle = action === "remove_rating" || action === "remove_watchlist";
+      const isFirstForMovie = !counted.has(tmdbId) && !isUntoggle;
       if (isFirstForMovie) {
         counted.add(tmdbId);
         actionCountRef.current.total++;

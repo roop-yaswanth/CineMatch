@@ -18,7 +18,7 @@ import { localStore } from "@/infrastructure/storage/StorageService";
 import { executeMovieAction } from "@/domain/services/movieActionService";
 
 export type MovieLike = Movie | Recommendation | ExploreMovie;
-export type ActionType = "love" | "like" | "dislike" | "watchlist" | "skip" | "remove";
+export type ActionType = "love" | "like" | "dislike" | "watchlist" | "skip" | "remove" | "remove_rating" | "remove_watchlist";
 
 export type UserReactionEntry = {
   rating?: "love" | "like" | "dislike" | null;
@@ -80,7 +80,7 @@ export function useMovieActions(opts?: {
 }
 
 /** Build a lookup map from HistoryItem[] -> tmdb_id -> reaction */
-export function buildReactionsMap(items: Array<{ tmdb_id: number; rating?: string | null }>): Record<number, UserReactionEntry> {
+export function buildReactionsMap(items: Array<{ tmdb_id: number; rating?: string | null; is_watchlist?: boolean }>): Record<number, UserReactionEntry> {
   const map: Record<number, UserReactionEntry> = {};
   for (const item of items) {
     if (!map[item.tmdb_id]) map[item.tmdb_id] = {};
@@ -88,6 +88,9 @@ export function buildReactionsMap(items: Array<{ tmdb_id: number; rating?: strin
     if (r === "love" || r === "like" || r === "dislike") {
       map[item.tmdb_id].rating = r as UserReactionEntry["rating"];
     } else if (r === "watchlist") {
+      map[item.tmdb_id].watchlist = true;
+    }
+    if (item.is_watchlist) {
       map[item.tmdb_id].watchlist = true;
     }
   }

@@ -50,6 +50,7 @@ export interface HistoryItem {
   year?: number;
   original_language?: string;
   primary_genre?: string;
+  is_watchlist?: boolean;
 }
 
 // --- Aggregates ---
@@ -135,9 +136,26 @@ export interface DetailMovieShape {
   backdrop_path?: string;
   imdb_rating?: number;
   director?: string;
+  userRating?: "love" | "like" | "dislike" | null;
+  isWatchlist?: boolean;
 }
 
 export function toDetailMovie(m: Partial<Movie> & { tmdb_id?: number; id?: number; title: string }): DetailMovieShape {
+  const ratingStr = ((m as unknown as { rating?: string }).rating || "").toLowerCase();
+  const explicitUserRating = (m as unknown as { userRating?: "love" | "like" | "dislike" | null }).userRating;
+  const derivedRating: "love" | "like" | "dislike" | null =
+    explicitUserRating !== undefined
+      ? explicitUserRating
+      : ratingStr === "love" || ratingStr === "like" || ratingStr === "dislike"
+      ? (ratingStr as "love" | "like" | "dislike")
+      : null;
+
+  const explicitWatchlist = (m as unknown as { isWatchlist?: boolean; is_watchlist?: boolean }).isWatchlist ??
+    (m as unknown as { is_watchlist?: boolean }).is_watchlist;
+  const derivedWatchlist = explicitWatchlist !== undefined
+    ? Boolean(explicitWatchlist)
+    : ratingStr === "watchlist";
+
   return {
     id: m.tmdb_id ?? m.id ?? 0,
     tmdb_id: m.tmdb_id ?? m.id,
@@ -151,5 +169,7 @@ export function toDetailMovie(m: Partial<Movie> & { tmdb_id?: number; id?: numbe
     backdrop_path: m.backdrop_path,
     imdb_rating: m.imdb_rating,
     director: m.director,
+    userRating: derivedRating,
+    isWatchlist: derivedWatchlist,
   };
 }

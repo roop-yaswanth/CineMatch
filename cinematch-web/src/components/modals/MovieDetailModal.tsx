@@ -40,7 +40,7 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   movie: DetailMovie | null;
-  onAction?: (action: "love" | "like" | "dislike" | "watchlist" | "skip" | "remove") => void;
+  onAction?: (action: "love" | "like" | "dislike" | "watchlist" | "skip" | "remove" | "remove_rating" | "remove_watchlist") => void;
   onMovieSelect?: (movie: DetailMovie) => void;
   sessionId?: string | null;
   userRegion?: string | null;
@@ -242,6 +242,7 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
 
     let initialWatchlist: boolean =
       Boolean(movie.isWatchlist) ||
+      Boolean((movie as unknown as { is_watchlist?: boolean }).is_watchlist) ||
       ((movie as unknown as { rating?: string }).rating === "watchlist");
 
     if (sessionId) {
@@ -253,6 +254,9 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
             if (r === "love" || r === "like" || r === "dislike") {
               initialRating = r as "love" | "like" | "dislike";
             } else if (r === "watchlist") {
+              initialWatchlist = true;
+            }
+            if (item.is_watchlist) {
               initialWatchlist = true;
             }
           }
@@ -268,6 +272,9 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
                   if (r === "love" || r === "like" || r === "dislike") {
                     setUserRating(r as "love" | "like" | "dislike");
                   } else if (r === "watchlist") {
+                    setIsWatchlisted(true);
+                  }
+                  if (item.is_watchlist) {
                     setIsWatchlisted(true);
                   }
                 }
@@ -290,16 +297,24 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
     if (action === "watchlist") {
       if (isWatchlisted) {
         // Toggling off watchlist -> remove from watchlist
-        onAction("remove");
+        onAction("remove_watchlist");
         setIsWatchlisted(false);
         setSuccessAction(null);
 
         if (sessionId) {
           const cached = readHistoryCache<HistoryItem>(sessionId);
           if (cached) {
-            const next = cached.filter(
-              (it) => !(Number(it.tmdb_id) === movieId && it.rating === "watchlist")
-            );
+            const next = cached
+              .map((it) => {
+                if (Number(it.tmdb_id) === movieId) {
+                  if (it.rating === "love" || it.rating === "like" || it.rating === "dislike") {
+                    return { ...it, is_watchlist: false };
+                  }
+                  return null;
+                }
+                return it;
+              })
+              .filter(Boolean) as HistoryItem[];
             writeHistoryCache(sessionId, next);
           }
         }
@@ -312,19 +327,27 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
 
         if (sessionId) {
           const cached = readHistoryCache<HistoryItem>(sessionId) || [];
-          const next = cached.filter(
-            (it) => !(Number(it.tmdb_id) === movieId && it.rating === "watchlist")
-          );
-          next.push({
-            tmdb_id: movieId,
-            title: movie.title,
-            poster_path: movie.poster_path,
-            rating: "watchlist",
-            context: "recommendation",
-            year: typeof movie.year === "number" ? movie.year : undefined,
-            original_language: movie.original_language,
-            primary_genre: movie.primary_genre,
+          let found = false;
+          const next = cached.map((it) => {
+            if (Number(it.tmdb_id) === movieId) {
+              found = true;
+              return { ...it, is_watchlist: true };
+            }
+            return it;
           });
+          if (!found) {
+            next.push({
+              tmdb_id: movieId,
+              title: movie.title,
+              poster_path: movie.poster_path,
+              rating: userRating || "watchlist",
+              is_watchlist: true,
+              context: "recommendation",
+              year: typeof movie.year === "number" ? movie.year : undefined,
+              original_language: movie.original_language,
+              primary_genre: movie.primary_genre,
+            });
+          }
           writeHistoryCache(sessionId, next);
         }
       }
@@ -334,16 +357,24 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
     if (action === "love" || action === "like" || action === "dislike") {
       if (userRating === action) {
         // Toggling off active rating -> remove rating
-        onAction("remove");
+        onAction("remove_rating");
         setUserRating(null);
         setSuccessAction(null);
 
         if (sessionId) {
           const cached = readHistoryCache<HistoryItem>(sessionId);
           if (cached) {
-            const next = cached.filter(
-              (it) => !(Number(it.tmdb_id) === movieId && (it.rating === "love" || it.rating === "like" || it.rating === "dislike"))
-            );
+            const next = cached
+              .map((it) => {
+                if (Number(it.tmdb_id) === movieId) {
+                  if (it.is_watchlist || isWatchlisted) {
+                    return { ...it, rating: "watchlist", is_watchlist: true };
+                  }
+                  return null;
+                }
+                return it;
+              })
+              .filter(Boolean) as HistoryItem[];
             writeHistoryCache(sessionId, next);
           }
         }
@@ -356,19 +387,31 @@ export default function MovieDetailModal({ isOpen, onClose, movie, onAction, onM
 
         if (sessionId) {
           const cached = readHistoryCache<HistoryItem>(sessionId) || [];
-          const next = cached.filter(
-            (it) => !(Number(it.tmdb_id) === movieId && (it.rating === "love" || it.rating === "like" || it.rating === "dislike"))
-          );
-          next.push({
-            tmdb_id: movieId,
-            title: movie.title,
-            poster_path: movie.poster_path,
-            rating: action,
-            context: "recommendation",
-            year: typeof movie.year === "number" ? movie.year : undefined,
-            original_language: movie.original_language,
-            primary_genre: movie.primary_genre,
+          let found = false;
+          const next = cached.map((it) => {
+            if (Number(it.tmdb_id) === movieId) {
+              found = true;
+              return {
+                ...it,
+                rating: action,
+                is_watchlist: Boolean(it.is_watchlist || isWatchlisted),
+              };
+            }
+            return it;
           });
+          if (!found) {
+            next.push({
+              tmdb_id: movieId,
+              title: movie.title,
+              poster_path: movie.poster_path,
+              rating: action,
+              is_watchlist: isWatchlisted,
+              context: "recommendation",
+              year: typeof movie.year === "number" ? movie.year : undefined,
+              original_language: movie.original_language,
+              primary_genre: movie.primary_genre,
+            });
+          }
           writeHistoryCache(sessionId, next);
         }
       }

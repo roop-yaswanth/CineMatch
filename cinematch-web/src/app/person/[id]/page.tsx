@@ -75,7 +75,7 @@ export default function PersonPage() {
   }, [data]);
 
   const handleAction = useCallback(
-    async (action: "love" | "like" | "dislike" | "watchlist" | "skip" | "remove") => {
+    async (action: "love" | "like" | "dislike" | "watchlist" | "skip" | "remove" | "remove_rating" | "remove_watchlist") => {
       if (!session || !active) return;
       const targetId = active.tmdb_id ?? active.id;
       try {

@@ -121,7 +121,9 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
     let filtered = items.slice().reverse();
 
     // Interaction filter
-    if (interactionFilter !== "all") {
+    if (interactionFilter === "watchlist") {
+      filtered = filtered.filter((item) => item.rating === "watchlist" || item.is_watchlist);
+    } else if (interactionFilter !== "all") {
       filtered = filtered.filter((item) => item.rating === interactionFilter);
     }
 
@@ -500,7 +502,7 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
                           ? item.rating
                           : null
                       }
-                      isWatchlist={item.rating === "watchlist"}
+                      isWatchlist={Boolean(item.is_watchlist || item.rating === "watchlist")}
                     />
                   </div>
                 ))}
@@ -519,11 +521,81 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
           onAction={async (action) => {
             const targetId = activeMovie.id || activeMovie.tmdb_id!;
             setItems((prev) => {
-              const next = action === "remove"
-                ? prev.filter((it) => it.tmdb_id !== targetId)
-                : prev.map((it) =>
+              let next: HistoryListItem[];
+              if (action === "remove") {
+                next = prev.filter((it) => it.tmdb_id !== targetId);
+              } else if (action === "remove_watchlist") {
+                next = prev
+                  .map((it) => {
+                    if (it.tmdb_id === targetId) {
+                      if (it.rating === "love" || it.rating === "like" || it.rating === "dislike") {
+                        return { ...it, is_watchlist: false };
+                      }
+                      return null;
+                    }
+                    return it;
+                  })
+                  .filter(Boolean) as HistoryListItem[];
+              } else if (action === "remove_rating") {
+                next = prev
+                  .map((it) => {
+                    if (it.tmdb_id === targetId) {
+                      if (it.is_watchlist) {
+                        return { ...it, rating: "watchlist", is_watchlist: true };
+                      }
+                      return null;
+                    }
+                    return it;
+                  })
+                  .filter(Boolean) as HistoryListItem[];
+              } else if (action === "watchlist") {
+                const found = prev.some((it) => it.tmdb_id === targetId);
+                if (found) {
+                  next = prev.map((it) =>
+                    it.tmdb_id === targetId ? { ...it, is_watchlist: true } : it
+                  );
+                } else {
+                  next = [
+                    ...prev,
+                    {
+                      tmdb_id: targetId,
+                      title: activeMovie.title,
+                      poster_path: activeMovie.poster_path,
+                      rating: "watchlist",
+                      is_watchlist: true,
+                      context: "recommendation",
+                      year: typeof activeMovie.year === "number" ? activeMovie.year : undefined,
+                      original_language: activeMovie.original_language,
+                      primary_genre: activeMovie.primary_genre,
+                      genres: activeMovie.genres,
+                    },
+                  ];
+                }
+              } else {
+                // "love" | "like" | "dislike"
+                const found = prev.some((it) => it.tmdb_id === targetId);
+                if (found) {
+                  next = prev.map((it) =>
                     it.tmdb_id === targetId ? { ...it, rating: action } : it
                   );
+                } else {
+                  next = [
+                    ...prev,
+                    {
+                      tmdb_id: targetId,
+                      title: activeMovie.title,
+                      poster_path: activeMovie.poster_path,
+                      rating: action,
+                      is_watchlist: Boolean(activeMovie.isWatchlist),
+                      context: "recommendation",
+                      year: typeof activeMovie.year === "number" ? activeMovie.year : undefined,
+                      original_language: activeMovie.original_language,
+                      primary_genre: activeMovie.primary_genre,
+                      genres: activeMovie.genres,
+                    },
+                  ];
+                }
+              }
               writeHistoryCache(sessionId, next);
               return next;
             });

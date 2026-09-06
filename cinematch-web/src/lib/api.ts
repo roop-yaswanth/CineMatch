@@ -276,6 +276,7 @@ export interface HistoryItem {
   year?: number;
   original_language?: string;
   primary_genre?: string;
+  is_watchlist?: boolean;
 }
 
 
