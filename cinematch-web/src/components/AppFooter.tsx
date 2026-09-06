@@ -14,7 +14,6 @@
  * footer's last line.
  */
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const HIDDEN_ROUTES: Array<(p: string) => boolean> = [
@@ -109,14 +108,10 @@ function FooterLink({ href, children }: { href: string; children: React.ReactNod
     ? { rel: "noopener noreferrer", target: href.startsWith("mailto:") ? undefined : "_blank" }
     : {};
   const cls = "app-footer-link";
-  return isExternal ? (
+  return (
     <a href={href} className={cls} {...props}>
       {children}
     </a>
-  ) : (
-    <Link href={href} className={cls}>
-      {children}
-    </Link>
   );
 }
 
