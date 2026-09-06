@@ -16,6 +16,7 @@ interface SessionContextType {
   session: UserSession | null;
   isLoading: boolean;
   logout: () => void;
+  clearSession: () => void;
   updateSession: (session: UserSession) => void;
   openPreferences: () => void;
   closePreferences: () => void;
@@ -368,6 +369,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         session,
         isLoading,
         logout,
+        clearSession,
         updateSession,
         openPreferences,
         closePreferences,
