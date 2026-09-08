@@ -6,6 +6,12 @@
  */
 
 import { httpRequest } from "@/infrastructure/http/HttpClient";
+
+// P1: bounded timeout for same-origin GETs (was bare fetch() with no timeout).
+// httpRequest throws on !ok — callers below preserve their old empty/throw contract.
+async function boundedGet<T>(path: string, timeoutMs = 10_000): Promise<T> {
+  return httpRequest<T>(path, { timeout: timeoutMs });
+}
 import type {
   RecommendationRepository,
   SearchRepository,
@@ -19,19 +25,27 @@ export class HttpRecommendationRepository implements RecommendationRepository {
     sessionId: string,
     prefs: RecommendationPreferences & { per_bucket_k?: number; exclude_ids?: number[] }
   ): Promise<MultiBucketResponse> {
+    // P1: /multi can take 12-14s+ on a cold backend — must outlive the 30s proxy.
     return httpRequest<MultiBucketResponse>("/api/recommendations/multi", {
       method: "POST",
       body: JSON.stringify({ session_id: sessionId, ...prefs }),
+      timeout: 30000,
     });
   }
   async submitAction(sessionId: string, tmdbId: number, action: string, dwellMs = 0) {
+    // P1: /action can trigger a full pool rebuild — 6s default aborted the
+    // request while the server still applied it (phantom failures).
     return httpRequest<{ session: import("@/domain/types/movie").UserSession }>("/api/recommendations/action", {
       method: "POST",
       body: JSON.stringify({ session_id: sessionId, tmdb_id: tmdbId, action, dwell_ms: dwellMs }),
+      timeout: 30000,
     });
   }
   async getHistory(sessionId: string): Promise<HistoryItem[]> {
-    return httpRequest<HistoryItem[]>(`/api/history?session_id=${sessionId}`, {
+    // P1: header-only — never put the session id in the URL (leaks to
+    // access logs, proxies, and shared-link referrers). Backend still accepts
+    // ?session_id for backward compat, but clients must not send it.
+    return httpRequest<HistoryItem[]>(`/api/history`, {
       headers: { "X-Session-Id": sessionId },
     });
   }
@@ -48,9 +62,12 @@ export class HttpSearchRepository implements SearchRepository {
       this.cache.set(key, hit);
       return hit;
     }
-    const res = await fetch(`/api/search/multi?q=${encodeURIComponent(query)}`);
-    if (!res.ok) return { movies: [], tv: [], people: [] };
-    const data: MultiSearchResponse = await res.json();
+    let data: MultiSearchResponse;
+    try {
+      data = await boundedGet<MultiSearchResponse>(`/api/search/multi?q=${encodeURIComponent(query)}`);
+    } catch {
+      return { movies: [], tv: [], people: [] };
+    }
     this.cache.set(key, data);
     if (this.cache.size > this.max) {
       const oldest = this.cache.keys().next().value;
@@ -67,9 +84,7 @@ export class HttpExploreRepository implements ExploreRepository {
     if (lang) params.set("with_original_language", lang);
     if (genre) params.set("with_genres", genre);
     if (sortBy) params.set("sort_by", sortBy);
-    const res = await fetch(`/api/tmdb/explore?${params.toString()}`);
-    if (!res.ok) throw new Error(`Explore fetch failed: ${res.status}`);
-    return res.json();
+    return boundedGet<ExploreResponse>(`/api/tmdb/explore?${params.toString()}`);
   }
   async discover(filters: DiscoverFilters): Promise<ExploreResponse> {
     const params = new URLSearchParams();
@@ -80,9 +95,7 @@ export class HttpExploreRepository implements ExploreRepository {
     if (filters.with_original_language) params.set("with_original_language", filters.with_original_language);
     if (filters.region) params.set("region", filters.region);
     params.set("page", String(filters.page ?? 1));
-    const res = await fetch(`/api/tmdb/discover?${params.toString()}`);
-    if (!res.ok) throw new Error(`Discover fetch failed: ${res.status}`);
-    return res.json();
+    return boundedGet<ExploreResponse>(`/api/tmdb/discover?${params.toString()}`);
   }
 }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { posterUrl, fetchTmdbPoster } from "@/lib/api";
+import { posterUrl, fetchTmdbPoster, fetchSameOrigin } from "@/lib/api";
 
 /**
  * Hook that returns a poster URL.
@@ -65,7 +65,9 @@ export function fetchBackdrop(tmdbId: number): Promise<string | null> {
   if (hit !== undefined) return Promise.resolve(hit);
   const inflight = backdropInflight.get(tmdbId);
   if (inflight) return inflight;
-  const p = fetch(`/api/tmdb?id=${tmdbId}`)
+  // P1: bounded timeout — a hung /api/tmdb previously left backdrop slots
+  // pending for the page lifetime.
+  const p = fetchSameOrigin(`/api/tmdb?id=${tmdbId}`)
     .then((res) => (res.ok ? res.json() : null))
     .then((data): string | null => {
       const path: string | null = data?.backdrop_path ?? null;

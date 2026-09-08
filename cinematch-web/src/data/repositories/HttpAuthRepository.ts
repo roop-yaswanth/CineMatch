@@ -4,15 +4,19 @@ import type { UserSession } from "@/domain/types/movie";
 
 export class HttpAuthRepository implements AuthRepository {
   loginWithGoogle(credential: string): Promise<UserSession> {
+    // P1: auth touches Mongo + Google verify — can exceed the 6s default on a
+    // cold backend, flipping a slow login into a false "server sleeping".
     return httpRequest<UserSession>("/api/auth/google", {
       method: "POST",
       body: JSON.stringify({ credential }),
+      timeout: 30000,
     });
   }
   refreshSession(authToken: string): Promise<UserSession> {
     return httpRequest<UserSession>("/api/auth/refresh", {
       method: "POST",
       body: JSON.stringify({ auth_token: authToken }),
+      timeout: 30000,
     });
   }
   refreshSessionFromCookie(): Promise<UserSession> {

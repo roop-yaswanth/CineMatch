@@ -40,7 +40,25 @@ export default function PrivacyPage() {
       <ul>
         <li>No tracking pixels from advertising networks.</li>
         <li>No third-party analytics other than Vercel Analytics (anonymous traffic stats).</li>
-        <li>No cookies set by us — your session is stored in browser <code>localStorage</code>.</li>
+        <li>
+          Two first-party cookies set by us:
+          <ul style={{ marginTop: "0.4rem", marginBottom: 0 }}>
+            <li>
+              <code>auth_token</code> — an <strong>httpOnly</strong>, Secure,
+              SameSite=Lax session credential (7-day TTL). JavaScript cannot
+              read it; it is used solely to authenticate your requests to our
+              backend.
+            </li>
+            <li>
+              <code>cm_auth</code> — a lightweight signed-in hint that lets the
+              server redirect unauthenticated visitors before any page JavaScript
+              loads. It carries no secrets and expires with your session.
+            </li>
+          </ul>
+          Both cookies are strictly necessary for the service to function and
+          are not used for advertising or cross-site tracking.
+        </li>
+
       </ul>
 
       <h2>How we use your data</h2>

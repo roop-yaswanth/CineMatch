@@ -60,6 +60,27 @@ export interface RequestOptions extends RequestInit {
   timeout?: number;
 }
 
+/* ─── Bounded same-origin fetch ─────────────────────────────────────────
+ * P1: several TMDB/IMDb/search helpers used bare fetch() with no timeout —
+ * a hung edge route hung the UI forever, and failures surfaced as confusing
+ * "no results". Same-origin cookies are sent automatically (default
+ * credentials mode), so auth keeps working. Returns the Response; callers
+ * keep their existing ok/data handling. Timeout defaults to 10s.
+ * ─────────────────────────────────────────────────────────────────────── */
+export async function fetchSameOrigin(
+  path: string,
+  init?: RequestInit,
+  timeoutMs = 10_000
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(path, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 async function request<T>(
   path: string,
   options?: RequestOptions
@@ -367,7 +388,7 @@ export async function apiImdbTitle(opts: { tmdbId?: number; imdbId?: string }): 
   if (opts.tmdbId != null) params.set("tmdb_id", String(opts.tmdbId));
   let data: ImdbTitle | null = null;
   try {
-    const res = await fetch(`/api/imdb/title?${params.toString()}`);
+    const res = await fetchSameOrigin(`/api/imdb/title?${params.toString()}`);
     if (res.ok) {
       const json = await res.json();
       data = json && json.imdb_id ? (json as ImdbTitle) : null;
@@ -732,16 +753,22 @@ export async function apiSearchMulti(query: string): Promise<MultiSearchResponse
     multiSearchCache.set(key, hit);
     return hit;
   }
-  const res = await fetch(`/api/search/multi?q=${encodeURIComponent(query)}`);
-  if (!res.ok) return { movies: [], tv: [], people: [] };
-  const data: MultiSearchResponse = await res.json();
-  multiSearchCache.set(key, data);
-  if (multiSearchCache.size > MULTI_SEARCH_CACHE_MAX) {
-    // Evict oldest entry.
-    const oldest = multiSearchCache.keys().next().value;
-    if (oldest !== undefined) multiSearchCache.delete(oldest);
+  // P1: bounded timeout + catch — previously an abort/hang propagated uncaught
+  // and a failure was indistinguishable from "no results".
+  try {
+    const res = await fetchSameOrigin(`/api/search/multi?q=${encodeURIComponent(query)}`);
+    if (!res.ok) return { movies: [], tv: [], people: [] };
+    const data: MultiSearchResponse = await res.json();
+    multiSearchCache.set(key, data);
+    if (multiSearchCache.size > MULTI_SEARCH_CACHE_MAX) {
+      // Evict oldest entry.
+      const oldest = multiSearchCache.keys().next().value;
+      if (oldest !== undefined) multiSearchCache.delete(oldest);
+    }
+    return data;
+  } catch {
+    return { movies: [], tv: [], people: [] };
   }
-  return data;
 }
 
 export async function apiSearchMovies(
@@ -834,7 +861,7 @@ export async function apiSimilarMovies(
       // If backend returned empty (e.g. newly announced 2026 title, uncataloged Explore movie, or timeout):
       if (results.length === 0 && tmdbId) {
         try {
-          const tmdbRes = await fetch(`/api/tmdb/recommendations?id=${tmdbId}`);
+          const tmdbRes = await fetchSameOrigin(`/api/tmdb/recommendations?id=${tmdbId}`);
           if (tmdbRes.ok) {
             const tmdbData = await tmdbRes.json();
             results = tmdbData.results ?? [];
@@ -931,7 +958,7 @@ export async function apiDiscover(filters: DiscoverFilters): Promise<ExploreResp
   if (filters.vote_count_gte != null) params.set("vote_count_gte", String(filters.vote_count_gte));
   if (filters.region) params.set("region", filters.region);
   params.set("page", String(filters.page ?? 1));
-  const res = await fetch(`/api/tmdb/discover?${params.toString()}`);
+  const res = await fetchSameOrigin(`/api/tmdb/discover?${params.toString()}`);
   if (!res.ok) throw new Error(`Discover fetch failed: ${res.status}`);
   return res.json();
 }
@@ -956,9 +983,7 @@ export async function apiTrendingHero(
     if (region) params.set("region", region);
     // genres param reserved for future server-side filtering
     void genres;
-    const res = await fetch(`/api/tmdb/hero?${params.toString()}`, {
-      signal: AbortSignal.timeout(8_000),
-    });
+    const res = await fetchSameOrigin(`/api/tmdb/hero?${params.toString()}`, undefined, 8_000);
     if (!res.ok) return { results: [], epoch: 0 };
     const data = await res.json();
     return {
@@ -1031,9 +1056,14 @@ export interface PersonDetail {
 }
 
 export async function apiPerson(personId: number): Promise<PersonDetail | null> {
-  const res = await fetch(`/api/tmdb/person?id=${personId}`);
-  if (!res.ok) return null;
-  return res.json();
+  // P1: previously an abort/hang threw uncaught from person pages.
+  try {
+    const res = await fetchSameOrigin(`/api/tmdb/person?id=${personId}`);
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
 }
 
 // Per-movie credits cache. Server already caches at the edge; this avoids
@@ -1050,7 +1080,7 @@ export async function apiCredits(tmdbId: number, kind: "movie" | "tv" = "movie")
   if (inflight) return inflight;
   const p = (async () => {
     try {
-      const res = await fetch(`/api/tmdb/credits?id=${tmdbId}&kind=${kind}`);
+      const res = await fetchSameOrigin(`/api/tmdb/credits?id=${tmdbId}&kind=${kind}`);
       if (!res.ok) return { cast: [], directors: [], writers: [] };
       const data: CreditsResponse = await res.json();
       creditsCache.set(key, data);
@@ -1083,11 +1113,16 @@ export interface TmdbGenre { id: number; name: string }
 let genreCache: TmdbGenre[] | null = null;
 export async function apiGenres(): Promise<TmdbGenre[]> {
   if (genreCache) return genreCache;
-  const res = await fetch("/api/tmdb/genres");
-  if (!res.ok) return [];
-  const data = await res.json();
-  genreCache = data.genres || [];
-  return genreCache!;
+  // P1: previously an abort/hang threw uncaught from every surface using genres.
+  try {
+    const res = await fetchSameOrigin("/api/tmdb/genres");
+    if (!res.ok) return [];
+    const data = await res.json();
+    genreCache = data.genres || [];
+    return genreCache!;
+  } catch {
+    return [];
+  }
 }
 
 export async function apiExplore(
@@ -1103,7 +1138,7 @@ export async function apiExplore(
   if (with_original_language) params.set("with_original_language", with_original_language);
   if (with_genres) params.set("with_genres", with_genres);
   if (sort_by) params.set("sort_by", sort_by);
-  const res = await fetch(`/api/tmdb/explore?${params.toString()}`);
+  const res = await fetchSameOrigin(`/api/tmdb/explore?${params.toString()}`);
   if (!res.ok) throw new Error(`Explore fetch failed: ${res.status}`);
   return res.json();
 }
@@ -1144,7 +1179,7 @@ export async function fetchTmdbPoster(tmdbId: number): Promise<string | null> {
 
   const promise = (async () => {
     try {
-      const res = await fetch(`/api/tmdb?id=${tmdbId}`);
+      const res = await fetchSameOrigin(`/api/tmdb?id=${tmdbId}`);
       if (!res.ok) {
         rememberPoster(tmdbId, null);
         return null;

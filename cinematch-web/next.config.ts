@@ -1,9 +1,15 @@
 import type { NextConfig } from "next";
 
+const _devOrigins = (process.env.NEXT_DEV_ORIGINS ?? "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+
 const nextConfig: NextConfig = {
-  allowedDevOrigins: ["192.168.0.146"],
+  allowedDevOrigins: _devOrigins,
 
   images: {
+
     remotePatterns: [
       {
         protocol: "https",
