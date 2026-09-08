@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   alternates: { canonical: "/privacy" },
 };
 
-const UPDATED = "2026-04-29";
+const UPDATED = "2026-09-08";
 
 export default function PrivacyPage() {
   return (
@@ -20,7 +20,12 @@ export default function PrivacyPage() {
       <h2>What we collect</h2>
       <ul>
         <li>
-          <strong>Email address</strong> — used as your account identifier when you sign in.
+          <strong>Email address</strong> — used as your account identifier when you sign in with Google.
+        </li>
+        <li>
+          <strong>Basic Google profile</strong> — your display name and profile photo,
+          provided by Google at sign-in so we can personalize your account. We
+          don&rsquo;t access your contacts, files, or anything else in your Google account.
         </li>
         <li>
           <strong>Taste preferences</strong> — the languages, genres, region, and age group
@@ -70,9 +75,26 @@ export default function PrivacyPage() {
 
       <h2>Third parties</h2>
       <p>
-        Movie metadata and posters are fetched from <a href="https://www.themoviedb.org/" target="_blank" rel="noopener noreferrer">TMDB</a>.
+        Sign-in is handled by <strong>Google Identity Services</strong> — Google sees
+        that you signed in to CineMatch and their privacy policy applies to that
+        flow. Movie metadata and posters are fetched from <a href="https://www.themoviedb.org/" target="_blank" rel="noopener noreferrer">TMDB</a>
+        (watch-provider logos via JustWatch data); ratings shown include IMDb data.
         Trailers are embedded from YouTube via the privacy-enhanced <em>youtube-nocookie.com</em>
-        domain. We don&rsquo;t share your interaction data with them.
+        domain. Hosting and anonymous traffic stats run on Vercel and Hugging Face.
+        We don&rsquo;t sell your data or share your interaction history with advertisers.
+      </p>
+
+      <h2>How long we keep it</h2>
+      <p>
+        Sessions expire after 30 days of inactivity. Recommendation caches expire
+        within days. Interaction history is kept to power your recommendations
+        until you ask us to delete it.
+      </p>
+
+      <h2>Children</h2>
+      <p>
+        CineMatch is not for children under 13 (16 in the EU/UK). We don&rsquo;t
+        knowingly collect data from them; contact us and we&rsquo;ll delete it.
       </p>
 
       <h2>Your rights</h2>
