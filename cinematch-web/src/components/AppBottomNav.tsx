@@ -62,7 +62,9 @@ export default function AppBottomNav() {
 
   const mounted = useMounted();
   const containerRef = useRef<HTMLElement>(null);
+  const startPosRef = useRef<{ x: number; y: number } | null>(null);
   const isDraggingRef = useRef(false);
+  const justDraggedRef = useRef(false);
   const [isDragging, setIsDragging] = useState(false);
 
   const activeId = activeIdFor(pathname, filterParam);
@@ -85,12 +87,10 @@ export default function AppBottomNav() {
     }
   }, [activeIndex, rawPos]);
 
-  const [prevRoute, setPrevRoute] = useState({ pathname, filterParam });
-  if (prevRoute.pathname !== pathname || prevRoute.filterParam !== filterParam) {
-    setPrevRoute({ pathname, filterParam });
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setOptimisticId(null);
-  }
-
+  }, [pathname, filterParam]);
 
   const bubbleX = useTransform(springPos, (val) => `${val * 100}%`);
 
@@ -100,59 +100,96 @@ export default function AppBottomNav() {
     const paddingLeft = 6;
     const paddingRight = 6;
     const usableWidth = rect.width - (paddingLeft + paddingRight);
+    if (usableWidth <= 0) return { fractional: 0, targetIndex: 0 };
     const itemWidth = usableWidth / NAV_ITEMS.length;
     const relativeX = clientX - rect.left - paddingLeft;
     const centerAligned = (relativeX / itemWidth) - 0.5;
     const fractional = Math.max(0, Math.min(NAV_ITEMS.length - 1, centerAligned));
-    const targetIndex = Math.max(0, Math.min(NAV_ITEMS.length - 1, Math.round(centerAligned)));
+    const targetIndex = Math.max(0, Math.min(NAV_ITEMS.length - 1, Math.floor(relativeX / itemWidth)));
     return { fractional, targetIndex };
   }, []);
 
   const handlePointerDown = (e: React.PointerEvent<HTMLElement>) => {
-    isDraggingRef.current = true;
-    setIsDragging(true);
-    const { fractional, targetIndex } = calculateTargetFromX(e.clientX);
-    rawPos.set(fractional);
-    setScrubIndex(targetIndex);
-    try {
-      containerRef.current?.setPointerCapture(e.pointerId);
-    } catch { }
+    if (e.button !== 0) return;
+    startPosRef.current = { x: e.clientX, y: e.clientY };
+    isDraggingRef.current = false;
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLElement>) => {
-    if (!isDraggingRef.current) return;
+    if (!startPosRef.current) return;
+    const dx = e.clientX - startPosRef.current.x;
+    const dy = e.clientY - startPosRef.current.y;
+
+    if (!isDraggingRef.current) {
+      // Require an intentional horizontal drag (>12px) before starting scrub
+      if (Math.abs(dx) > 12 && Math.abs(dx) > Math.abs(dy)) {
+        isDraggingRef.current = true;
+        setIsDragging(true);
+        try {
+          containerRef.current?.setPointerCapture(e.pointerId);
+        } catch { }
+      } else {
+        return;
+      }
+    }
+
     const { fractional, targetIndex } = calculateTargetFromX(e.clientX);
     rawPos.set(fractional);
     if (targetIndex !== scrubIndex) {
       setScrubIndex(targetIndex);
+      if (typeof navigator !== "undefined" && navigator.vibrate) {
+        try { navigator.vibrate(5); } catch { }
+      }
     }
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLElement>) => {
-    if (!isDraggingRef.current) return;
+    const wasDragging = isDraggingRef.current;
+    startPosRef.current = null;
     isDraggingRef.current = false;
     setIsDragging(false);
-    try {
-      containerRef.current?.releasePointerCapture(e.pointerId);
-    } catch { }
 
-    const { targetIndex } = calculateTargetFromX(e.clientX);
-    rawPos.set(targetIndex);
-    setScrubIndex(targetIndex);
+    if (wasDragging) {
+      justDraggedRef.current = true;
+      setTimeout(() => {
+        justDraggedRef.current = false;
+      }, 150);
 
-    const targetItem = NAV_ITEMS[targetIndex];
-    if (targetItem) {
-      setOptimisticId(targetItem.id);
-      router.push(targetItem.href);
+      try {
+        containerRef.current?.releasePointerCapture(e.pointerId);
+      } catch { }
+
+      const { targetIndex } = calculateTargetFromX(e.clientX);
+      rawPos.set(targetIndex);
+      setScrubIndex(targetIndex);
+
+      const targetItem = NAV_ITEMS[targetIndex];
+      if (targetItem && displayedActiveId !== targetItem.id) {
+        setOptimisticId(targetItem.id);
+        const currentIsYourLikes = pathname.startsWith("/your-likes");
+        const targetIsYourLikes = targetItem.href.startsWith("/your-likes");
+
+        if (currentIsYourLikes && targetIsYourLikes) {
+          const targetFilter = targetItem.id === "watchlist" ? "watchlist" : "love";
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent("cinematch:filter-change", { detail: targetFilter }));
+          }
+          router.replace(targetItem.href, { scroll: false });
+        } else {
+          router.push(targetItem.href);
+        }
+      }
     }
   };
 
   const handlePointerCancel = () => {
-    if (!isDraggingRef.current) return;
-    isDraggingRef.current = false;
-    setIsDragging(false);
-    rawPos.set(activeIndex);
-    setScrubIndex(activeIndex);
+    startPosRef.current = null;
+    if (isDraggingRef.current) {
+      isDraggingRef.current = false;
+      setIsDragging(false);
+      rawPos.set(activeIndex);
+      setScrubIndex(activeIndex);
+    }
   };
 
   if (!mounted || !session) return null;
@@ -230,14 +267,34 @@ export default function AppBottomNav() {
               href={item.href}
               prefetch={false}
               onClick={(e) => {
-                if (isDraggingRef.current) {
+                if (justDraggedRef.current) {
                   e.preventDefault();
                   return;
                 }
-                if (displayedActiveId !== item.id) {
-                  setOptimisticId(item.id);
-                  rawPos.set(idx);
-                  setScrubIndex(idx);
+
+                if (displayedActiveId === item.id) {
+                  e.preventDefault();
+                  if (typeof window !== "undefined") {
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }
+                  return;
+                }
+
+                setOptimisticId(item.id);
+                rawPos.set(idx);
+                setScrubIndex(idx);
+
+                const currentIsYourLikes = pathname.startsWith("/your-likes");
+                const targetIsYourLikes = item.href.startsWith("/your-likes");
+
+                if (currentIsYourLikes && targetIsYourLikes) {
+                  e.preventDefault();
+                  const targetFilter = item.id === "watchlist" ? "watchlist" : "love";
+                  if (typeof window !== "undefined") {
+                    window.dispatchEvent(new CustomEvent("cinematch:filter-change", { detail: targetFilter }));
+                  }
+                  router.replace(item.href, { scroll: false });
+                  return;
                 }
               }}
               aria-current={isActive ? "page" : undefined}

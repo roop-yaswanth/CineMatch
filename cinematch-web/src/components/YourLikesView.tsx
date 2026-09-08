@@ -69,7 +69,18 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "lov
     /* eslint-disable-next-line react-hooks/set-state-in-effect */
     setInteractionFilter(normalizeFilter(initialFilter));
   }, [initialFilter]);
-  // We don't watch searchParams here since it's passed from parent as initialFilter
+
+  // Instant filter switches from bottom nav or external events
+  useEffect(() => {
+    const handleFilterChange = (e: Event) => {
+      const customEvent = e as CustomEvent<InteractionFilter>;
+      if (customEvent.detail) {
+        setInteractionFilter(normalizeFilter(customEvent.detail));
+      }
+    };
+    window.addEventListener("cinematch:filter-change", handleFilterChange);
+    return () => window.removeEventListener("cinematch:filter-change", handleFilterChange);
+  }, []);
 
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect */
