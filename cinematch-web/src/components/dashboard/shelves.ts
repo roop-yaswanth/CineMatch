@@ -470,16 +470,25 @@ export function buildShelves(
       ((b.trend_score ?? 0) - (a.trend_score ?? 0)) ||
       (prominenceScore(b) - prominenceScore(a))
     );
-  let freshTaken = takeFrom(
-    sortByYearThenHits(curatedSource.filter((m) => yearOf(m) >= CURRENT_YEAR - 3)),
-    THEME_VISIBLE, { seed: "fresh" }
-  );
-  if (!freshTaken) {
-    freshTaken = takeFrom(
-      sortByYearThenHits(curatedSource.filter((m) => yearOf(m) >= CURRENT_YEAR - 5)),
-      THEME_VISIBLE, { seed: "fresh-wide" }
-    );
+
+  // Check how many unused candidates exist before taking, widening the year window
+  // progressively if the pool has fewer than 15 fresh titles.
+  let freshCandidates = sortByYearThenHits(curatedSource.filter((m) => yearOf(m) >= CURRENT_YEAR - 3));
+  let freshUnusedCount = freshCandidates.filter((m) => !usedIds.has(Number(recommendationId(m)))).length;
+
+  if (freshUnusedCount < 15) {
+    freshCandidates = sortByYearThenHits(curatedSource.filter((m) => yearOf(m) >= CURRENT_YEAR - 5));
+    freshUnusedCount = freshCandidates.filter((m) => !usedIds.has(Number(recommendationId(m)))).length;
   }
+  if (freshUnusedCount < 15) {
+    freshCandidates = sortByYearThenHits(curatedSource.filter((m) => yearOf(m) >= CURRENT_YEAR - 8));
+  }
+
+  const freshTaken = takeFrom(
+    freshCandidates,
+    THEME_VISIBLE,
+    { seed: "fresh", minNeeded: 10, reserve: OVERLAY_RESERVE }
+  );
   if (freshTaken) {
     shelves.push({
       id: "fresh",
@@ -487,13 +496,14 @@ export function buildShelves(
       title: "Fresh & Buzzing",
       variant: "poster",
       movies: freshTaken.movies,
-      fullMovies: freshTaken.movies,
+      fullMovies: freshTaken.fullMovies ?? freshTaken.movies,
     });
   }
 
   /* ── 5–7 · Genre micro-shelves (strictly preferred languages) ── */
   const genreCounts = new Map<string, number>();
   for (const m of curatedSource) {
+    if (usedIds.has(Number(recommendationId(m)))) continue;
     const genres = m.genres?.length ? m.genres : m.primary_genre ? [m.primary_genre] : [];
     for (const g of genres) {
       if (g && g !== "Unknown" && !NON_NARRATIVE_GENRES.has(g)) {
@@ -503,7 +513,7 @@ export function buildShelves(
   }
 
   const topGenres = [...genreCounts.entries()]
-    .filter(([, count]) => count >= MIN_SHELF)
+    .filter(([, count]) => count >= 10)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 3)
     .map(([g]) => g);
@@ -513,7 +523,11 @@ export function buildShelves(
       const gs = m.genres?.length ? m.genres : [m.primary_genre ?? ""];
       return gs.includes(genre);
     });
-    const taken = takeFrom(membersFull, THEME_VISIBLE, { seed: `genre-${i}-${genre}` });
+    const taken = takeFrom(membersFull, THEME_VISIBLE, {
+      seed: `genre-${i}-${genre}`,
+      minNeeded: 10,
+      reserve: OVERLAY_RESERVE,
+    });
     if (!taken) return;
     shelves.push({
       id: `genre-${i}`,
@@ -521,31 +535,30 @@ export function buildShelves(
       title: GENRE_SHELF_TITLES[genre] ?? `${genre} Spotlight`,
       variant: "poster",
       movies: taken.movies,
-      fullMovies: taken.movies,
+      fullMovies: taken.fullMovies ?? taken.movies,
     });
   });
 
   /* ── 8 · Hidden gems (strictly preferred languages) ── */
-  // (placed after genre rails; director shelf is injected in section 7b below)
+  let gemsCandidates = curatedSource
+    .filter((m) => {
+      const v = votesOf(m);
+      return v >= 100 && v <= 45_000 && ratingOf(m) >= 6.8;
+    })
+    .sort((a, b) => ratingOf(b) - ratingOf(a));
 
-  /* ── 8 · Hidden gems (strictly preferred languages) ── */
-  let gemsTaken = takeFrom(
-    curatedSource
-      .filter((m) => {
-        const v = votesOf(m);
-        return v >= 100 && v <= 45_000 && ratingOf(m) >= 6.8;
-      })
-      .sort((a, b) => ratingOf(b) - ratingOf(a)),
-    THEME_VISIBLE, { seed: "gems" }
-  );
-  if (!gemsTaken) {
-    gemsTaken = takeFrom(
-      curatedSource
-        .filter((m) => votesOf(m) <= 90_000 && ratingOf(m) >= 6.7)
-        .sort((a, b) => ratingOf(b) - ratingOf(a)),
-      THEME_VISIBLE, { seed: "gems-wide" }
-    );
+  const gemsUnusedCount = gemsCandidates.filter((m) => !usedIds.has(Number(recommendationId(m)))).length;
+  if (gemsUnusedCount < 12) {
+    gemsCandidates = curatedSource
+      .filter((m) => votesOf(m) <= 90_000 && ratingOf(m) >= 6.7)
+      .sort((a, b) => ratingOf(b) - ratingOf(a));
   }
+
+  const gemsTaken = takeFrom(gemsCandidates, THEME_VISIBLE, {
+    seed: "gems",
+    minNeeded: 10,
+    reserve: OVERLAY_RESERVE,
+  });
   if (gemsTaken) {
     shelves.push({
       id: "gems",
@@ -553,7 +566,7 @@ export function buildShelves(
       title: "Hidden Gems",
       variant: "poster",
       movies: gemsTaken.movies,
-      fullMovies: gemsTaken.movies,
+      fullMovies: gemsTaken.fullMovies ?? gemsTaken.movies,
     });
   }
 
@@ -563,7 +576,8 @@ export function buildShelves(
       curatedSource
         .filter((m) => yearOf(m) > 0 && yearOf(m) < 2000)
         .sort((a, b) => ratingOf(b) - ratingOf(a)),
-      THEME_VISIBLE, { seed: "classics" }
+      THEME_VISIBLE,
+      { seed: "classics", minNeeded: 10, reserve: OVERLAY_RESERVE }
     );
     if (classicsTaken) {
       shelves.push({
@@ -572,7 +586,7 @@ export function buildShelves(
         title: "Timeless Classics",
         variant: "poster",
         movies: classicsTaken.movies,
-        fullMovies: classicsTaken.movies,
+        fullMovies: classicsTaken.fullMovies ?? classicsTaken.movies,
       });
     }
   }
