@@ -44,10 +44,10 @@ function normalizeFilter(f?: string | null): InteractionFilter {
 }
 
 const INTERACTION_FILTERS: Array<{ value: InteractionFilter; label: string }> = [
+  { value: "all", label: "All Reactions" },
   { value: "love", label: "Loved" },
   { value: "like", label: "Liked" },
   { value: "watchlist", label: "Watchlist" },
-  { value: "all", label: "All Reactions" },
   { value: "not_watched", label: "Skipped" },
   { value: "dislike", label: "Disliked" },
 ];
@@ -109,7 +109,7 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "lov
             setItems(data);
             writeHistoryCache(sessionId, data);
           })
-          .catch(() => {});
+          .catch(() => { });
       }
     };
     window.addEventListener("focus", onFocus);
