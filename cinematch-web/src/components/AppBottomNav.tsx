@@ -11,6 +11,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 
 import { useMounted } from "@/lib/useMounted";
+import { useSession } from "@/context/SessionContext";
 import {
   IconHome,
   IconCompass,
@@ -30,17 +31,19 @@ const NAV_ITEMS: NavItem[] = [
   { id: "home", href: "/dashboard", label: "Home", Icon: IconHome },
   { id: "explore", href: "/explore", label: "Explore", Icon: IconCompass },
   { id: "watchlist", href: "/your-likes?filter=watchlist", label: "Watchlist", Icon: IconBookmark },
-  { id: "likes", href: "/your-likes", label: "Likes", Icon: IconHeart },
+  { id: "likes", href: "/your-likes?filter=likes", label: "Likes", Icon: IconHeart },
   { id: "search", href: "/search", label: "Search", Icon: IconSearch },
 ];
 
 const HIDDEN_ROUTES: Array<(p: string) => boolean> = [
-  (p) => p === "/login",
+  (p) => p === "/" || p === "",
+  (p) => p === "/login" || p.startsWith("/login/"),
   (p) => p.startsWith("/onboarding"),
+  (p) => p.startsWith("/about") || p.startsWith("/terms") || p.startsWith("/privacy"),
 ];
 
 function activeIdFor(pathname: string, filterParam: string | null): NavItem["id"] | null {
-  if (pathname === "/dashboard" || pathname === "/") return "home";
+  if (pathname === "/dashboard") return "home";
   if (pathname.startsWith("/explore")) return "explore";
   if (pathname.startsWith("/search")) return "search";
   if (pathname.startsWith("/your-likes")) {
@@ -51,6 +54,7 @@ function activeIdFor(pathname: string, filterParam: string | null): NavItem["id"
 
 export default function AppBottomNav() {
   const router = useRouter();
+  const { session } = useSession();
   const pathname = usePathname() ?? "/";
   const searchParams = useSearchParams();
   const filterParam = searchParams?.get("filter") ?? null;
@@ -145,7 +149,7 @@ export default function AppBottomNav() {
     setScrubIndex(activeIndex);
   };
 
-  if (!mounted) return null;
+  if (!mounted || !session) return null;
   if (HIDDEN_ROUTES.some((m) => m(pathname))) return null;
 
   return (

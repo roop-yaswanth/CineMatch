@@ -10,7 +10,7 @@ function YourLikesContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const rawFilter = searchParams.get("filter");
-  const filter = (rawFilter ?? "all") as "watchlist" | "love" | "like" | "dislike" | "not_watched" | "all";
+  const filter = (rawFilter ?? "likes") as "watchlist" | "likes" | "love" | "like" | "dislike" | "not_watched" | "all";
   const { session, isLoading } = useSession();
   useAuthGuard();
 

@@ -30,11 +30,19 @@ export function proxy(req: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // Root route: default to /login for visitors, /dashboard for signed-in users
+  if (pathname === "/") {
+    const url = req.nextUrl.clone();
+    url.pathname = signedIn ? "/dashboard" : "/login";
+    return NextResponse.redirect(url);
+  }
+
   return NextResponse.next();
 }
 
 export const config = {
   matcher: [
+    "/",
     "/dashboard/:path*",
     "/onboarding/:path*",
     "/your-likes/:path*",

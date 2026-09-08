@@ -29,20 +29,21 @@ interface Props {
   initialFilter?: InteractionFilter;
 }
 
-type InteractionFilter = "all" | "love" | "like" | "dislike" | "not_watched" | "watchlist";
+type InteractionFilter = "all" | "likes" | "love" | "like" | "dislike" | "not_watched" | "watchlist";
 // Exported so we can cast it when using domain functions
 export type HistoryListItem = HistoryItem & { genres?: string[] };
 
 const INTERACTION_FILTERS: Array<{ value: InteractionFilter; label: string }> = [
-  { value: "all", label: "All Reactions" },
+  { value: "likes", label: "Likes (Loved & Liked)" },
   { value: "love", label: "Loved" },
   { value: "like", label: "Liked" },
-  { value: "dislike", label: "Disliked" },
-  { value: "not_watched", label: "Skipped" },
+  { value: "all", label: "All Reactions" },
   { value: "watchlist", label: "Watchlist" },
+  { value: "not_watched", label: "Skipped" },
+  { value: "dislike", label: "Disliked" },
 ];
 
-export default function YourLikesView({ sessionId, onClose, initialFilter = "all" }: Props) {
+export default function YourLikesView({ sessionId, onClose, initialFilter = "likes" }: Props) {
   const { logout } = useSession();
   const [items, setItems] = useState<HistoryListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -123,7 +124,12 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
     // Interaction filter
     if (interactionFilter === "watchlist") {
       filtered = filtered.filter((item) => item.rating === "watchlist" || item.is_watchlist);
-    } else if (interactionFilter !== "all") {
+    } else if (interactionFilter === "likes") {
+      filtered = filtered.filter((item) => item.rating === "like" || item.rating === "love");
+    } else if (interactionFilter === "all") {
+      // All reacted items, excluding unrated synthetic watchlist entries
+      filtered = filtered.filter((item) => item.rating !== "watchlist");
+    } else {
       filtered = filtered.filter((item) => item.rating === interactionFilter);
     }
 
@@ -181,7 +187,7 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
           showNavTabs
           title={
             <span style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}>
-              {interactionFilter === "watchlist" ? "Watchlist" : "Your Collection"}
+              {interactionFilter === "watchlist" ? "Watchlist" : interactionFilter === "likes" ? "Your Likes" : "Your Collection"}
             </span>
           }
           rightSlot={
@@ -215,7 +221,7 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder={interactionFilter === "watchlist" ? "Search watchlist…" : "Search collection…"}
+                  placeholder={interactionFilter === "watchlist" ? "Search watchlist…" : interactionFilter === "likes" ? "Search likes…" : "Search collection…"}
                   className="dash-search"
                   style={{
                     width: "100%",
@@ -281,7 +287,7 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={interactionFilter === "watchlist" ? "Search watchlist…" : "Search collection…"}
+              placeholder={interactionFilter === "watchlist" ? "Search watchlist…" : interactionFilter === "likes" ? "Search likes…" : "Search collection…"}
               className="app-search-input"
               style={{
                 width: "100%",
@@ -443,6 +449,15 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "all
                     title="Your watchlist is empty"
                     description="Add movies to your watchlist from dashboard or explore to watch them later."
                     cta={{ kind: "link", href: "/explore", label: "Browse Trending" }}
+                  />
+                );
+              }
+              if (interactionFilter === "likes") {
+                return (
+                  <EmptyState
+                    title="No liked movies yet"
+                    description="Movies you like or love while browsing will appear here."
+                    cta={{ kind: "link", href: "/dashboard", label: "Explore Recommendations" }}
                   />
                 );
               }

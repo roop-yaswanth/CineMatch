@@ -23,7 +23,7 @@ import { preferencesFromProfile, recommendationId } from "@/domain/types/movie";
 import type { Collection } from "@/components/dashboard/CollectionOverlay";
 import type { DetailMovie } from "@/components/modals/MovieDetailModal";
 
-export type RecommendationAction = "love" | "like" | "dislike" | "remove" | "watchlist" | "skip" | "remove_rating" | "remove_watchlist";
+export type RecommendationAction = "love" | "like" | "dislike" | "remove" | "watchlist" | "skip" | "remove_rating" | "remove_watchlist" | "not_watched";
 export type StackId = "hollywood" | "matched" | "other" | string;
 
 export interface Stack {
@@ -203,10 +203,13 @@ export function useRecommendations(
   const actionCountRef = useRef({ positive: 0, negative: 0, total: 0 });
   const countedActionsRef = useRef<Set<number>>(new Set());
 
-  // Track permanently rated IDs so they are never forgotten or wiped on reset
+  // Track permanently rated IDs so they are never forgotten or wiped on reset.
+  // Exclude 'not_watched' items so they remain eligible for future recommendations if they match taste.
   const [initialRatedIds] = useState<Set<number>>(() => {
     const fromHistory = typeof window !== "undefined" && session?.session_id ? readHistoryCache(session.session_id) : null;
-    const historyIds = fromHistory ? fromHistory.map((h) => Number(h.tmdb_id)).filter(Boolean) : [];
+    const historyIds = fromHistory
+      ? fromHistory.filter((h) => h.rating !== "not_watched").map((h) => Number(h.tmdb_id)).filter(Boolean)
+      : [];
     return new Set(historyIds);
   });
   const ratedIdsRef = useRef<Set<number>>(new Set(initialRatedIds));
@@ -507,7 +510,9 @@ export function useRecommendations(
       const rawId = "tmdb_id" in movie && movie.tmdb_id ? movie.tmdb_id : movie.id;
       const tmdbId = Number(rawId);
 
-      ratedIdsRef.current.add(tmdbId);
+      if (action !== "not_watched" && action !== "skip") {
+        ratedIdsRef.current.add(tmdbId);
+      }
       seenIdsRef.current.add(tmdbId);
       setSeenMovieIds((prev) => {
         const next = new Set(prev);
@@ -631,7 +636,8 @@ export function useRecommendations(
       .then((history) => {
         if (cancelled || !Array.isArray(history)) return;
         writeHistoryCache(session.session_id, history);
-        const ids = history.map((h) => Number(h.tmdb_id)).filter(Boolean);
+        const ratedHistory = history.filter((h) => h.rating !== "not_watched");
+        const ids = ratedHistory.map((h) => Number(h.tmdb_id)).filter(Boolean);
         if (ids.length === 0) return;
         for (const id of ids) {
           ratedIdsRef.current.add(id);
