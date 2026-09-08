@@ -232,6 +232,12 @@ function PosterCard({
             loading={priority ? "eager" : "lazy"}
             decoding="async"
             draggable={false}
+            onError={(e) => {
+              const target = e.currentTarget;
+              if (!target.src.endsWith("/poster_placeholder.svg")) {
+                target.src = "/poster_placeholder.svg";
+              }
+            }}
           />
           {(imdb || yearLabel(movie)) && (
             <span className={`shelf-card-badge${rank != null ? " ranked-badge" : ""}`}>
@@ -735,8 +741,31 @@ function SpotlightCard({
           />
         ) : (
           <div className="spotlight-fallback">
-            <img src={poster} alt="" className="spotlight-fallback-blur" aria-hidden draggable={false} />
-            <img src={poster} alt={movie.title} className="spotlight-fallback-poster" draggable={false} />
+            <img
+              src={poster}
+              alt=""
+              className="spotlight-fallback-blur"
+              aria-hidden
+              draggable={false}
+              onError={(e) => {
+                const target = e.currentTarget;
+                if (!target.src.endsWith("/poster_placeholder.svg")) {
+                  target.src = "/poster_placeholder.svg";
+                }
+              }}
+            />
+            <img
+              src={poster}
+              alt={movie.title}
+              className="spotlight-fallback-poster"
+              draggable={false}
+              onError={(e) => {
+                const target = e.currentTarget;
+                if (!target.src.endsWith("/poster_placeholder.svg")) {
+                  target.src = "/poster_placeholder.svg";
+                }
+              }}
+            />
           </div>
         )}
         <div className="spotlight-scrim" aria-hidden />

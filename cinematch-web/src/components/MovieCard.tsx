@@ -91,7 +91,6 @@ export const MovieCard = memo(function MovieCard({
   className = "",
   compact = false,
   overlay = false,
-  noLayout = false,
   showFullDate = false,
   userRating,
   isWatchlist = false,
@@ -145,7 +144,6 @@ export const MovieCard = memo(function MovieCard({
 
   const posterFrame = (
     <motion.div
-      layout={!noLayout}
       className="card-poster-frame"
       style={posterFrameStyle(compact)}
       whileHover={overlay ? { scale: 1.03, y: -4 } : { scale: 1.02, y: -4 }}
@@ -155,7 +153,14 @@ export const MovieCard = memo(function MovieCard({
         src={poster}
         alt={movie.title}
         loading={priority ? "eager" : "lazy"}
+        decoding="async"
         style={imageStyle}
+        onError={(e) => {
+          const target = e.currentTarget;
+          if (!target.src.endsWith("/poster_placeholder.svg")) {
+            target.src = "/poster_placeholder.svg";
+          }
+        }}
       />
       <StatusBadge movie={movie} />
       {!overlay && (imdb || tmdbRating) && <RatingBadge score={imdb || tmdbRating!} />}
