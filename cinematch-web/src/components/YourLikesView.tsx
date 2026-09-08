@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { AnimatePresence } from "framer-motion";
+import { useRouter } from "next/navigation";
 import { MovieCard } from "@/components/MovieCard";
 
 import dynamic from "next/dynamic";
@@ -29,35 +29,45 @@ interface Props {
   initialFilter?: InteractionFilter;
 }
 
-type InteractionFilter = "all" | "likes" | "love" | "like" | "dislike" | "not_watched" | "watchlist";
+type InteractionFilter = "all" | "love" | "like" | "dislike" | "not_watched" | "watchlist";
 // Exported so we can cast it when using domain functions
 export type HistoryListItem = HistoryItem & { genres?: string[] };
 
+function normalizeFilter(f?: string | null): InteractionFilter {
+  if (f === "likes" || f === "love") return "love";
+  if (f === "like") return "like";
+  if (f === "watchlist") return "watchlist";
+  if (f === "not_watched") return "not_watched";
+  if (f === "dislike") return "dislike";
+  if (f === "all") return "all";
+  return "love";
+}
+
 const INTERACTION_FILTERS: Array<{ value: InteractionFilter; label: string }> = [
-  { value: "likes", label: "Likes (Loved & Liked)" },
   { value: "love", label: "Loved" },
   { value: "like", label: "Liked" },
-  { value: "all", label: "All Reactions" },
   { value: "watchlist", label: "Watchlist" },
+  { value: "all", label: "All Reactions" },
   { value: "not_watched", label: "Skipped" },
   { value: "dislike", label: "Disliked" },
 ];
 
-export default function YourLikesView({ sessionId, onClose, initialFilter = "likes" }: Props) {
+export default function YourLikesView({ sessionId, onClose, initialFilter = "love" }: Props) {
+  const router = useRouter();
   const { logout } = useSession();
   const [items, setItems] = useState<HistoryListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeMovie, setActiveMovie] = useState<DetailMovie | null>(null);
 
   // Filters
-  const [interactionFilter, setInteractionFilter] = useState<InteractionFilter>(initialFilter);
+  const [interactionFilter, setInteractionFilter] = useState<InteractionFilter>(() => normalizeFilter(initialFilter));
   const [genreFilter, setGenreFilter] = useState<string>("all");
   const [languageFilter, setLanguageFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
 
   useEffect(() => {
     /* eslint-disable-next-line react-hooks/set-state-in-effect */
-    setInteractionFilter(initialFilter);
+    setInteractionFilter(normalizeFilter(initialFilter));
   }, [initialFilter]);
   // We don't watch searchParams here since it's passed from parent as initialFilter
 
@@ -89,6 +99,26 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "lik
       });
     return () => { cancelled = true; };
   }, [logout, sessionId]);
+
+  // Multi-device sync: auto-refetch when user switches tabs or returns to the window
+  useEffect(() => {
+    const onFocus = () => {
+      if (document.visibilityState === "visible") {
+        apiGetHistory(sessionId)
+          .then((data) => {
+            setItems(data);
+            writeHistoryCache(sessionId, data);
+          })
+          .catch(() => {});
+      }
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+    };
+  }, [sessionId]);
 
   // Extract unique genres and languages from items
   const { genres, languages } = useMemo(() => {
@@ -124,8 +154,6 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "lik
     // Interaction filter
     if (interactionFilter === "watchlist") {
       filtered = filtered.filter((item) => item.rating === "watchlist" || item.is_watchlist);
-    } else if (interactionFilter === "likes") {
-      filtered = filtered.filter((item) => item.rating === "like" || item.rating === "love");
     } else if (interactionFilter === "all") {
       // All reacted items, excluding unrated synthetic watchlist entries
       filtered = filtered.filter((item) => item.rating !== "watchlist");
@@ -187,7 +215,7 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "lik
           showNavTabs
           title={
             <span style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}>
-              {interactionFilter === "watchlist" ? "Watchlist" : interactionFilter === "likes" ? "Your Likes" : "Your Collection"}
+              {interactionFilter === "watchlist" ? "Watchlist" : interactionFilter === "love" ? "Loved Movies" : interactionFilter === "like" ? "Liked Movies" : "Your Collection"}
             </span>
           }
           rightSlot={
@@ -221,7 +249,7 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "lik
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder={interactionFilter === "watchlist" ? "Search watchlist…" : interactionFilter === "likes" ? "Search likes…" : "Search collection…"}
+                  placeholder={interactionFilter === "watchlist" ? "Search watchlist…" : interactionFilter === "love" || interactionFilter === "like" ? "Search likes…" : "Search collection…"}
                   className="dash-search"
                   style={{
                     width: "100%",
@@ -287,7 +315,7 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "lik
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={interactionFilter === "watchlist" ? "Search watchlist…" : interactionFilter === "likes" ? "Search likes…" : "Search collection…"}
+              placeholder={interactionFilter === "watchlist" ? "Search watchlist…" : interactionFilter === "love" || interactionFilter === "like" ? "Search likes…" : "Search collection…"}
               className="app-search-input"
               style={{
                 width: "100%",
@@ -349,7 +377,9 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "lik
           <select
             value={interactionFilter}
             onChange={(e) => {
-              setInteractionFilter(e.target.value as InteractionFilter);
+              const val = e.target.value as InteractionFilter;
+              setInteractionFilter(val);
+              router.replace(`/your-likes?filter=${val}`, { scroll: false });
             }}
             className="filter-select"
             data-active={interactionFilter !== "all" ? "true" : undefined}
@@ -452,7 +482,7 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "lik
                   />
                 );
               }
-              if (interactionFilter === "likes") {
+              if (interactionFilter === "love" || interactionFilter === "like") {
                 return (
                   <EmptyState
                     title="No liked movies yet"
@@ -493,36 +523,34 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "lik
           )}
 
           {!loading && filteredItems.length > 0 && (
-            <AnimatePresence>
-              <div className="likes-grid"
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
-                  gap: "16px",
-                }}
-              >
-                {filteredItems.map((item, idx) => (
-                  <div
-                    key={`${item.tmdb_id}-${idx}`}
-                    onClick={() => {
-                      setActiveMovie(toDetailMovie({ ...item, id: item.tmdb_id }));
-                    }}
-                    style={{ cursor: "pointer" }}
-                  >
-                    <MovieCard
-                      movie={{ ...item, id: item.tmdb_id }}
-                      compact
-                      userRating={
-                        item.rating === "love" || item.rating === "like" || item.rating === "dislike"
-                          ? item.rating
-                          : null
-                      }
-                      isWatchlist={Boolean(item.is_watchlist || item.rating === "watchlist")}
-                    />
-                  </div>
-                ))}
-              </div>
-            </AnimatePresence>
+            <div className="likes-grid"
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+                gap: "16px",
+              }}
+            >
+              {filteredItems.map((item) => (
+                <div
+                  key={item.tmdb_id}
+                  onClick={() => {
+                    setActiveMovie(toDetailMovie({ ...item, id: item.tmdb_id }));
+                  }}
+                  style={{ cursor: "pointer" }}
+                >
+                  <MovieCard
+                    movie={{ ...item, id: item.tmdb_id }}
+                    compact
+                    userRating={
+                      item.rating === "love" || item.rating === "like" || item.rating === "dislike"
+                        ? item.rating
+                        : null
+                    }
+                    isWatchlist={Boolean(item.is_watchlist || item.rating === "watchlist")}
+                  />
+                </div>
+              ))}
+            </div>
           )}
         </div>
       </div>

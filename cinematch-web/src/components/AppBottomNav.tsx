@@ -31,7 +31,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "home", href: "/dashboard", label: "Home", Icon: IconHome },
   { id: "explore", href: "/explore", label: "Explore", Icon: IconCompass },
   { id: "watchlist", href: "/your-likes?filter=watchlist", label: "Watchlist", Icon: IconBookmark },
-  { id: "likes", href: "/your-likes?filter=likes", label: "Likes", Icon: IconHeart },
+  { id: "likes", href: "/your-likes?filter=love", label: "Likes", Icon: IconHeart },
   { id: "search", href: "/search", label: "Search", Icon: IconSearch },
 ];
 
@@ -84,6 +84,12 @@ export default function AppBottomNav() {
       setScrubIndex(activeIndex);
     }
   }, [activeIndex, rawPos]);
+
+  const [prevRoute, setPrevRoute] = useState({ pathname, filterParam });
+  if (prevRoute.pathname !== pathname || prevRoute.filterParam !== filterParam) {
+    setPrevRoute({ pathname, filterParam });
+    setOptimisticId(null);
+  }
 
 
   const bubbleX = useTransform(springPos, (val) => `${val * 100}%`);
