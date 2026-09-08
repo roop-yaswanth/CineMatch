@@ -84,9 +84,8 @@ export default function GoogleSignInButton({
           msg.includes("exceeded") ||
           msg.includes("SERVER_SLEEPING")
         ) {
-          if (typeof window !== "undefined") {
-            window.location.href = "/500";
-          }
+
+          setError("Server is waking up. Please wait a minute and try again.");
           return;
         }
         setError(msg || "Sign-in failed. Please try again.");

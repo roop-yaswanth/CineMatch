@@ -78,11 +78,13 @@ async function proxy(
   }
 
   let upstream: Response;
-  // 20s timeout — HuggingFace free-tier Spaces hibernate when inactive; a waking Space
+  // 30s timeout — HuggingFace free-tier Spaces hibernate when inactive; a waking Space
   // or deep multi-bucket generation (up to ~6 language buckets × 90-150 movies)
-  // can legitimately take 12-14s on CPU. Giving 20s prevents premature 12s aborts.
+  // can legitimately take 12-14s on CPU, longer under queueing during a spike.
+  // Must stay below Vercel's function timeout but above backend compute so slow
+  // requests surface as structured SERVER_SLEEPING (inline retry) instead of aborts.
   const controller = new AbortController();
-  const upstreamTimeout = setTimeout(() => controller.abort(), 20_000);
+  const upstreamTimeout = setTimeout(() => controller.abort(), 30_000);
   try {
     upstream = await fetch(url, { method: req.method, headers, body, signal: controller.signal });
   } catch {
@@ -129,7 +131,7 @@ async function proxy(
       if (json.auth_token) {
         const token = json.auth_token;
         delete json.auth_token;
-        
+
         const newBody = new TextEncoder().encode(JSON.stringify(json));
         const newResponse = new NextResponse(newBody, {
           status: upstream.status,
@@ -151,7 +153,7 @@ async function proxy(
           path: "/",
           maxAge: 7 * 24 * 60 * 60, // 7 days
         });
-        
+
         return newResponse;
       }
     } catch {

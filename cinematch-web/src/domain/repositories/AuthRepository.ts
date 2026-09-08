@@ -9,6 +9,7 @@ import type { UserSession } from "../types/movie";
 export interface AuthRepository {
   loginWithGoogle(credential: string): Promise<UserSession>;
   refreshSession(authToken: string): Promise<UserSession>;
+  refreshSessionFromCookie(): Promise<UserSession>;
   logout(sessionId: string): Promise<void>;
 }
 

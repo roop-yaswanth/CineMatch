@@ -15,6 +15,15 @@ export class HttpAuthRepository implements AuthRepository {
       body: JSON.stringify({ auth_token: authToken }),
     });
   }
+  refreshSessionFromCookie(): Promise<UserSession> {
+    // httpOnly-cookie refresh — no secret in JS. Same-origin fetch sends
+    // cookies automatically; the proxy forwards them as `x-auth-token`.
+    return httpRequest<UserSession>("/api/auth/refresh", {
+      method: "POST",
+      body: JSON.stringify({}),
+      timeout: 30000,
+    });
+  }
   logout(sessionId: string): Promise<void> {
     return httpRequest<void>("/api/logout", {
       method: "POST",

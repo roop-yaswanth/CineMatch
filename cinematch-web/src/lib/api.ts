@@ -312,6 +312,16 @@ export async function apiAuthRefresh(authToken: string): Promise<UserSession> {
   });
 }
 
+/** P0: cookie-based refresh — relies on the httpOnly `auth_token` cookie set
+ *  by the proxy (forwarded server-side as `x-auth-token`). No secret touches
+ *  JS/localStorage. Same-origin fetch sends cookies automatically. */
+export async function apiAuthRefreshFromCookie(): Promise<UserSession> {
+  return request<UserSession>("/api/auth/refresh", {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
 /** Best-effort server-side session invalidation on explicit logout. Failures are
  *  non-fatal — the client clears its local session regardless. */
 export async function apiLogout(sessionId: string): Promise<void> {
@@ -388,7 +398,10 @@ export async function apiBuildSlate(
     method: "POST",
     body: JSON.stringify({ session_id: sessionId, ...preferences }),
     retries: 2,
-    timeout: 20000,
+    // must exceed proxy 30s timeout so slow cold-starts surface as a
+    // structured SERVER_SLEEPING 500 (with inline retry) instead of a client
+    // AbortError that previously hard-navigated to /500.
+    timeout: 30000,
   });
 }
 
@@ -462,7 +475,8 @@ export async function apiGenerateRecommendations(
     method: "POST",
     body: JSON.stringify({ session_id: sessionId, ...preferences }),
     retries: 2,
-    timeout: 20000,
+    // see apiBuildSlate — must outlive the proxy timeout.
+    timeout: 30000,
   });
 }
 
@@ -537,7 +551,8 @@ export async function apiMultiRecommendations(
         method: "POST",
         body: JSON.stringify({ session_id: sessionId ?? "", ...preferences }),
         retries: 2,
-        timeout: 20000,
+        // see apiBuildSlate — must outlive the proxy timeout.
+        timeout: 30000,
       }).then((fresh) => {
         if (cacheKey) _multiRecsCacheWrite(cacheKey, fresh);
       }).catch(() => { /* background refresh failure is silent */ });
@@ -549,7 +564,8 @@ export async function apiMultiRecommendations(
     method: "POST",
     body: JSON.stringify({ session_id: sessionId ?? "", ...preferences }),
     retries: 2,
-    timeout: 20000,
+    // see apiBuildSlate — must outlive the proxy timeout.
+    timeout: 30000,
   });
   if (cacheKey) _multiRecsCacheWrite(cacheKey, result);
   return result;
@@ -752,7 +768,8 @@ export async function apiUpdatePreferences(
     method: "PUT",
     body: JSON.stringify({ session_id: sessionId, ...preferences }),
     retries: 2,
-    timeout: 20000,
+    // see apiBuildSlate — must outlive the proxy timeout.
+    timeout: 30000,
   });
 }
 

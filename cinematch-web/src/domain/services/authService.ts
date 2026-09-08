@@ -17,6 +17,11 @@ export async function refreshSession(authToken: string): Promise<UserSession> {
   return repo.refreshSession(authToken);
 }
 
+// cookie-based refresh — no token string needed (httpOnly cookie).
+export async function refreshSessionFromCookie(): Promise<UserSession> {
+  return repo.refreshSessionFromCookie();
+}
+
 export async function signOut(sessionId: string): Promise<void> {
   return repo.logout(sessionId);
 }

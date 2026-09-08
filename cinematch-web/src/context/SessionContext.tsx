@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
 import { AnimatePresence } from "framer-motion";
-import { refreshSession, signOut } from "@/domain/services/authService";
+import { refreshSession, refreshSessionFromCookie, signOut } from "@/domain/services/authService";
 import {
   apiUpdatePreferences,
   isSessionExpiredError,
@@ -72,10 +72,20 @@ function setAuthHintCookie(on: boolean) {
   } catch { /* ignore */ }
 }
 
+// never persist the long-lived auth token to plaintext localStorage —
+// any XSS could exfiltrate the 7-day credential. The httpOnly `auth_token`
+// cookie set by the proxy is the durable credential; localStorage keeps only
+// the non-secret session snapshot for instant paint.
+function stripSecretsForCache(s: UserSession): UserSession {
+  const { auth_token: _dropped, ...rest } = s as UserSession & { auth_token?: unknown };
+  void _dropped;
+  return rest as UserSession;
+}
+
 function persistSession(s: UserSession) {
   try {
     localStorage.setItem(STORAGE_KEY, s.identifier);
-    localStorage.setItem(SESSION_CACHE_KEY, JSON.stringify(s));
+    localStorage.setItem(SESSION_CACHE_KEY, JSON.stringify(stripSecretsForCache(s)));
     setAuthHintCookie(true);
     markActivity();
   } catch { /* storage full */ }
@@ -212,43 +222,53 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setSession(cached);
       setIsLoading(false);
 
-      if (cached.auth_token) {
-        try {
-          const fresh = await refreshSession(cached.auth_token);
-          const next = profileOptimisticActive() && cached.profile
-            ? { ...fresh, profile: cached.profile, auth_token: fresh.auth_token ?? cached.auth_token }
-            : fresh;
-          if (isValidUserSession(next)) {
-            setSession(next);
-            persistSession(next);
-          } else {
-            // Malformed refresh response — keep the cached session rather
-            // than poisoning in-memory state with a null id.
-            console.warn("[SessionProvider] Refresh returned an invalid session; keeping cached copy.");
+      // prefer httpOnly-cookie refresh (no secret in JS). Legacy cached
+      // sessions may still carry an auth_token from before the fix — use it
+      // once, then persistSession strips it going forward.
+      const legacyToken = (cached as UserSession & { auth_token?: string }).auth_token;
+      try {
+        const fresh = legacyToken
+          ? await refreshSession(legacyToken)
+          : await refreshSessionFromCookie();
+        const merged = profileOptimisticActive() && cached.profile
+          ? { ...fresh, profile: cached.profile }
+          : fresh;
+        const next = stripSecretsForCache(merged);
+        if (isValidUserSession(next)) {
+          setSession(next);
+          persistSession(next);
+        } else {
+          // Malformed refresh response — keep the cached session rather
+          // than poisoning in-memory state with a null id.
+          console.warn("[SessionProvider] Refresh returned an invalid session; keeping cached copy.");
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "";
+        if (
+          (err && typeof err === "object" && "isServerSleeping" in err) ||
+          msg.includes("500") ||
+          msg.includes("ServerSleeping") ||
+          msg.includes("exceeded") ||
+          msg.includes("SERVER_SLEEPING")
+        ) {
+          // never hard-nav away on transient backend sleep/overload —
+          // that destroys dashboard stacks + cached session. Keep the cached
+          // session and let the view show inline retry instead.
+          if (typeof window !== "undefined") {
+            try {
+              window.dispatchEvent(new CustomEvent("cinematch:server_sleeping"));
+            } catch { /* ignore */ }
           }
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : "";
-          if (
-            (err && typeof err === "object" && "isServerSleeping" in err) ||
-            msg.includes("500") ||
-            msg.includes("ServerSleeping") ||
-            msg.includes("exceeded") ||
-            msg.includes("SERVER_SLEEPING")
-          ) {
-            if (typeof window !== "undefined") {
-              window.location.href = "/500";
-            }
-            return;
+          return;
+        }
+        if (isSessionExpiredError(err) || msg.includes("401") || msg.includes("Session not found")) {
+          clearStoredSession();
+          setSession(null);
+          if (typeof window !== "undefined") {
+            window.location.replace("/login");
           }
-          if (isSessionExpiredError(err) || msg.includes("401") || msg.includes("Session not found")) {
-            clearStoredSession();
-            setSession(null);
-            if (typeof window !== "undefined") {
-              window.location.replace("/login");
-            }
-          } else {
-            console.warn("[SessionProvider] Token refresh failed; keeping cached session.");
-          }
+        } else {
+          console.warn("[SessionProvider] Token refresh failed; keeping cached session.");
         }
       }
       return;

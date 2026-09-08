@@ -462,8 +462,13 @@ export function useRecommendations(
           msg.includes("exceeded") ||
           msg.includes("SERVER_SLEEPING")
         ) {
+          // keep dashboard state + existing movies visible so the
+          // RecommendationsView empty-state retry stays reachable instead of
+          // hard-navigating to /500 (which previously destroyed all state).
           if (typeof window !== "undefined") {
-            window.location.href = "/500";
+            try {
+              window.dispatchEvent(new CustomEvent("cinematch:server_sleeping"));
+            } catch { /* ignore */ }
           }
         }
       } finally {
@@ -598,9 +603,9 @@ export function useRecommendations(
       apiAnalyticsSwipe(session.session_id, tmdbId, action)
         .then((result) => {
           invalidateHistoryCache(session.session_id);
-          
+
           if (result.should_rerun) {
-             void silentRefresh(preferences);
+            void silentRefresh(preferences);
           }
 
           if (targetStackId) {
@@ -657,7 +662,7 @@ export function useRecommendations(
           };
         });
       })
-      .catch(() => {});
+      .catch(() => { });
     return () => {
       cancelled = true;
     };
