@@ -84,17 +84,58 @@ export function prominenceScore(m: Recommendation): number {
   return bayes * Math.log10(Math.max(v, 10));
 }
 
+/** Interleaves an array of arrays round-robin deterministically. */
+function interleaveRoundRobin<T>(arrays: T[][]): T[] {
+  const cursors = arrays.map(() => 0);
+  const result: T[] = [];
+  let added = true;
+  while (added) {
+    added = false;
+    for (let i = 0; i < arrays.length; i++) {
+      if (cursors[i] < arrays[i].length) {
+        result.push(arrays[i][cursors[i]++]);
+        added = true;
+      }
+    }
+  }
+  return result;
+}
+
 /** Ensures that the first `count` movies in any rail are guaranteed hit films
- *  ranked by Bayesian prominence score, with deeper catalog items trailing. */
+ *  ranked by prominence score, with deeper catalog items trailing.
+ *  When multiple languages are present, top hits are round-robin interleaved across
+ *  all represented languages so no single language (e.g. English) monopolizes the head,
+ *  and the tail continues alternating so items are never chunked into solid language blocks. */
 function ensureHitLead(movies: Recommendation[], count = 15): Recommendation[] {
   if (!movies || movies.length === 0) return [];
-  if (movies.length <= count) {
-    return [...movies].sort((a, b) => prominenceScore(b) - prominenceScore(a));
+  if (movies.length <= 1) return [...movies];
+
+  const byLang = new Map<string, Recommendation[]>();
+  for (const m of movies) {
+    const lg = m.original_language || "unknown";
+    if (!byLang.has(lg)) byLang.set(lg, []);
+    byLang.get(lg)!.push(m);
   }
-  const sortedByHit = [...movies].sort((a, b) => prominenceScore(b) - prominenceScore(a));
-  const leadHits = sortedByHit.slice(0, count);
-  const leadHitIds = new Set(leadHits.map((m) => recommendationId(m)));
-  const remaining = movies.filter((m) => !leadHitIds.has(recommendationId(m)));
+
+  // Single-language pool: standard prominence sort
+  if (byLang.size <= 1) {
+    const sorted = [...movies].sort((a, b) => prominenceScore(b) - prominenceScore(a));
+    const leadHits = sorted.slice(0, count);
+    const leadHitIds = new Set(leadHits.map((m) => recommendationId(m)));
+    const remaining = movies.filter((m) => !leadHitIds.has(recommendationId(m)));
+    return [...leadHits, ...remaining];
+  }
+
+  // Multi-language pool: sort hits within each language by prominence, then round-robin
+  // interleave so each language's blockbusters lead fairly together
+  const sortedByLang: Recommendation[][] = [];
+  for (const [, arr] of byLang) {
+    sortedByLang.push([...arr].sort((a, b) => prominenceScore(b) - prominenceScore(a)));
+  }
+
+  const interleaved = interleaveRoundRobin(sortedByLang);
+  const leadHits = interleaved.slice(0, count);
+  const remaining = interleaved.slice(count);
   return [...leadHits, ...remaining];
 }
 
@@ -151,10 +192,28 @@ export function buildShelves(
   const selectedLanguages = (preferences.languages || []).filter(Boolean);
   const hasEn = selectedLanguages.includes("en") || selectedLanguages.length === 0;
 
-  const preferredPool = dedupe([
-    ...(matched?.movies ?? []),
-    ...(hasEn ? (hollywood?.movies ?? []) : []),
-  ]);
+  // Gather language arrays across matched regional cinema and Hollywood,
+  // then interleave them round-robin so the base preferred pool is organically
+  // distributed across all user-selected languages from the root.
+  const preferredLangBuckets: Recommendation[][] = [];
+  if (matched?.byLanguage && Object.keys(matched.byLanguage).length > 0) {
+    for (const [lg, arr] of Object.entries(matched.byLanguage)) {
+      if (lg !== "_merged" && arr && arr.length > 0) {
+        preferredLangBuckets.push(arr);
+      }
+    }
+  } else if (matched?.movies && matched.movies.length > 0) {
+    preferredLangBuckets.push(matched.movies);
+  }
+  if (hasEn && hollywood?.movies && hollywood.movies.length > 0) {
+    preferredLangBuckets.push(hollywood.movies);
+  }
+
+  const preferredPool = dedupe(
+    preferredLangBuckets.length > 1
+      ? interleaveRoundRobin(preferredLangBuckets)
+      : (preferredLangBuckets[0] ?? [])
+  );
 
   const discoveryPool = dedupe(world?.movies ?? []);
 
@@ -175,7 +234,7 @@ export function buildShelves(
   const takeFrom = (
     pool: Recommendation[],
     visibleCap: number,
-    opts: { minNeeded?: number; reserve?: number; seed?: string } = {}
+    opts: { minNeeded?: number; reserve?: number; seed?: string; skipHitLead?: boolean } = {}
   ): { movies: Recommendation[]; fullMovies?: Recommendation[] } | null => {
     const unused = dedupe(pool.filter((m) => !usedIds.has(recommendationId(m))));
     const minNeeded = opts.minNeeded ?? Math.min(visibleCap, MIN_SHELF);
@@ -184,7 +243,7 @@ export function buildShelves(
     // serves buckets hit-led already; re-assert here because category
     // filters (fresh-year sort, genre membership, gems window) reorder the
     // pool after it left the server.
-    const ordered = ensureHitLead(unused, 15);
+    const ordered = opts.skipHitLead ? unused : ensureHitLead(unused, 15);
     const movies = ordered.slice(0, visibleCap);
     const reserveCount = opts.reserve ?? 0;
     const deep = ordered.slice(visibleCap);
@@ -254,12 +313,25 @@ export function buildShelves(
   const acclaimedCandidates = [...curatedSource]
     .filter((m) => !usedIds.has(Number(recommendationId(m))) && ratingOf(m) >= 7.0)
     .sort((a, b) => normProminence(b) - normProminence(a));
-  const acclaimedPool =
+  const baseAcclaimed =
     acclaimedCandidates.length >= 10
       ? acclaimedCandidates
       : [...curatedSource]
         .filter((m) => !usedIds.has(Number(recommendationId(m))))
         .sort((a, b) => normProminence(b) - normProminence(a));
+
+  // Multi-language fair allocation: group acclaimed candidates by language
+  // and round-robin interleave so every user-selected language gets fair, alternating
+  // representation in the Top 10 matches instead of being monopolized by one language.
+  const acclaimedByLang = new Map<string, Recommendation[]>();
+  for (const m of baseAcclaimed) {
+    const lg = m.original_language ?? "unknown";
+    if (!acclaimedByLang.has(lg)) acclaimedByLang.set(lg, []);
+    acclaimedByLang.get(lg)!.push(m);
+  }
+  const acclaimedPool = acclaimedByLang.size > 1
+    ? interleaveRoundRobin([...acclaimedByLang.values()])
+    : baseAcclaimed;
 
   /* ── Hero billboard ──────────────────────────
      When TMDB trending data is available, the hero interleaves trending/recent
@@ -367,8 +439,8 @@ export function buildShelves(
     usedIds.add(Number(recommendationId(m)));
   }
 
-  /* ── 1 · Ranked Top 10 — highest-prominence matches ── */
-  const top10 = takeFrom(acclaimedPool, 10, { minNeeded: 5 });
+  /* ── 1 · Ranked Top 10 — highest-prominence matches across all selected languages ── */
+  const top10 = takeFrom(acclaimedPool, 10, { minNeeded: 5, skipHitLead: true });
   if (top10) {
     shelves.push({
       id: "acclaimed",
