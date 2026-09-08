@@ -37,9 +37,32 @@ function YourLikesContent() {
   );
 }
 
+function YourLikesSkeleton() {
+  return (
+    <div
+      style={{
+        minHeight: "100dvh",
+        display: "flex",
+        flexDirection: "column",
+        background: "var(--color-bg)",
+        fontFamily: "var(--font-sans)",
+      }}
+    >
+      <div style={{ height: "var(--s-header-h, 64px)", borderBottom: "1px solid var(--hairline)" }} />
+      <div style={{ flex: 1, padding: "24px 24px calc(120px + env(safe-area-inset-bottom))" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: "16px" }}>
+          {Array.from({ length: 12 }).map((_, i) => (
+            <div key={i} className="skeleton-shimmer" style={{ width: "100%", aspectRatio: "2 / 3", borderRadius: "12px" }} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function YourLikesPage() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<YourLikesSkeleton />}>
       <YourLikesContent />
     </Suspense>
   );

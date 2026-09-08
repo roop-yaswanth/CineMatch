@@ -33,9 +33,37 @@ import { SkeletonGrid } from "@/components/ui/Skeleton";
 
 // Removed TABS definition
 
+function SearchSkeleton() {
+  return (
+    <div
+      style={{
+        minHeight: "100dvh",
+        display: "flex",
+        flexDirection: "column",
+        background: "var(--color-bg)",
+        fontFamily: "var(--font-sans)",
+      }}
+    >
+      <header
+        style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 40,
+          height: "var(--s-header-h, 60px)",
+          borderBottom: "1px solid var(--hairline)",
+          background: "var(--color-bg)",
+        }}
+      />
+      <div className="app-container" style={{ flex: 1, width: "100%", padding: "var(--s-5) var(--s-header-x) var(--s-bottom-clearance)" }}>
+        <SkeletonGrid count={12} />
+      </div>
+    </div>
+  );
+}
+
 export default function SearchPageWrapper() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<SearchSkeleton />}>
       <SearchPage />
     </Suspense>
   );

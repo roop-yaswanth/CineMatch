@@ -101,7 +101,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={`${inter.variable}`} suppressHydrationWarning>
-      <body className="bg-[var(--color-bg)] text-[var(--color-text-primary)] antialiased">
+      <body className={`${inter.className} ${inter.variable} bg-[var(--color-bg)] text-[var(--color-text-primary)] antialiased min-h-[100dvh] flex flex-col`}>
         {/* Organization + WebApplication structured data so search engines
             can render rich cards and connect this domain to the brand. */}
         <script
@@ -134,9 +134,7 @@ export default function RootLayout({
           }}
         />
         <SessionProvider>
-          <Suspense fallback={null}>
-            <RouteTransition>{children}</RouteTransition>
-          </Suspense>
+          <RouteTransition>{children}</RouteTransition>
           <AppFooter />
           {/* AppBottomNav uses useSearchParams; wrap it in Suspense so the
               rest of the layout still prerenders statically. */}

@@ -381,6 +381,8 @@ function HeroSlide({
               <img
                 src={posterUrl(liveLogo, "w500")}
                 alt={movie.title}
+                width={320}
+                height={68}
                 style={{
                   maxHeight: "clamp(50px, 8.5vw, 68px)",
                   maxWidth: "min(320px, 78vw)",

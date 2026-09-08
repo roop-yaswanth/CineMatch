@@ -78,9 +78,11 @@ export default function LoginPage() {
     }
   };
 
-  // Avoid flashing login screen if session is already active and valid
+  // Avoid flashing login screen if session is already active and valid; preserve 100dvh to avoid CLS
   const hasNext = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("next");
-  if (!isLoading && session && !hasNext) return null;
+  if (!isLoading && session && !hasNext) {
+    return <div style={{ height: "100dvh", width: "100%", background: "var(--color-bg)" }} />;
+  }
 
   return <LoginScreen onLogin={handleLogin} />;
 }

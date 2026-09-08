@@ -103,9 +103,41 @@ function toDetailMovie(m: ExploreMovie): DetailMovie {
   return { ...m, id: m.tmdb_id, runtime: m.runtime ?? undefined };
 }
 
+function ExploreSkeleton() {
+  return (
+    <div
+      style={{
+        minHeight: "100dvh",
+        display: "flex",
+        flexDirection: "column",
+        background: "var(--color-bg)",
+        fontFamily: "var(--font-sans)",
+      }}
+    >
+      <header
+        style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 40,
+          height: "var(--s-header-h, 60px)",
+          borderBottom: "1px solid var(--hairline)",
+          background: "var(--color-bg)",
+        }}
+      />
+      <div className="app-container" style={{ flex: 1, width: "100%", padding: "var(--s-5) var(--s-header-x) var(--s-bottom-clearance)" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(var(--poster-w), 1fr))", gap: "20px 14px" }}>
+          {Array.from({ length: 14 }).map((_, i) => (
+            <div key={i} className="skeleton-shimmer skeleton-grain" style={{ aspectRatio: "2 / 3", borderRadius: "var(--radius-poster)" }} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ExplorePage() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<ExploreSkeleton />}>
       <ExplorePageInner />
     </Suspense>
   );

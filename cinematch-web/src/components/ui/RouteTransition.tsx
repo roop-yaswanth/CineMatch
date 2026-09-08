@@ -1,14 +1,11 @@
 "use client";
 
 
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 export default function RouteTransition({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const searchStr = searchParams?.toString() ?? "";
-  const navKey = `${pathname}?${searchStr}`;
 
   const [progress, setProgress] = useState<number>(0);
   const tRef = useRef<number | null>(null);
@@ -40,7 +37,7 @@ export default function RouteTransition({ children }: { children: React.ReactNod
       clearTimeout(t2);
       clearTimeout(t3);
     };
-  }, [navKey]);
+  }, [pathname]);
 
   return (
     <>
@@ -88,7 +85,7 @@ export default function RouteTransition({ children }: { children: React.ReactNod
         pathname change without unmounting children, so we still get the
         soft hand-off without losing any client state.
       */}
-      <div ref={fadeRef} className="route-fade">
+      <div ref={fadeRef} className="route-fade app-shell-main">
         {children}
       </div>
 

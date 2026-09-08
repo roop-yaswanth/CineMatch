@@ -204,6 +204,8 @@ function WallLayer({
                 key={`${isDup ? "d" : ""}${i}`}
                 src={`${BASE}${path}`}
                 alt=""
+                width={130}
+                height={195}
                 loading="lazy"
                 decoding="async"
                 fetchPriority="low"
@@ -214,6 +216,7 @@ function WallLayer({
                   borderRadius: "12px",
                   objectFit: "cover",
                   backgroundColor: "#141420",
+                  aspectRatio: "130 / 195",
                 }}
               />
             ))}

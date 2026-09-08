@@ -2947,11 +2947,20 @@ a[role="button"]:active,
   z-index: 5;
 }
 
+/* Main application route container — ensures footer is always pushed below 100dvh */
+.app-shell-main {
+  flex: 1 0 auto;
+  width: 100%;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
 /* Skeleton hero block matching HeroCarousel dimensions */
 .dash-hero-skel {
   width: 100%;
-  height: min(68vh, 620px);
-  min-height: 440px;
+  height: clamp(460px, 58vh, 640px);
+  min-height: 420px;
 }
 
 .collection-grid {
