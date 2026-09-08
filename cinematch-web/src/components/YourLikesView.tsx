@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
 import { MovieCard } from "@/components/MovieCard";
 
 import dynamic from "next/dynamic";
@@ -534,7 +535,12 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "lov
           )}
 
           {!loading && filteredItems.length > 0 && (
-            <div className="likes-grid"
+            <motion.div
+              key={interactionFilter}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+              className="likes-grid"
               style={{
                 display: "grid",
                 gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
@@ -561,7 +567,7 @@ export default function YourLikesView({ sessionId, onClose, initialFilter = "lov
                   />
                 </div>
               ))}
-            </div>
+            </motion.div>
           )}
         </div>
       </div>

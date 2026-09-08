@@ -11,23 +11,36 @@
  * Session & Auth management is handled on the client via SessionContext.
  */
 
-const CACHE_VERSION = "26.9.8.1";
+const CACHE_VERSION = "26.9.8.2";
 const SHELL_CACHE = `cinematch-shell-${CACHE_VERSION}`;
 const IMAGE_CACHE = `cinematch-images-${CACHE_VERSION}`;
 const API_CACHE = `cinematch-api-${CACHE_VERSION}`;
 
+// Static shell assets — DO NOT include "/" as it is a dynamic redirect route that causes TypeError: Failed to fetch in cache.addAll
 const SHELL_ASSETS = [
-  "/",
   "/manifest.json",
   "/icon-192.png",
   "/icon-512.png",
   "/apple-touch-icon.png",
 ];
 
-// ── Install: pre-cache app shell ────────────────────────────────────────────
+// ── Install: pre-cache app shell safely ────────────────────────────────────────────
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(SHELL_CACHE).then((cache) => cache.addAll(SHELL_ASSETS))
+    caches.open(SHELL_CACHE).then(async (cache) => {
+      await Promise.allSettled(
+        SHELL_ASSETS.map(async (asset) => {
+          try {
+            const res = await fetch(asset);
+            if (res && res.ok && res.status === 200) {
+              await cache.put(asset, res);
+            }
+          } catch {
+            // Ignore asset fetch failures during install
+          }
+        })
+      );
+    })
   );
   self.skipWaiting();
 });
@@ -162,14 +175,10 @@ async function networkFirstNavigation(request, cacheName) {
     const cached = await cache.match(request);
     if (cached) return cached;
 
-    const fallback = await cache.match("/");
-    return (
-      fallback ||
-      new Response("Offline", {
-        status: 503,
-        headers: { "Content-Type": "text/html" },
-      })
-    );
+    return new Response("Offline", {
+      status: 503,
+      headers: { "Content-Type": "text/html" },
+    });
   }
 }
 
@@ -185,7 +194,6 @@ async function cacheFirstWithNetwork(request, cacheName) {
     }
     return response;
   } catch {
-    const fallback = await cache.match("/");
-    return fallback || new Response("Offline", { status: 503 });
+    return new Response("Offline", { status: 503 });
   }
 }

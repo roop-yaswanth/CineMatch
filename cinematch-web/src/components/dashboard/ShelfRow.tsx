@@ -123,6 +123,7 @@ function PosterCard({
   const previewImage = backdrop.src || poster;
   const imdb = movie.imdb_rating ? movie.imdb_rating.toFixed(1) : null;
   const [isHovered, setIsHovered] = useState(false);
+  const [imgLoaded, setImgLoaded] = useState(false);
   const [coords, setCoords] = useState<{ top: number; left: number; width: number } | null>(null);
   const hoverTimerRef = useRef<NodeJS.Timeout | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -232,7 +233,13 @@ function PosterCard({
             loading={priority ? "eager" : "lazy"}
             decoding="async"
             draggable={false}
+            onLoad={() => setImgLoaded(true)}
+            style={{
+              opacity: imgLoaded ? 1 : 0,
+              transition: "opacity 260ms ease, transform 320ms cubic-bezier(0.22, 1, 0.36, 1)",
+            }}
             onError={(e) => {
+              setImgLoaded(true);
               const target = e.currentTarget;
               if (!target.src.endsWith("/poster_placeholder.svg")) {
                 target.src = "/poster_placeholder.svg";

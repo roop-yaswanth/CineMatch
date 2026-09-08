@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useCallback, useRef } from "react";
+import { memo, useCallback, useRef, useState } from "react";
 import { motion, AnimatePresence, type Transition } from "framer-motion";
 import { usePoster } from "@/lib/usePoster";
 import { recommendationId, type Movie, type Recommendation, type ExploreMovie } from "@/lib/api";
@@ -50,7 +50,9 @@ const posterFrameStyle = (compact: boolean): React.CSSProperties => ({
   aspectRatio: "2 / 3",
   borderRadius: compact ? "14px" : "var(--radius-poster)",
   overflow: "hidden",
-  background: "var(--color-surface)",
+  background: "linear-gradient(110deg, rgba(255, 255, 255, 0.02) 20%, rgba(255, 255, 255, 0.07) 50%, rgba(255, 255, 255, 0.02) 80%)",
+  backgroundSize: "200% 100%",
+  animation: "shimmer 2s ease-in-out infinite",
   isolation: "isolate",
 });
 
@@ -104,6 +106,7 @@ export const MovieCard = memo(function MovieCard({
     : null;
   const tmdbRating = movie.vote_average ? movie.vote_average.toFixed(1) : null;
 
+  const [imgLoaded, setImgLoaded] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
   const handleHoverStart = useCallback(() => {
@@ -154,8 +157,14 @@ export const MovieCard = memo(function MovieCard({
         alt={movie.title}
         loading={priority ? "eager" : "lazy"}
         decoding="async"
-        style={imageStyle}
+        onLoad={() => setImgLoaded(true)}
+        style={{
+          ...imageStyle,
+          opacity: imgLoaded ? 1 : 0,
+          transition: "opacity 280ms ease, transform var(--dur-slow) var(--ease-spring)",
+        }}
         onError={(e) => {
+          setImgLoaded(true);
           const target = e.currentTarget;
           if (!target.src.endsWith("/poster_placeholder.svg")) {
             target.src = "/poster_placeholder.svg";

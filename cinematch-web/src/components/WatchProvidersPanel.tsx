@@ -69,24 +69,7 @@ function countryName(iso: string): string {
 
 
 
-function toJustWatchSlug(title: string): string {
-  return title
-    .toLowerCase()
-    // Normalize Unicode (ā → a, é → e, etc.)
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    // Remove characters that aren't letters, digits, or spaces
-    .replace(/[^a-z0-9\s-]/g, " ")
-    // Collapse whitespace/dashes into a single dash
-    .trim()
-    .replace(/[\s-]+/g, "-");
-}
 
-/** JustWatch country-path codes — same as ISO 3166-1 alpha-2 but lowercase. */
-function justWatchUrl(country: string, title: string): string {
-  const slug = toJustWatchSlug(title);
-  return `https://www.justwatch.com/${country.toLowerCase()}/movie/${slug}`;
-}
 
 /**
  * Shared search + scrollable country list — used by both the desktop popover
@@ -285,7 +268,7 @@ const panelCardStyle: React.CSSProperties = {
   WebkitBackdropFilter: "blur(18px) saturate(1.4)",
 };
 
-export default function WatchProvidersPanel({ tmdbId, defaultCountry, movieTitle }: Props) {
+export default function WatchProvidersPanel({ tmdbId, defaultCountry }: Props) {
   const cached = watchProvidersCache.get(tmdbId);
   const [data, setData] = useState<WatchProvidersResponse | null>(cached ?? null);
   const [loading, setLoading] = useState(!cached);
@@ -396,9 +379,6 @@ export default function WatchProvidersPanel({ tmdbId, defaultCountry, movieTitle
   }, [availableCountries, countryQuery]);
 
   const current: CountryProviders | undefined = data?.results?.[country];
-  // Build the JustWatch deep-link for the currently selected country.
-  // JustWatch auto-corrects slugs so near-misses (missing year, diacritics) still resolve.
-  const jwLink = movieTitle ? justWatchUrl(country, movieTitle) : current?.link;
 
   if (loading) {
     return (
@@ -417,43 +397,13 @@ export default function WatchProvidersPanel({ tmdbId, defaultCountry, movieTitle
   }
 
   if (error || !data || availableCountries.length === 0) {
-    // TMDB has no streaming data (e.g. in-theatres, unreleased, or API error).
-    // Still show a JustWatch link — JustWatch often has theatre/upcoming info.
-    const fallbackJwLink = movieTitle ? justWatchUrl(country, movieTitle) : null;
     return (
       <div style={panelCardStyle}>
-        <p style={{ margin: "0 0 10px", fontSize: "12px", color: "rgba(255,255,255,0.45)", lineHeight: 1.5 }}>
+        <p style={{ margin: 0, fontSize: "12px", color: "rgba(255,255,255,0.45)", lineHeight: 1.5 }}>
           {error
             ? "Couldn't load streaming info."
             : "No streaming data found — may be in theatres or unreleased."}
         </p>
-        {fallbackJwLink && (
-          <a
-            href={fallbackJwLink}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "6px",
-              fontSize: "12px",
-              fontWeight: 600,
-              color: "rgba(255,255,255,0.75)",
-              textDecoration: "none",
-              background: "rgba(255,255,255,0.07)",
-              border: "1px solid rgba(255,255,255,0.12)",
-              borderRadius: "8px",
-              padding: "8px 12px",
-            }}
-          >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-              <polyline points="15 3 21 3 21 9" />
-              <line x1="10" y1="14" x2="21" y2="3" />
-            </svg>
-            Check on JustWatch
-          </a>
-        )}
       </div>
     );
   }
@@ -538,39 +488,11 @@ export default function WatchProvidersPanel({ tmdbId, defaultCountry, movieTitle
       ) : (
         <div style={{ marginTop: "10px", fontSize: "12px", color: "rgba(255,255,255,0.45)" }}>
           Not listed for this country.
-          {jwLink && (
-            <>
-              {" "}
-              <a
-                href={jwLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ color: "rgba(255,255,255,0.65)", textDecoration: "underline", textUnderlineOffset: "2px" }}
-              >
-                Check on JustWatch ↗
-              </a>
-            </>
-          )}
         </div>
       )}
 
-      <div style={{ marginTop: "12px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
-        {jwLink ? (
-          <a
-            href={jwLink}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              fontSize: "11px",
-              color: "rgba(255,255,255,0.6)",
-              textDecoration: "underline",
-              textUnderlineOffset: "3px",
-            }}
-          >
-            View on JustWatch ↗
-          </a>
-        ) : <span />}
-        <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.35)" }}>via TMDB · JustWatch</span>
+      <div style={{ marginTop: "12px", display: "flex", justifyContent: "flex-end", alignItems: "center" }}>
+        <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.35)" }}>via TMDB</span>
       </div>
     </div>
   );

@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { motion, AnimatePresence, useMotionValue, useMotionValueEvent } from "framer-motion";
-import type { MotionValue } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import MovieCard from "@/components/MovieCard";
 import PreferencesModal from "@/components/PreferencesModal";
 import MobileMenu from "@/components/MobileMenu";
@@ -61,89 +60,6 @@ const LOADING_VARIANTS = [
   { emoji: "🎥", text: "Rolling the cameras..." },
 ];
 
-const SWIPE_CONFIGS = {
-  up: { label: "LOVE", emoji: "😍", isSkip: false, color: "#30d158", stampTop: "28px", stampLeft: "50%", stampRotate: "-8deg", stampTranslateX: "-50%" },
-  right: { label: "LIKE", emoji: "😀", isSkip: false, color: "#facc15", stampTop: "28px", stampLeft: "18px", stampRotate: "-22deg" },
-  left: { label: "DISLIKE", emoji: "🙁", isSkip: false, color: "#ef4444", stampTop: "28px", stampRight: "18px", stampRotate: "22deg" },
-  down: { label: "SKIP", emoji: "", isSkip: true, color: "#8e8e93", stampBottom: "90px", stampLeft: "50%", stampRotate: "8deg", stampTranslateX: "-50%" },
-} as const;
-
-type SwipeDir = keyof typeof SWIPE_CONFIGS;
-
-function SwipeGlowOverlay({ dragX, dragY }: { dragX: MotionValue<number>; dragY: MotionValue<number> }) {
-  const [state, setState] = useState<{ dir: SwipeDir; op: number } | null>(null);
-
-  const update = (x: number, y: number) => {
-    const ax = Math.abs(x), ay = Math.abs(y);
-    if (ax < 16 && ay < 16) { setState(null); return; }
-    const horizontal = ax >= ay;
-    const dir: SwipeDir = horizontal ? (x > 0 ? "right" : "left") : (y < 0 ? "up" : "down");
-    const raw = (horizontal ? ax : ay) - 16;
-    setState({ dir, op: Math.min(1, raw / 80) });
-  };
-
-  useMotionValueEvent(dragX, "change", (x) => update(x, dragY.get()));
-  useMotionValueEvent(dragY, "change", (y) => update(dragX.get(), y));
-
-  if (!state) return null;
-  const { dir, op } = state;
-  const cfg = SWIPE_CONFIGS[dir];
-  const hex = cfg.color;
-  const stOp = Math.min(1, op * 1.8);
-
-  return (
-    <>
-      <div style={{
-        position: "absolute", inset: 0, borderRadius: "var(--radius-poster)",
-        background: hex, opacity: op * 0.22,
-        pointerEvents: "none", zIndex: 10,
-      }} />
-
-      <div style={{
-        position: "absolute",
-        ...("stampTop" in cfg && { top: cfg.stampTop }),
-        ...("stampBottom" in cfg && { bottom: cfg.stampBottom }),
-        ...("stampLeft" in cfg && { left: cfg.stampLeft }),
-        ...("stampRight" in cfg && { right: cfg.stampRight }),
-        transform: [
-          `rotate(${cfg.stampRotate})`,
-          "stampTranslateX" in cfg ? `translateX(${cfg.stampTranslateX})` : "",
-        ].filter(Boolean).join(" "),
-        zIndex: 20, pointerEvents: "none", opacity: stOp,
-      }}>
-        <div style={{
-          padding: "5px 16px 6px",
-          border: `4px solid ${hex}`,
-          borderRadius: "6px",
-          color: hex,
-          fontSize: "24px",
-          fontWeight: 900,
-          letterSpacing: "0.14em",
-          lineHeight: 1.15,
-          background: "rgba(0,0,0,0.5)",
-          backdropFilter: "blur(4px)",
-          WebkitBackdropFilter: "blur(4px)",
-          userSelect: "none",
-          whiteSpace: "nowrap",
-          boxShadow: `inset 0 0 0 1px ${hex}44`,
-          display: "inline-flex",
-          alignItems: "center",
-          gap: "8px",
-        }}>
-          {cfg.emoji ? <span>{cfg.emoji}</span> : null}
-          {cfg.isSkip ? (
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-              <polygon points="5 4 15 12 5 20 5 4" fill="currentColor" />
-              <line x1="19" y1="5" x2="19" y2="19" />
-            </svg>
-          ) : null}
-          <span>{cfg.label}</span>
-        </div>
-      </div>
-    </>
-  );
-}
-
 
 interface Props {
   state: OnboardingState | null;
@@ -197,9 +113,7 @@ export default function OnboardingRatingStep({
   setBuildingSlate,
 }: Props) {
   const mounted = useMounted();
-  const dragX = useMotionValue(0);
-  const dragY = useMotionValue(0);
-  const [cardGlow, setCardGlow] = useState("none");
+  const [activeSwipeTarget, setActiveSwipeTarget] = useState<string | null>(null);
 
   useEffect(() => {
     const handleKeyboard = (e: KeyboardEvent) => {
@@ -219,6 +133,7 @@ export default function OnboardingRatingStep({
   }, [state?.movie, loading, handleRate, handleUndo]);
 
   const handleDragEnd = (_event: unknown, info: { offset: { x: number; y: number } }) => {
+    setActiveSwipeTarget(null);
     if (!state?.movie || loading) return;
     const offset = info.offset;
     const threshold = 40;
@@ -327,7 +242,7 @@ export default function OnboardingRatingStep({
           }}
         >
           <div style={{ position: "relative", width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <AnimatePresence initial={false} custom={lastSwipe} mode="wait">
+            <AnimatePresence initial={false} custom={lastSwipe} mode="popLayout">
               {(!optimisticRemoved && state?.movie) ? (
                 <motion.div
                   className="onboarding-card-shell"
@@ -344,27 +259,34 @@ export default function OnboardingRatingStep({
                     touchAction: "none",
                     position: "relative",
                     borderRadius: "var(--radius-poster)",
-                    boxShadow: cardGlow,
+                    boxShadow: "0 20px 48px -8px rgba(0, 0, 0, 0.7)",
+                    zIndex: 2,
                   }}
                   drag
                   dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
                   dragElastic={0.65}
                   onDrag={(_, info) => {
                     const x = info.offset.x, y = info.offset.y;
-                    dragX.set(x); dragY.set(y);
                     const ax = Math.abs(x), ay = Math.abs(y);
-                    if (ax < 16 && ay < 16) { setCardGlow("none"); return; }
-                    const op = Math.min(1, (Math.max(ax, ay) - 16) / 80);
-                    const c = ax >= ay
-                      ? (x > 0 ? "250,204,21" : "255,69,58")
-                      : (y < 0 ? "48,209,88" : "142,142,147");
-                    setCardGlow(`0 0 ${44 * op}px ${14 * op}px rgba(${c},${0.7 * op})`);
+                    const threshold = 28;
+                    if (ax < threshold && ay < threshold) {
+                      if (activeSwipeTarget !== null) setActiveSwipeTarget(null);
+                      return;
+                    }
+                    if (ax >= ay) {
+                      const target = x > 0 ? "like" : "dislike";
+                      if (activeSwipeTarget !== target) setActiveSwipeTarget(target);
+                    } else {
+                      const target = y < 0 ? "love" : "not_watched";
+                      if (activeSwipeTarget !== target) setActiveSwipeTarget(target);
+                    }
                   }}
-                  onDragEnd={(e, info) => { dragX.set(0); dragY.set(0); setCardGlow("none"); handleDragEnd(e, info); }}
-                  whileDrag={{ scale: 1.02, rotate: 1.5, cursor: "grabbing" }}
+                  onDragEnd={(e, info) => {
+                    setActiveSwipeTarget(null);
+                    handleDragEnd(e, info);
+                  }}
+                  whileDrag={{ scale: 1.02, rotate: 1.2, cursor: "grabbing" }}
                 >
-                  <SwipeGlowOverlay dragX={dragX} dragY={dragY} />
-
                   <MovieCard movie={state.movie} priority noLayout overlay />
 
                   {!hasInteracted && (
@@ -466,19 +388,47 @@ export default function OnboardingRatingStep({
                   )}
                 </motion.div>
               ) : (loading || optimisticRemoved) ? (
-                <motion.div key="loading" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} style={{ textAlign: "center", width: "100%", padding: "40px 0" }}>
-                  <div style={{ fontSize: "64px", animation: "bounce 1s infinite alternate" }}>
-                    {LOADING_VARIANTS[loadingVariantIdx].emoji}
+                <motion.div
+                  key="loading-card"
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{ duration: 0.22 }}
+                  style={{
+                    height: "100%",
+                    maxHeight: "100%",
+                    aspectRatio: "2 / 3",
+                    maxWidth: "min(76vw, 320px)",
+                    width: "100%",
+                    borderRadius: "var(--radius-poster)",
+                    background: "linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.03) 100%)",
+                    border: "1px solid rgba(255, 255, 255, 0.12)",
+                    boxShadow: "0 12px 36px rgba(0, 0, 0, 0.5)",
+                    position: "relative",
+                    overflow: "hidden",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: "24px",
+                    zIndex: 2,
+                  }}
+                >
+                  <div className="skeleton-shimmer" style={{ position: "absolute", inset: 0, opacity: 0.4 }} />
+                  <div style={{ position: "relative", zIndex: 1, textAlign: "center" }}>
+                    <div style={{ fontSize: "52px", animation: "bounce 1s infinite alternate" }}>
+                      {LOADING_VARIANTS[loadingVariantIdx].emoji}
+                    </div>
+                    <p style={{ marginTop: "14px", fontSize: "13px", color: "var(--color-text-primary)", fontWeight: 600, letterSpacing: "-0.01em" }}>
+                      {LOADING_VARIANTS[loadingVariantIdx].text}
+                    </p>
                   </div>
-                  <p style={{ marginTop: "16px", fontSize: "14px", color: "var(--color-text-primary)", fontWeight: 500 }}>
-                    {LOADING_VARIANTS[loadingVariantIdx].text}
-                  </p>
                   <style>{`
-                  @keyframes bounce {
-                    from { transform: translateY(0); }
-                    to { transform: translateY(-16px); }
-                  }
-                `}</style>
+                    @keyframes bounce {
+                      from { transform: translateY(0); }
+                      to { transform: translateY(-12px); }
+                    }
+                  `}</style>
                 </motion.div>
               ) : (
                 <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }}
@@ -500,61 +450,71 @@ export default function OnboardingRatingStep({
           {state?.movie && (
             <>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "8px" }}>
-                {RATING_OPTIONS.slice(0, 3).map((opt) => (
-                  <motion.button
-                    key={opt.value}
-                    whileTap={{ scale: 0.94 }}
-                    onClick={() => handleRate(opt.value)}
-                    disabled={loading}
-                    className={`rating-btn rating-btn--${opt.variant}`}
-                    style={{
-                      cursor: loading ? "not-allowed" : "pointer",
-                      opacity: loading ? 0.4 : 1,
-                      padding: "12px 8px",
-                      fontSize: "13px",
-                      fontWeight: 600,
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: "6px",
-                    }}
-                    title={`${opt.label} (${opt.shortcut})`}
-                  >
-                    <span style={{ fontSize: "18px" }}>{opt.emoji}</span>
-                    <span>{opt.label}</span>
-                  </motion.button>
-                ))}
+                {RATING_OPTIONS.slice(0, 3).map((opt) => {
+                  const isTargeted = activeSwipeTarget === opt.value;
+                  return (
+                    <motion.button
+                      key={opt.value}
+                      animate={{ scale: isTargeted ? 1.06 : 1 }}
+                      transition={{ type: "spring", stiffness: 450, damping: 25 }}
+                      whileTap={{ scale: 0.94 }}
+                      onClick={() => handleRate(opt.value)}
+                      disabled={loading}
+                      className={`rating-btn rating-btn--${opt.variant} ${isTargeted ? "is-swipe-active" : ""}`}
+                      style={{
+                        cursor: loading ? "not-allowed" : "pointer",
+                        opacity: loading ? 0.4 : 1,
+                        padding: "12px 8px",
+                        fontSize: "13px",
+                        fontWeight: 600,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "6px",
+                      }}
+                      title={`${opt.label} (${opt.shortcut})`}
+                    >
+                      <span style={{ fontSize: "18px" }}>{opt.emoji}</span>
+                      <span>{opt.label}</span>
+                    </motion.button>
+                  );
+                })}
               </div>
 
               <div style={{ marginTop: "8px" }}>
-                {RATING_OPTIONS.slice(3).map((opt) => (
-                  <motion.button
-                    key={opt.value}
-                    whileTap={{ scale: 0.94 }}
-                    onClick={() => handleRate(opt.value)}
-                    disabled={loading}
-                    className={`rating-btn rating-btn--${opt.variant}`}
-                    style={{
-                      width: "100%",
-                      cursor: loading ? "not-allowed" : "pointer",
-                      opacity: loading ? 0.4 : 1,
-                      padding: "11px 8px",
-                      fontSize: "13px",
-                      fontWeight: 500,
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: "7px",
-                    }}
-                    title={`${opt.label} (${opt.shortcut})`}
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                      <polygon points="5 4 15 12 5 20 5 4" fill="currentColor" />
-                      <line x1="19" y1="5" x2="19" y2="19" />
-                    </svg>
-                    <span>{opt.label}</span>
-                  </motion.button>
-                ))}
+                {RATING_OPTIONS.slice(3).map((opt) => {
+                  const isTargeted = activeSwipeTarget === opt.value;
+                  return (
+                    <motion.button
+                      key={opt.value}
+                      animate={{ scale: isTargeted ? 1.04 : 1 }}
+                      transition={{ type: "spring", stiffness: 450, damping: 25 }}
+                      whileTap={{ scale: 0.94 }}
+                      onClick={() => handleRate(opt.value)}
+                      disabled={loading}
+                      className={`rating-btn rating-btn--${opt.variant} ${isTargeted ? "is-swipe-active" : ""}`}
+                      style={{
+                        width: "100%",
+                        cursor: loading ? "not-allowed" : "pointer",
+                        opacity: loading ? 0.4 : 1,
+                        padding: "11px 8px",
+                        fontSize: "13px",
+                        fontWeight: 500,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "7px",
+                      }}
+                      title={`${opt.label} (${opt.shortcut})`}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                        <polygon points="5 4 15 12 5 20 5 4" fill="currentColor" />
+                        <line x1="19" y1="5" x2="19" y2="19" />
+                      </svg>
+                      <span>{opt.label}</span>
+                    </motion.button>
+                  );
+                })}
               </div>
 
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "10px", gap: "8px", minHeight: "28px" }}>
