@@ -275,6 +275,8 @@ export interface MultiBucketResponse {
   total_pool_size: number;
   status: string;
   errors?: Record<string, string> | null;
+  from_durable_cache?: boolean;
+  needs_revalidation?: boolean;
 }
 
 
@@ -557,20 +559,20 @@ export async function apiMultiRecommendations(
     per_bucket_k?: number;
     exclude_ids?: number[];
   },
-  { revalidate = false }: { revalidate?: boolean } = {}
+  { revalidate = false, force = false }: { revalidate?: boolean; force?: boolean } = {}
 ): Promise<MultiBucketResponse> {
   const cacheKey = typeof sessionStorage !== "undefined"
     ? _multiRecsKey(sessionId, preferences)
     : "";
 
   // ── Stale-while-revalidate: return cached immediately if fresh enough ──
-  if (!revalidate && cacheKey) {
+  if (!revalidate && !force && cacheKey) {
     const cached = _multiRecsCacheRead(cacheKey);
     if (cached) {
       // Kick off background revalidation without blocking the caller.
       void request<MultiBucketResponse>("/api/recommendations/multi", {
         method: "POST",
-        body: JSON.stringify({ session_id: sessionId ?? "", ...preferences }),
+        body: JSON.stringify({ session_id: sessionId ?? "", ...preferences, force_refresh: false }),
         retries: 2,
         // see apiBuildSlate — must outlive the proxy timeout.
         timeout: 30000,
@@ -583,7 +585,7 @@ export async function apiMultiRecommendations(
 
   const result = await request<MultiBucketResponse>("/api/recommendations/multi", {
     method: "POST",
-    body: JSON.stringify({ session_id: sessionId ?? "", ...preferences }),
+    body: JSON.stringify({ session_id: sessionId ?? "", ...preferences, force_refresh: force }),
     retries: 2,
     // see apiBuildSlate — must outlive the proxy timeout.
     timeout: 30000,

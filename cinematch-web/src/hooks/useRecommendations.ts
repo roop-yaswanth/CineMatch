@@ -311,7 +311,10 @@ export function useRecommendations(
   const silentRefreshInFlight = useRef(false);
   const silentRefreshToken = useRef(0);
 
-  const silentRefresh = useCallback(async (prefs: RecommendationPreferences) => {
+  const silentRefresh = useCallback(async (
+    prefs: RecommendationPreferences,
+    { force = false }: { force?: boolean } = {}
+  ) => {
     if (silentRefreshInFlight.current) return;
     silentRefreshInFlight.current = true;
     silentRefreshToken.current += 1;
@@ -326,7 +329,7 @@ export function useRecommendations(
         include_classics: prefs.include_classics,
         semantic_index: prefs.semantic_index,
         per_bucket_k: bucketFetchK(prefs),
-      });
+      }, { force });
 
       if (myToken !== silentRefreshToken.current) return;
 
@@ -359,12 +362,27 @@ export function useRecommendations(
     }
   }, [applyBucketResponse, onLogout, onSessionUpdate, session.session_id]);
 
+  const revalTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (revalTimerRef.current) {
+        clearTimeout(revalTimerRef.current);
+        revalTimerRef.current = null;
+      }
+    };
+  }, []);
+
   const generateTokenRef = useRef(0);
   const generate = useCallback(
     async (
       nextPreferences: RecommendationPreferences = preferences,
       { autoRerun = false }: { autoRerun?: boolean } = {}
     ) => {
+      if (revalTimerRef.current) {
+        clearTimeout(revalTimerRef.current);
+        revalTimerRef.current = null;
+      }
       const myToken = ++generateTokenRef.current;
       if (autoRerun) {
         setIsUpdating(true);
@@ -447,6 +465,11 @@ export function useRecommendations(
         } else {
           applyBucketResponse(resp, nextPreferences);
           if (resp.session) onSessionUpdate(resp.session);
+          if (resp.needs_revalidation) {
+            revalTimerRef.current = setTimeout(() => {
+              void silentRefresh(nextPreferences, { force: true });
+            }, 1500);
+          }
         }
       } catch (err) {
         if (isSessionExpiredError(err)) {
@@ -486,6 +509,7 @@ export function useRecommendations(
       preferences,
       session.session_id,
       session.user_id,
+      silentRefresh,
     ]
   );
 

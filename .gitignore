@@ -44,23 +44,18 @@ next-env.d.ts
 AGENTS.md
 CLAUDE.md
 .claude/
+/.agents/
 
 # env files
 .env*
 
-/Data/
-/Test/
-/models/
+
 /RecBole-GNN/
-/.agents/
 
-
-
-
-#temp
-/Cinematchapi/
+/Data/
+/models/
 /cinematchproapi/
-minimal *
-report.tex
 /admin_cleanup/
-issues.md
+/other/
+/research/
+*.tex

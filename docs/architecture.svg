@@ -1,0 +1,301 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1210" width="1000" height="1210">
+  <defs>
+    <marker id="arr" viewBox="0 0 8 8" refX="5" refY="4" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 1 L 6 4 L 0 7 z" fill="#000000"/>
+    </marker>
+  </defs>
+
+  <style>
+    text { font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif; }
+    .title { font-size: 14px; font-weight: 700; fill: #000000; text-anchor: middle; }
+    .sub { font-size: 11px; font-weight: 500; fill: #333333; text-anchor: middle; }
+    .sub-left { font-size: 11px; font-weight: 500; fill: #333333; text-anchor: start; }
+    .code { font-family: "SF Mono", Monaco, Consolas, "Courier New", monospace; font-size: 11px; font-weight: 600; fill: #000000; text-anchor: middle; }
+    .code-left { font-family: "SF Mono", Monaco, Consolas, "Courier New", monospace; font-size: 10.5px; font-weight: 600; fill: #000000; text-anchor: start; }
+    .layer-lbl { font-size: 11px; font-weight: 800; fill: #444444; letter-spacing: 0.8px; text-anchor: start; }
+    .signal { font-family: "Times New Roman", Times, "Nimbus Roman No9 L", Georgia, serif; font-size: 12px; font-weight: 600; fill: #000000; text-anchor: middle; }
+    .math { font-family: "Times New Roman", Times, "Cambria Math", "Nimbus Roman No9 L", Georgia, serif; font-size: 12px; fill: #000000; text-anchor: middle; }
+    .math-left { font-family: "Times New Roman", Times, "Cambria Math", "Nimbus Roman No9 L", Georgia, serif; font-size: 11px; fill: #000000; text-anchor: start; }
+    .math-var { font-style: italic; }
+    .math-sub { baseline-shift: sub; font-size: 78%; font-style: normal; }
+    .math-sub-it { baseline-shift: sub; font-size: 78%; font-style: italic; }
+  </style>
+
+  <!-- Clean White Canvas -->
+  <rect width="1000" height="1210" fill="#FFFFFF"/>
+
+  <!-- Outer Frame -->
+  <rect x="15" y="15" width="970" height="1180" fill="none" stroke="#000000" stroke-width="1.5"/>
+
+  <!-- ================================================================= -->
+  <!-- LAYER 1: DATA FOUNDATION -->
+  <!-- ================================================================= -->
+  <g transform="translate(40, 32)">
+    <text x="0" y="0" class="layer-lbl">LAYER 1: DATA FOUNDATION</text>
+    
+    <!-- TMDB + IMDb -->
+    <rect x="0" y="10" width="440" height="60" rx="3" fill="#FFFFFF" stroke="#000000" stroke-width="1.2"/>
+    <text x="220" y="34" class="title">TMDB + IMDb Catalog</text>
+    <text x="220" y="52" class="sub">1.37M Movies • Filtered via ~738K IMDb Ratings</text>
+
+    <!-- MovieLens -->
+    <rect x="480" y="10" width="440" height="60" rx="3" fill="#FFFFFF" stroke="#000000" stroke-width="1.2"/>
+    <text x="700" y="34" class="title">MovieLens-32M Benchmark</text>
+    <text x="700" y="52" class="sub">32M User-Item Interactions (Ground Truth)</text>
+  </g>
+
+  <!-- Connectors L1 -> L2 (with fill="none") -->
+  <path d="M 160 102 L 160 148" fill="none" stroke="#000000" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#arr)"/>
+  <path d="M 380 102 L 380 148" fill="none" stroke="#000000" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#arr)"/>
+  <path d="M 640 102 L 640 148" fill="none" stroke="#000000" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#arr)"/>
+  <path d="M 840 102 L 840 148" fill="none" stroke="#000000" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#arr)"/>
+
+  <!-- ================================================================= -->
+  <!-- LAYER 2: THREE-PATH RETRIEVAL & ADAPTIVE ROUTING -->
+  <!-- ================================================================= -->
+  <g transform="translate(40, 150)">
+    <rect x="0" y="0" width="920" height="425" rx="4" fill="#FAFAFA" stroke="#CCCCCC" stroke-width="1"/>
+    <text x="20" y="20" class="layer-lbl">LAYER 2: THREE-PATH RETRIEVAL &amp; ADAPTIVE ROUTING</text>
+
+    <!-- Path A: Semantic -->
+    <g transform="translate(20, 32)">
+      <rect x="0" y="0" width="200" height="26" fill="#EEEEEE" stroke="#000000" stroke-width="1"/>
+      <text x="100" y="17" class="title" font-size="12px">PATH A: SEMANTIC</text>
+
+      <!-- BGE-M3 -->
+      <rect x="0" y="36" width="200" height="66" rx="3" fill="#FFFFFF" stroke="#000000" stroke-width="1.2"/>
+      <text x="100" y="60" class="title" font-size="13px">BGE-M3 Encoder</text>
+      <text x="100" y="78" class="sub">1024-d, L2-normalized</text>
+      <text x="100" y="92" class="sub" font-size="10px">(Qwen3 index dev-only)</text>
+
+      <path d="M 100 102 L 100 126" fill="none" stroke="#000000" stroke-width="1.2" marker-end="url(#arr)"/>
+
+      <!-- RRF Query -->
+      <rect x="0" y="126" width="200" height="66" rx="3" fill="#FFFFFF" stroke="#000000" stroke-width="1.2"/>
+      <text x="100" y="150" class="title" font-size="13px">RRF Query Assembly</text>
+      <text x="100" y="168" class="sub">Stored Liked Vectors</text>
+      <text x="100" y="182" class="sub" font-size="10px">≤24 likes, β=0.45, K=60</text>
+
+      <path d="M 100 192 L 100 216" fill="none" stroke="#000000" stroke-width="1.2" marker-end="url(#arr)"/>
+
+      <!-- FAISS -->
+      <rect x="0" y="216" width="200" height="68" rx="3" fill="#FFFFFF" stroke="#000000" stroke-width="1.2"/>
+      <text x="100" y="240" class="title" font-size="13px">FAISS IndexIDMap2</text>
+      <text x="100" y="258" class="sub">Exact FlatIP Search</text>
+      <text x="100" y="274" class="math"><tspan class="math-var">s</tspan><tspan class="math-sub">sem</tspan> ∈ [0, 1]</text>
+    </g>
+
+    <!-- Center: Router -->
+    <g transform="translate(245, 32)">
+      <rect x="0" y="0" width="230" height="26" fill="#EEEEEE" stroke="#000000" stroke-width="1"/>
+      <text x="115" y="17" class="title" font-size="12px">DYNAMIC ROUTING</text>
+
+      <!-- User State -->
+      <rect x="15" y="36" width="200" height="66" rx="33" fill="#FFFFFF" stroke="#000000" stroke-width="1.5"/>
+      <text x="115" y="61" class="title" font-size="13px">User State</text>
+      <text x="115" y="79" class="sub">Warmth × Lang × Genre</text>
+      <text x="115" y="92" class="sub" font-size="10px">(Active Session Picks)</text>
+
+      <path d="M 115 102 L 115 126" fill="none" stroke="#000000" stroke-width="1.2" marker-end="url(#arr)"/>
+
+      <!-- Adaptive Router -->
+      <rect x="0" y="126" width="230" height="158" rx="3" fill="#FFFFFF" stroke="#000000" stroke-width="1.5"/>
+      <text x="115" y="148" class="title" font-size="13px">Adaptive Fusion Router</text>
+      <text x="115" y="164" class="sub" font-size="11px">[Rule-based; No trained MLP]</text>
+      
+      <line x1="15" y1="174" x2="215" y2="174" stroke="#DDDDDD" stroke-width="1"/>
+
+      <text x="18" y="191" class="sub-left" font-weight="700" font-size="11px">Outputs 5-Tuple Weights:</text>
+      <text x="18" y="207" class="math-left"><tspan font-weight="bold">w</tspan> = (<tspan class="math-var">w</tspan><tspan class="math-sub">sem</tspan>, <tspan class="math-var">w</tspan><tspan class="math-sub">CF</tspan>, <tspan class="math-var">w</tspan><tspan class="math-sub">qual</tspan>, <tspan class="math-var">w</tspan><tspan class="math-sub">lang</tspan>, <tspan class="math-var">w</tspan><tspan class="math-sub">genre</tspan>)</text>
+
+      <line x1="15" y1="216" x2="215" y2="216" stroke="#DDDDDD" stroke-width="1"/>
+
+      <text x="18" y="233" class="sub-left" font-size="10.5px">• Warm: (0.14, 0.48, 0.13, 0.11, 0.07)</text>
+      <text x="18" y="250" class="sub-left" font-size="10.5px">• Cold: (0.34, 0.23, 0.22, 0.09, 0.05)</text>
+      <text x="18" y="267" class="sub-left" font-size="10.5px">• Regional stack: <tspan class="math-var" font-family="serif">w</tspan><tspan class="math-sub" font-family="serif">lang</tspan> boosted</text>
+    </g>
+
+    <!-- Path B: Collaborative -->
+    <g transform="translate(500, 32)">
+      <rect x="0" y="0" width="190" height="26" fill="#EEEEEE" stroke="#000000" stroke-width="1"/>
+      <text x="95" y="17" class="title" font-size="12px">PATH B: GRAPH CF</text>
+
+      <!-- XSimGCL -->
+      <rect x="0" y="36" width="190" height="90" rx="3" fill="#FFFFFF" stroke="#000000" stroke-width="1.2"/>
+      <text x="95" y="60" class="title" font-size="13px">XSimGCL GNN</text>
+      <text x="95" y="78" class="sub">512-d Item Vectors</text>
+      <text x="95" y="96" class="sub" font-size="10px">Uniform Noise CL</text>
+      <text x="95" y="112" class="sub" font-size="10px">Rescues Long-Tail Items</text>
+
+      <path d="M 95 126 L 95 150" fill="none" stroke="#000000" stroke-width="1.2" marker-end="url(#arr)"/>
+
+      <!-- Dot Product -->
+      <rect x="0" y="150" width="190" height="134" rx="3" fill="#FFFFFF" stroke="#000000" stroke-width="1.2"/>
+      <text x="95" y="176" class="title" font-size="13px">Dot Product</text>
+      <text x="95" y="198" class="math">Inner Product: <tspan class="math-var">u</tspan><tspan class="math-sub-it">i</tspan> · <tspan class="math-var">v</tspan><tspan class="math-sub-it">j</tspan></text>
+      <text x="95" y="222" class="sub">BPR + InfoNCE Loss</text>
+      <text x="95" y="248" class="math"><tspan class="math-var">s</tspan><tspan class="math-sub">cf</tspan> ∈ [0, 1]</text>
+    </g>
+
+    <!-- Path C: Co-occurrence -->
+    <g transform="translate(710, 32)">
+      <rect x="0" y="0" width="190" height="26" fill="#EEEEEE" stroke="#000000" stroke-width="1"/>
+      <text x="95" y="17" class="title" font-size="12px">PATH C: CO-OCCUR</text>
+
+      <!-- Co-occurrence PPR -->
+      <rect x="0" y="36" width="190" height="248" rx="3" fill="#FFFFFF" stroke="#000000" stroke-width="1.2"/>
+      <text x="95" y="64" class="title" font-size="13px">Item Co-occurrence</text>
+      <text x="95" y="84" class="sub">PPR Graph Walk</text>
+      
+      <line x1="15" y1="98" x2="175" y2="98" stroke="#DDDDDD" stroke-width="1"/>
+      
+      <text x="95" y="122" class="sub">Like-Only Pairs</text>
+      <text x="95" y="142" class="sub">Support ≥ 3</text>
+      <text x="95" y="162" class="sub">Top-50 per Item</text>
+      
+      <line x1="15" y1="182" x2="175" y2="182" stroke="#DDDDDD" stroke-width="1"/>
+
+      <text x="95" y="210" class="sub" font-size="11px">Personalized PageRank</text>
+      <text x="95" y="228" class="sub" font-size="11px">at Request Time</text>
+      <text x="95" y="254" class="math">Fixed wt <tspan class="math-var">w</tspan><tspan class="math-sub">cooc</tspan> = 0.05</text>
+    </g>
+
+    <!-- Signals emitted to Layer 3 (straight down, fill="none", clean badges) -->
+    <!-- Signal A: s_sem -->
+    <path d="M 120 316 L 120 395" fill="none" stroke="#000000" stroke-width="1.4" marker-end="url(#arr)"/>
+    <rect x="85" y="338" width="70" height="22" rx="3" fill="#FFFFFF" stroke="#000000" stroke-width="1"/>
+    <text x="120" y="353" class="signal"><tspan class="math-var">s</tspan><tspan class="math-sub">sem</tspan></text>
+
+    <!-- Signal Router: w -->
+    <path d="M 360 316 L 360 395" fill="none" stroke="#000000" stroke-width="1.4" marker-end="url(#arr)"/>
+    <rect x="330" y="338" width="60" height="22" rx="3" fill="#FFFFFF" stroke="#000000" stroke-width="1"/>
+    <text x="360" y="353" class="signal"><tspan font-weight="bold">w</tspan></text>
+
+    <!-- Signal B: s_cf -->
+    <path d="M 595 316 L 595 395" fill="none" stroke="#000000" stroke-width="1.4" marker-end="url(#arr)"/>
+    <rect x="565" y="338" width="60" height="22" rx="3" fill="#FFFFFF" stroke="#000000" stroke-width="1"/>
+    <text x="595" y="353" class="signal"><tspan class="math-var">s</tspan><tspan class="math-sub">cf</tspan></text>
+
+    <!-- Signal C: cooc -->
+    <path d="M 805 316 L 805 395" fill="none" stroke="#000000" stroke-width="1.4" marker-end="url(#arr)"/>
+    <rect x="765" y="338" width="80" height="22" rx="3" fill="#FFFFFF" stroke="#000000" stroke-width="1"/>
+    <text x="805" y="353" class="signal"><tspan class="math-var">s</tspan><tspan class="math-sub">cooc</tspan></text>
+  </g>
+
+  <!-- Connectors L2 -> L3 (Center feeder) -->
+  <path d="M 500 575 L 500 600" fill="none" stroke="#000000" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- ================================================================= -->
+  <!-- LAYER 3: SCORE FUSION ENGINE -->
+  <!-- ================================================================= -->
+  <g transform="translate(40, 608)">
+    <text x="0" y="0" class="layer-lbl">LAYER 3: SCORE FUSION ENGINE</text>
+    
+    <rect x="0" y="10" width="920" height="96" rx="4" fill="#FFFFFF" stroke="#000000" stroke-width="1.8"/>
+    <text x="460" y="36" class="title" font-size="14px">Late-Fusion Linear Aggregation</text>
+    
+    <rect x="25" y="46" width="870" height="34" rx="3" fill="#F5F5F5" stroke="#000000" stroke-width="0.8"/>
+    <text x="460" y="68" class="math" font-size="13.5px">
+      <tspan font-weight="bold" font-style="normal">Final</tspan> = <tspan class="math-var">w</tspan><tspan class="math-sub">sem</tspan> · <tspan class="math-var">s</tspan><tspan class="math-sub">sem</tspan> + <tspan class="math-var">w</tspan><tspan class="math-sub">CF</tspan> · <tspan class="math-var">s</tspan><tspan class="math-sub">cf</tspan> + <tspan class="math-var">w</tspan><tspan class="math-sub">qual</tspan> · <tspan class="math-var">s</tspan><tspan class="math-sub">qual</tspan> + <tspan class="math-var">w</tspan><tspan class="math-sub">lang</tspan> · <tspan class="math-var">s</tspan><tspan class="math-sub">lang</tspan> + <tspan class="math-var">w</tspan><tspan class="math-sub">genre</tspan> · <tspan class="math-var">s</tspan><tspan class="math-sub">genre</tspan>
+    </text>
+    
+    <text x="460" y="95" class="sub" font-size="10.5px">
+      Linear aggregation of independently min–max normalized scores (never softmax).
+    </text>
+  </g>
+
+  <!-- Connectors L3 -> L4 -->
+  <path d="M 500 714 L 500 742" fill="none" stroke="#000000" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- ================================================================= -->
+  <!-- LAYER 4: POST-PROCESSING & RERANKING -->
+  <!-- ================================================================= -->
+  <g transform="translate(40, 750)">
+    <text x="0" y="0" class="layer-lbl">LAYER 4: POST-PROCESSING &amp; RERANKING CASCADE</text>
+
+    <!-- Container -->
+    <rect x="0" y="10" width="920" height="185" rx="4" fill="#FAFAFA" stroke="#CCCCCC" stroke-width="1"/>
+
+    <!-- Left: Bayesian Quality Cascade -->
+    <g transform="translate(20, 25)">
+      <rect x="0" y="0" width="425" height="155" rx="3" fill="#FFFFFF" stroke="#000000" stroke-width="1.2"/>
+      <text x="212" y="26" class="title">Bayesian Quality Cascade</text>
+      <text x="212" y="44" class="sub">(IMDb-Only Rating Policy)</text>
+      
+      <line x1="20" y1="54" x2="405" y2="54" stroke="#DDDDDD" stroke-width="1"/>
+
+      <text x="25" y="74" class="sub-left">1. Language Priors: Regional Bayesian shrinkage</text>
+      <text x="25" y="94" class="sub-left">2. Confidence Gate: Bayes-score threshold (drops noise)</text>
+      <text x="25" y="114" class="sub-left">3. Vote-Mass Fallback: Floor exemption for ≥10k votes</text>
+      
+      <line x1="20" y1="124" x2="405" y2="124" stroke="#DDDDDD" stroke-width="1"/>
+      <text x="212" y="142" class="math" font-size="11.5px">+ genre-dominance fit (+0.35 / +0.25 / +0.05 / −0.20 / −0.10)</text>
+    </g>
+
+    <!-- Arrow L4 left to right -->
+    <path d="M 452 102 L 478 102" fill="none" stroke="#000000" stroke-width="1.4" marker-end="url(#arr)"/>
+
+    <!-- Right: DPP Diversity -->
+    <g transform="translate(485, 25)">
+      <rect x="0" y="0" width="415" height="155" rx="3" fill="#FFFFFF" stroke="#000000" stroke-width="1.2"/>
+      <text x="207" y="26" class="title">Categorical DPP Diversity Rerank</text>
+      <text x="207" y="44" class="sub">Determinantal Point Process</text>
+      
+      <line x1="20" y1="54" x2="395" y2="54" stroke="#DDDDDD" stroke-width="1"/>
+
+      <text x="25" y="74" class="sub-left">• Kernel Matrix: <tspan class="math-var" font-family="serif">L</tspan><tspan class="math-sub-it" font-family="serif">ij</tspan> = <tspan class="math-var" font-family="serif">q</tspan><tspan class="math-sub-it" font-family="serif">i</tspan> · <tspan class="math-var" font-family="serif">S</tspan><tspan class="math-sub-it" font-family="serif">ij</tspan> · <tspan class="math-var" font-family="serif">q</tspan><tspan class="math-sub-it" font-family="serif">j</tspan></text>
+      <text x="25" y="94" class="sub-left">• Similarity <tspan class="math-var" font-family="serif">S</tspan>: Genre + Language one-hots (0.6 / 0.4)</text>
+      <text x="25" y="114" class="sub-left">• Inference: Greedy MAP via Cholesky decomposition</text>
+      
+      <line x1="20" y1="124" x2="395" y2="124" stroke="#DDDDDD" stroke-width="1"/>
+      <text x="207" y="142" class="code" font-size="11px">Selects Top-90 Diverse Slate from Top-200</text>
+    </g>
+  </g>
+
+  <!-- Connectors L4 -> L5 -->
+  <path d="M 500 945 L 500 975" fill="none" stroke="#000000" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- ================================================================= -->
+  <!-- LAYER 5: SERVING & PRESENTATION -->
+  <!-- ================================================================= -->
+  <g transform="translate(40, 982)">
+    <text x="0" y="0" class="layer-lbl">LAYER 5: SERVING &amp; PRESENTATION LAYER</text>
+
+    <rect x="0" y="10" width="920" height="110" rx="4" fill="#FFFFFF" stroke="#000000" stroke-width="1.5"/>
+    <text x="460" y="36" class="title" font-size="15px">Next.js Web UI &amp; Real-Time Serving Platform</text>
+    <line x1="30" y1="46" x2="890" y2="46" stroke="#DDDDDD" stroke-width="1"/>
+
+    <g transform="translate(30, 58)">
+      <rect x="0" y="0" width="200" height="48" fill="#F8F9FA" stroke="#000000" stroke-width="0.8"/>
+      <text x="100" y="22" class="title" font-size="11.5px">Hit-Led Stacks</text>
+      <text x="100" y="38" class="sub" font-size="10px">15 certified hits lead stack</text>
+
+      <rect x="220" y="0" width="200" height="48" fill="#F8F9FA" stroke="#000000" stroke-width="0.8"/>
+      <text x="320" y="22" class="title" font-size="11.5px">Swipe Onboarding</text>
+      <text x="320" y="38" class="sub" font-size="10px">24-card centroid bootstrap</text>
+
+      <rect x="440" y="0" width="200" height="48" fill="#F8F9FA" stroke="#000000" stroke-width="0.8"/>
+      <text x="540" y="22" class="title" font-size="11.5px">Disjoint Shelves</text>
+      <text x="540" y="38" class="sub" font-size="10px">8–14 rails, zero duplicates</text>
+
+      <rect x="660" y="0" width="200" height="48" fill="#F8F9FA" stroke="#000000" stroke-width="0.8"/>
+      <text x="760" y="22" class="title" font-size="11.5px">Hardened Gateway</text>
+      <text x="760" y="38" class="sub" font-size="10px">FastAPI def, sub-50ms SLA</text>
+    </g>
+  </g>
+
+  <!-- ================================================================= -->
+  <!-- CAPTION -->
+  <!-- ================================================================= -->
+  <g transform="translate(40, 1125)">
+    <line x1="0" y1="0" x2="920" y2="0" stroke="#000000" stroke-width="1"/>
+    <text x="460" y="24" class="title" font-size="12px">
+      Fig. 1. End-to-end CineMatch inference pipeline architecture.
+    </text>
+    <text x="460" y="42" class="sub" font-size="11px">
+      Three-path candidate generation (Path A, B, C) with rule-based adaptive routing, 5-signal linear fusion, and downstream reranking.
+    </text>
+  </g>
+
+</svg>
